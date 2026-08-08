@@ -32,6 +32,7 @@ SOURCE_LABEL = "DLE /mnt/renz"
 
 TYPE_TO_CATEGORY = {
     ".pdf": "19-认证合同-PDF",
+    ".doc": "19-认证合同-DOC",
     ".docx": "19-认证合同-DOCX",
     ".xlsx": "21-企业资料-XLSX",
     ".xls": "21-企业资料-XLS",
@@ -83,10 +84,21 @@ def scan_files(limit: int) -> list:
         if "客户" in rel: return 2
         if "程序" in rel or "手册" in rel: return 3
         return 4
-    all_files.sort(key=lambda x: (priority(str(x[0].relative_to(DLE_ROOT))), x[1]))
+    extension_rank = {
+        ".txt": 0,
+        ".md": 1,
+        ".docx": 2,
+        ".xlsx": 3,
+        ".xls": 4,
+        ".doc": 5,
+        ".pdf": 6
+    }
+    all_files.sort(key=lambda x: (
+        extension_rank.get(x[0].suffix.lower(), 99),
+        priority(str(x[0].relative_to(DLE_ROOT))),
+        x[1]
+    ))
 
-    # limit 表示目标成功数。为容纳空文件和解析失败，最多准备 20 倍候选。
-    candidate_limit = max(limit, limit * 20)
     new_files = []
     for f, sz in all_files:
         rel = str(f.relative_to(DLE_ROOT)).replace("/", "_")[:80]
@@ -95,8 +107,6 @@ def scan_files(limit: int) -> list:
         if doc_code in existing:
             continue
         new_files.append(f)
-        if len(new_files) >= candidate_limit:
-            break
     return new_files
 
 
