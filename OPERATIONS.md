@@ -1,181 +1,102 @@
-# AI 数字化咨询中心 · 运行手册
+# AI数字化咨询中心运行手册
 
-部署时间：2026-07-30
-部署主机：本机 103.117.123.100
+更新日期：2026-08-08
 部署路径：`/opt/ai-consulting-center`
-入口端口：**3001**（绑定所有接口，Token 鉴权）
-守护进程：systemd `ai-consulting-center.service`
+正式试用入口：`http://10.168.1.105:8080/ai/`
+应用服务：`ai-consulting-center.service`（systemd user unit）
 
----
+## 1. 用户操作
 
-## 0. 访问入口（两种方式）
+1. 浏览器打开正式试用入口并登录。
+2. 管理员可维护本企业用户、客户、知识、审核任务和成果状态。
+3. 普通用户可发起咨询、生成报价、分析文档、查看本企业资料和提交知识纠正。
+4. 咨询成果可导出原生 DOCX/PPTX；认证报价可导出 DOCX。
+5. 对外发送前由管理员完成人工审核。AI 输出不得替代认证专业判断。
 
-| 入口 | URL | 备注 |
-|---|---|---|
-| **公网 / 主站反代**（推荐）| `http://103.117.123.100:8080/ai/` | 经 Apache 转发，自动 `WEB_ORIGIN` 同源，无 CORS 问题 |
-| 直接访问（调试用）| `http://10.168.1.105:3001/` 或 `http://127.0.0.1:3001/` | LAN/本机；浏览器可裸访问，API 也走 `/api` |
+系统不提供公开默认密码。管理员创建或重置用户后，应通过安全渠道传递临时密码；用户登录后立即修改。
 
-> 端口对照：本机 **3000** Hermes / **3001** AI 中心 / **8080** Apache+主站 / **8889** FastAPI
-> 浏览器**记得带尾斜杠**：`/ai/` ✅，裸 `/ai` 会 404（Apache 路由规则限定）。
-
-## 1. 日常操作
-
-### 查看状态
-```bash
-sudo systemctl status ai-consulting-center.service
-sudo journalctl -u ai-consulting-center -n 50 --no-pager
-```
-
-### 重启 / 停止 / 启动
-```bash
-sudo systemctl restart ai-consulting-center.service   # 重启（应用配置/代码改动）
-sudo systemctl stop ai-consulting-center.service      # 停
-sudo systemctl start ai-consulting-center.service     # 开
-```
-
-### 健康检查（无需 Token）
-```bash
-curl http://127.0.0.1:3001/health
-```
-
-### 调 API（需 Token）
-```bash
-TOKEN=$(grep '^API_TOKEN=' /opt/ai-consulting-center/.env | cut -d= -f2)
-
-# 直接访问（3001）
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3001/api/employees
-
-# 经 Apache 反代（8080/ai）
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/ai/api/employees
-```
-
-### 查看前端 / 浏览器访问
-```
-http://127.0.0.1:3001/                   ← 本机
-http://103.117.123.100:3001/             ← 局域网/公网（首次访问需填 Token）
-```
-**⚠️ 当前没有登录界面**：浏览器直接调 `/api/*` 需要在 DevTools 里手动加 `Authorization` 头。
-UX 需要时再说，待办。
-
----
-
-## 2. 数据备份 / 恢复
-
-### 备份（建议每天 1 次）
-```bash
-sudo systemctl stop ai-consulting-center.service
-sudo tar czf /var/backups/ai-consulting-center-$(date +%Y%m%d).tar.gz \
-  /opt/ai-consulting-center/data
-sudo systemctl start ai-consulting-center.service
-```
-**或**用 cron 加 systemd timer（自动）— 待办。
-
-### 恢复
-```bash
-sudo systemctl stop ai-consulting-center.service
-sudo tar xzf /var/backups/ai-consulting-center-20260730.tar.gz -C /
-sudo systemctl start ai-consulting-center.service
-```
-
----
-
-## 3. 升级流程（新版本发布）
+## 2. 服务检查
 
 ```bash
-sudo systemctl stop ai-consulting-center.service
+systemctl --user status ai-consulting-center.service
+systemctl --user show ai-consulting-center.service -p MainPID --value
+curl -fsS http://127.0.0.1:3001/health
+curl -I http://127.0.0.1:8080/ai/
+```
+
+查看应用日志：
+
+```bash
+journalctl --user -u ai-consulting-center.service -n 100 --no-pager
+```
+
+日志必须对 `Authorization`、`Cookie` 和 `Set-Cookie` 显示为 `[REDACTED]`。不得复制或传播日志中的凭据。
+
+## 3. 受控重启
+
+```bash
+old=$(systemctl --user show ai-consulting-center.service -p MainPID --value)
+systemctl --user restart ai-consulting-center.service
+sleep 3
+new=$(systemctl --user show ai-consulting-center.service -p MainPID --value)
+printf 'app_pid=%s->%s\n' "$old" "$new"
+curl -fsS http://127.0.0.1:3001/health
+systemctl --user is-active hermes-gateway.service
+systemctl --user is-active openclaw-gateway.service
+```
+
+只操作 `ai-consulting-center.service`。不要为了应用发布停止 Hermes、OpenClaw、Embedding、FRP、Apache 或 Ollama。
+
+## 4. 发布流程
+
+发布顺序固定为：检查、备份、变更、构建测试、提交、重启、烟雾测试、回滚确认。
+
+```bash
 cd /opt/ai-consulting-center
-# 拉新代码或复制新文件
-cp -r /path/to/new/apps/server/src . # 仅 server 改动需重建
-npx tsc -p apps/server/tsconfig.json # 重建
-sudo systemctl start ai-consulting-center.service
+git status --short
+git rev-parse --short HEAD
+npm run build
+npm run test
+git diff --check
 ```
 
-前端改动（`apps/web/**`）：
+发布后验证：
+
 ```bash
-cd /opt/ai-consulting-center/apps/web
-npm run build          # 输出覆盖 dist/
-sudo systemctl restart ai-consulting-center.service  # express.static 内存加载，无需 restart 也行
+curl -fsS http://127.0.0.1:8080/ai/health
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/ai/
+git status --short
 ```
 
-Apache 配置改动：
-```bash
-sudo apache2ctl configtest     # 必须先测，错则不改
-sudo systemctl reload apache2  # 不丢现有 TCP 连接
-```
+前端生产文件由 Apache 的 `/ai/` 入口提供；Node 3001 端口主要承载 API 和健康检查，不以 `/ai/` 作为页面入口。
 
-若 `package.json` 改了：
-```bash
-npm install --omit=dev --include=dev   # 临时装 dev
-npx tsc -p apps/server/tsconfig.json
-# 跑完可清理 dev：npm prune --omit=dev
-```
+## 5. 数据与备份
 
----
+正式数据包括：
 
-## 4. 已知限制（MVP 边界）
+- PostgreSQL 数据库 `ai_consult`。
+- `data/uploads/` 原始上传文件。
+- `templates/` DOCX/PPTX 模板。
+- `.env` 生产配置。
 
-| # | 限制 | 影响 | 缓解 |
-|---|---|---|---|
-| 1 | **JSON 文件存数据** | 单实例 OK，多进程并发会丢 | 别开第二个实例 |
-| 2 | **docx 字符截 100K** | 超长文档丢失尾部 | 分章节入库 |
-| 3 | **无浏览器登录** | API 需手填 Token | 配合 nginx + basic_auth，或后续加 /login |
-| 4 | **知识检索是关键词**（非向量） | 同义词召回差 | 关键词覆盖 + 标签补全 |
-| 5 | **CORS 仅单 origin** | 多前端接入失败 | 需改 `WEB_ORIGIN` 或扩展白名单 |
-| 6 | **public 暴露** | Token 公开 = 全开放 | 加 nginx 反代 + IP 白名单 / basic_auth |
+升级、迁移或恢复前必须同时备份数据库和文件，并分别验证 `pg_restore --list` 与 `tar -tzf`。代码回滚与数据回滚是两件事，不得用旧数据库覆盖新业务数据。
 
----
+原始认证资料目录和 15GB 知识文件不得删除、移动或上传到外部服务。长期向量任务需在资源确认后单独启动，不随 Web 服务自动恢复。
 
-## 5. 配置项（`.env`）
+## 6. 安全要求
 
-```dotenv
-PORT=3001                                # 监听端口
-WEB_ORIGIN=http://localhost:3001         # CORS 白名单
-DEFAULT_MODEL=ollama                     # demo | openai | ollama
-API_TOKEN=<64字符hex>                    # ★ 必改；rotated 后需同步更新客户端
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen2.5:7b                  # 可改 qwen3:8b / 35b-iq2
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=                          # 留空 = OpenAI 通道不可用
-OPENAI_MODEL=gpt-4.1-mini
-LOG_LEVEL=info                           # debug | info | warn | error
-```
+- `.env` 权限保持 `600`，真实密钥不进入 Git。
+- 当前 HTTP 内网入口使用 HttpOnly + SameSite=Strict Cookie。
+- 配置 HTTPS 后设置 `COOKIE_SECURE=true`，公网只开放反向代理端口。
+- 凭据或会话疑似泄漏时，先封堵日志，再轮换 `JWT_SECRET`、撤销活动会话并重启应用；不要重置用户密码，除非密码本身泄漏。
+- 数据库不可用时应停止正式业务操作。共享 JSON 回退仅用于兼容，不应作为生产数据源。
 
-`chmod 600 .env`，仅 root + 部署用户可读。
+## 7. 当前待办
 
----
-
-## 6. 紧急处置
-
-### 服务挂了
-```bash
-sudo journalctl -u ai-consulting-center -n 100 --no-pager    # 看错误
-sudo systemctl restart ai-consulting-center.service          # 重拉
-```
-
-### Token 泄漏
-```bash
-NEW=$(openssl rand -hex 32)
-sudo sed -i "s/^API_TOKEN=.*/API_TOKEN=$NEW/" /opt/ai-consulting-center/.env
-sudo systemctl restart ai-consulting-center.service
-```
-同步通知所有 Token 使用方。
-
-### Ollama 不可用
-```bash
-curl http://127.0.0.1:11434/api/version   # 探活
-# 若挂了，先重启 ollama：
-sudo systemctl restart ollama 2>/dev/null || ollama serve &
-```
-服务会自动回落 `DEFAULT_MODEL=demo`，不阻断咨询流。
-
----
-
-## 7. 暂未做（按优先级）
-
-- [ ] 加登录页 + session
-- [ ] DB 替代 JSON（SQLite 起步）
-- [ ] nginx 反代 + HTTPS（lucaai.com DNS 先修）
-- [ ] 多用户/多租户
-- [ ] 知识库向量检索（Qdrant/pgvector）
-- [ ] 自动备份 systemd timer
-- [ ] Token 改 JWT，expires_in + refresh
+- 登录失败限流和账号锁定策略。
+- `audit_log` 全业务写入与审计查询。
+- HTTPS、Secure Cookie 和正式域名。
+- 生产依赖的 4 个 high severity 告警评估与无破坏升级。
+- 扫描 PDF OCR 队列、失败重试和进度监控。
+- 五种正式业务成果的内容验收、审批门禁和版本归档。
+- 自动备份、恢复演练和监控告警。

@@ -1,88 +1,90 @@
 # AI数字化咨询中心部署说明
 
-发布包已包含前端和后端生产构建文件，服务器无需重新编译。
+本说明适用于单家公司正式试用版本。生产环境以 PostgreSQL/pgvector、React/Express 和 systemd user service 运行。
 
 ## 环境要求
 
-- Linux 服务器
-- Node.js 20 或更高版本
-- npm 10 或更高版本
-- 可选：PM2、Nginx
+- Linux、Node.js 20+、npm 10+。
+- PostgreSQL 15+，启用 pgvector。
+- Apache 或 Nginx 反向代理。
+- 可访问的本地 Ollama或 OpenAI 兼容模型服务。
 
-## 部署步骤
+## 必需配置
 
-```bash
-mkdir -p /opt/ai-consulting-center
-unzip AI数字化咨询中心-MVP-V1.0-部署包.zip -d /opt/ai-consulting-center
-cd /opt/ai-consulting-center
-npm ci --omit=dev
-cp .env.example .env
-```
-
-编辑 `.env`，至少确认以下配置：
+复制 `.env.example` 为 `.env`，权限设为 `600`。至少配置：
 
 ```dotenv
+NODE_ENV=production
 PORT=3001
-WEB_ORIGIN=https://your-domain.example
+WEB_ORIGIN=http://your-host:8080
+DATABASE_URL=postgresql://user:password@127.0.0.1:5432/ai_consult
+JWT_SECRET=replace-with-a-long-random-secret
+COOKIE_SECURE=false
 DEFAULT_MODEL=demo
 ```
 
-直接启动：
+真实密码、JWT密钥、数据库URI和模型密钥不得进入 Git 或发布包。HTTPS 启用后将 `COOKIE_SECURE` 改为 `true`。
+
+## 构建与数据库
 
 ```bash
-npm start
+cd /opt/ai-consulting-center
+npm ci
+npm run build
+npm run test
 ```
 
-访问 `http://服务器IP:3001`，健康检查地址为：
+执行 `data/migrations/` 中尚未应用的迁移前，先备份数据库并在测试库验证。不得对正式库重复执行破坏性迁移。
+
+## systemd user service
+
+服务定义参考 `deploy/ai-consulting-center.service`：
 
 ```bash
-curl http://127.0.0.1:3001/health
+mkdir -p ~/.config/systemd/user
+cp deploy/ai-consulting-center.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now ai-consulting-center.service
+systemctl --user status ai-consulting-center.service
 ```
 
-## PM2 守护
+健康检查：
 
 ```bash
-npm install -g pm2
-pm2 start ecosystem.config.cjs
-pm2 save
-pm2 startup
+curl -fsS http://127.0.0.1:3001/health
 ```
 
-## Nginx 反向代理
+## 反向代理
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.example;
+将 `/ai/` 页面和 `/ai/api/` API 转发到应用，保留 `Host`、`X-Real-IP`、`X-Forwarded-For` 和 `X-Forwarded-Proto`。上传限制至少为 20MB。
 
-    client_max_body_size 20m;
+反向代理修改后先执行配置检查，再 reload，不要直接停止其他站点：
 
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+```bash
+sudo apache2ctl configtest
+sudo systemctl reload apache2
 ```
 
-## 数据与更新
+## 发布验收
 
-运行时数据保存在 `data/`：
+发布后至少验证：
 
-```text
-data/
-  knowledge.json
-  consultations.json
-  uploads/
-```
+- `/ai/` 和 `/ai/health` 返回 200。
+- 未登录业务接口返回 401。
+- 管理员和普通用户权限差异符合预期。
+- 跨企业读取被阻断。
+- 咨询 DOCX/PPTX、认证报价 DOCX 均为有效 OpenXML。
+- 文档分析、知识反馈、人工审核和版本记录可用。
+- 模型输出不包含 `<think>` 或调试内容。
+- 日志不记录 Cookie、JWT、数据库URI和模型密钥。
+- 测试数据完全清理，Hermes/OpenClaw 服务未受影响。
 
-升级版本前应备份该目录。发布包不包含现有客户数据、咨询历史和上传文件。
+核心自动验收脚本：`deploy/core-acceptance.sh`。
 
-公网部署前请注意：
+## 正式公网发布前置项
 
-- `.env` 中的模型密钥不得公开。
-- 当前 MVP 没有用户登录和租户隔离，建议增加访问控制。
-- 公网只开放 80/443，应用端口 3001 建议仅供本机或内网访问。
+- HTTPS 与 `COOKIE_SECURE=true`。
+- 登录限流、账号锁定和完整审计日志。
+- 生产依赖漏洞治理。
+- 自动备份、恢复演练和监控告警。
+- 去除数据库异常时的共享 JSON 数据回退。
