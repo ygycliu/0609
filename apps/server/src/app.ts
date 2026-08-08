@@ -6,7 +6,6 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import multer from "multer";
-import pino from "pino";
 import { pinoHttp } from "pino-http";
 import { z } from "zod";
 import { config } from "./config.js";
@@ -35,11 +34,12 @@ import { searchKnowledge } from "./knowledge/retrieval.service.js";
 import { generateWithModel, getAvailableModels } from "./models/model.gateway.js";
 import { handleEvent, pushMessage } from "./integrations/feishu/index.js";
 import { AppError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "./shared/errors.js";
+import { createLogger } from "./shared/logger.js";
 import { query } from "./db/pool.js";
 import type { EmployeeRole, ModelProvider } from "./shared/types.js";
 import { generateQuote, getAvailableCertifications, INDUSTRY_OPTIONS, RISK_LEVEL_OPTIONS } from "./certification/quote.service.js";
 
-const logger = pino({ level: process.env.LOG_LEVEL ?? "info" });
+const logger = createLogger();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }
@@ -75,6 +75,39 @@ const pptxExportSchema = z.object({
   presenter: z.string().trim().min(1, "请填写汇报人员").max(100),
   confidentiality: z.string().trim().min(1, "请填写密级或使用范围").max(50),
   includeReferences: z.boolean().default(true)
+});
+
+export const quoteExportPayloadSchema = z.object({
+  companyName: z.string().trim().min(1).max(100),
+  companyContext: z.string().trim().max(1000).optional().default(""),
+  quote: z.object({
+    companyName: z.string(),
+    industry: z.string(),
+    employeeCount: z.number(),
+    certifications: z.array(z.object({
+      certId: z.string(),
+      certName: z.string(),
+      basePrice: z.number(),
+      industryFactor: z.number(),
+      adjustedBase: z.number(),
+      initialAuditDays: z.number(),
+      supervisionAuditDays: z.number(),
+      recertificationAuditDays: z.number(),
+      auditorLevel: z.enum(["中级", "高级"])
+    })),
+    sizeFactor: z.number(),
+    sizeTier: z.string(),
+    subtotal: z.number(),
+    afterSizeFactor: z.number(),
+    bundleDiscount: z.number(),
+    bundleTier: z.string(),
+    initialPrice: z.number(),
+    supervisionPrice: z.number(),
+    priceIncludes: z.array(z.string()),
+    priceExcludes: z.array(z.string()),
+    estimatedAuditDays: z.number(),
+    generatedAt: z.string()
+  })
 });
 
 function encodedFileName(value: string, extension: "docx" | "pptx") {
@@ -314,7 +347,7 @@ export function createApp() {
         `SELECT id, name, short_name, industry FROM company WHERE id = $1`,
         [u.companyId]
       );
-      response.json({ 
+      response.json({
         data: {
           user: u,
           company: company.rows[0] ?? null
@@ -1096,51 +1129,11 @@ export function createApp() {
   // ====== 认证报价导出 DOCX ======
   app.post("/api/certification/quote/export/docx", async (request, response, next) => {
     try {
-      const quoteSchema = z.object({
-        companyName: z.string().trim().min(1).max(100),
-        companyContext: z.string().trim().max(1000).optional().default("")
-      });
-      const parsed = quoteSchema.safeParse(request.body);
+      const parsed = quoteExportPayloadSchema.safeParse(request.body);
       if (!parsed.success) {
         throw new ValidationError(parsed.error.issues[0]?.message ?? "导出参数无效");
       }
-      const quoteParsed = z.object({
-        companyName: z.string(),
-        industry: z.string(),
-        employeeCount: z.number(),
-        certifications: z.array(z.string()),
-        sizeFactor: z.number(),
-        sizeTier: z.string(),
-        subtotal: z.number(),
-        afterSizeFactor: z.number(),
-        bundleDiscount: z.number(),
-        bundleTier: z.string(),
-        initialPrice: z.number(),
-        supervisionPrice: z.number(),
-        priceIncludes: z.array(z.string()),
-        priceExcludes: z.array(z.string()),
-        estimatedAuditDays: z.number(),
-        generatedAt: z.string()
-      }).safeParse(request.body.quote);
-      if (!quoteParsed.success) {
-        throw new ValidationError("报价数据格式无效");
-      }
-      const q = quoteParsed.data;
-      // 简化版：使用 generateQuoteDocx + 客户端传来的详细人日数据
-      const buffer = await generateQuoteDocx({
-        ...q,
-        certifications: q.certifications.map((id: string) => ({
-          certId: id,
-          certName: id,
-          basePrice: 0,
-          industryFactor: 1,
-          adjustedBase: 0,
-          initialAuditDays: 0,
-          supervisionAuditDays: 0,
-          recertificationAuditDays: 0,
-          auditorLevel: "中级" as const
-        }))
-      }, {
+      const buffer = await generateQuoteDocx(parsed.data.quote, {
         companyName: parsed.data.companyName,
         clientName: parsed.data.companyName,
         projectName: "认证证书报价",
