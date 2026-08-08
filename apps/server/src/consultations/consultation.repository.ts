@@ -93,10 +93,27 @@ export class ConsultationRepository {
     if (this.useDb) {
       try {
         const r = await query<DbRow>(
-          `SELECT id, role, industry, company_context, request, deliverable,
-                  model, result, references, created_at
-           FROM consultation_project
-           WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+          `SELECT
+             cp.id,
+             d.content->>'role' AS role,
+             d.content->>'industry' AS industry,
+             d.content->>'companyContext' AS company_context,
+             d.content->>'request' AS request,
+             d.content->>'deliverable' AS deliverable,
+             d.content->>'model' AS model,
+             d.content->>'result' AS result,
+             d.content->'references' AS references,
+             cp.created_at,
+             d.content AS content
+           FROM consultation_project cp
+           JOIN deliverable d
+             ON d.project_id = cp.id
+            AND d.deleted_at IS NULL
+           WHERE cp.id = $1
+             AND cp.company_id = $2
+             AND cp.deleted_at IS NULL
+           ORDER BY d.created_at DESC
+           LIMIT 1`,
           [id, companyId]
         );
         return r.rows[0] ? rowToRecord(r.rows[0]) : null;
