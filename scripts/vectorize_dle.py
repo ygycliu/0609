@@ -85,6 +85,8 @@ def scan_files(limit: int) -> list:
         return 4
     all_files.sort(key=lambda x: (priority(str(x[0].relative_to(DLE_ROOT))), x[1]))
 
+    # limit 表示目标成功数。为容纳空文件和解析失败，最多准备 20 倍候选。
+    candidate_limit = max(limit, limit * 20)
     new_files = []
     for f, sz in all_files:
         rel = str(f.relative_to(DLE_ROOT)).replace("/", "_")[:80]
@@ -93,7 +95,7 @@ def scan_files(limit: int) -> list:
         if doc_code in existing:
             continue
         new_files.append(f)
-        if len(new_files) >= limit:
+        if len(new_files) >= candidate_limit:
             break
     return new_files
 
@@ -263,7 +265,7 @@ def main():
         limit = int(sys.argv[idx + 1])
 
     print(f"=== DLE 向量化 V4（增量）===")
-    print(f"目标: 新增 {limit} 个文件")
+    print(f"目标: 成功新增 {limit} 个文件")
     print(f"开始: {datetime.now().strftime('%H:%M:%S')}\n")
 
     files = scan_files(limit)
@@ -275,6 +277,8 @@ def main():
     total_chunks = 0
 
     for i, f in enumerate(files):
+        if ok >= limit:
+            break
         if i % 25 == 0:
             print(f"[{i}/{len(files)}] 已成功 {ok}, 失败 {failed}, 跳过 {skipped}", flush=True)
 
