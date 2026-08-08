@@ -1,0 +1,24 @@
+{
+  "name": "ai-digital-consulting-center",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c green,cyan \"npm run dev -w @consulting/server\" \"npm run dev -w @consulting/web\"",
+    "build": "npm run build -w @consulting/server && npm run build -w @consulting/web",
+    "test": "npm run test -w @consulting/server && npm run test -w @consulting/web",
+    "start": "npm run start -w @consulting/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  },
+  "dependencies": {
+    "@types/pg": "^8.20.4",
+    "bcryptjs": "^3.0.3",
+    "otplib": "^13.4.1",
+    "pg": "^8.22.0",
+    "qrcode": "^1.5.4"
+  }
+}

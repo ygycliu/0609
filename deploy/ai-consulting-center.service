@@ -1,0 +1,23 @@
+[Unit]
+Description=AI Digital Consulting Center
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ai-consulting-center
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/ai-consulting-center/.env
+ExecStart=/usr/bin/node /opt/ai-consulting-center/apps/server/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ai-consulting-center/data
+
+[Install]
+WantedBy=default.target
