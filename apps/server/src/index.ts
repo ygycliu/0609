@@ -1,11 +1,13 @@
 import fs from "node:fs/promises";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
+import { assertCurrentProductionRuntimeOwnership } from "./shared/runtime-ownership.js";
 
+await assertCurrentProductionRuntimeOwnership();
 await fs.mkdir(config.dataDir, { recursive: true });
 
-const server = createApp().listen(config.port, () => {
-  console.log(`AI 数字化咨询中心 API: http://localhost:${config.port}`);
+const server = createApp().listen(config.port, config.host, () => {
+  console.log(`AI 数字化咨询中心 API: http://${config.host}:${config.port}`);
 });
 
 function shutdown() {

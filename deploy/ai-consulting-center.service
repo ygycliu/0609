@@ -6,13 +6,16 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/ai-consulting-center
-Environment=NODE_ENV=production
 EnvironmentFile=/opt/ai-consulting-center/.env
+Environment=NODE_ENV=production
+Environment=AI_CENTER_RUNTIME_OWNER=systemd
+Environment=HOST=127.0.0.1
 ExecStart=/usr/bin/node /opt/ai-consulting-center/apps/server/dist/index.js
-Restart=on-failure
+Restart=always
 RestartSec=5
 TimeoutStopSec=30
 KillSignal=SIGTERM
+KillMode=control-group
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

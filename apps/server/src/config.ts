@@ -17,6 +17,7 @@ function requiredInProduction(name: string): string {
 
 export const config = {
   production,
+  host: process.env.HOST?.trim() || "127.0.0.1",
   port: Number(process.env.PORT ?? 3001),
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
   defaultModel: process.env.DEFAULT_MODEL ?? "demo",

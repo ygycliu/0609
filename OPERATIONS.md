@@ -1,6 +1,6 @@
 # AI数字化咨询中心运行手册
 
-更新日期：2026-08-08
+更新日期：2026-08-10
 部署路径：`/opt/ai-consulting-center`
 正式试用入口：`http://10.168.1.105:8080/ai/`
 应用服务：`ai-consulting-center.service`（systemd user unit）
@@ -46,6 +46,18 @@ systemctl --user is-active openclaw-gateway.service
 ```
 
 只操作 `ai-consulting-center.service`。不要为了应用发布停止 Hermes、OpenClaw、Embedding、FRP、Apache 或 Ollama。
+
+生产实例只能由 `ai-consulting-center.service` 启动。禁止使用 `node apps/server/dist/index.js`、`npm start`、Hermes/OpenClaw 工具或后台脚本直接拉起生产 Node 进程。服务单元固定注入 `AI_CENTER_RUNTIME_OWNER=systemd`，应用还会校验自身 Linux cgroup；该变量不得写入 `.env`。
+
+确认进程归属和监听范围：
+
+```bash
+pid=$(systemctl --user show ai-consulting-center.service -p MainPID --value)
+cat "/proc/$pid/cgroup"
+ss -ltnp 'sport = :3001'
+```
+
+验收标准是 cgroup 包含 `ai-consulting-center.service`，且 3001 只监听 `127.0.0.1`。
 
 ## 4. 发布流程
 

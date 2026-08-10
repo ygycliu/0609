@@ -15,6 +15,7 @@
 
 ```dotenv
 NODE_ENV=production
+HOST=127.0.0.1
 PORT=3001
 WEB_ORIGIN=http://your-host:8080
 DATABASE_URL=postgresql://user:password@127.0.0.1:5432/ai_consult
@@ -24,6 +25,8 @@ DEFAULT_MODEL=demo
 ```
 
 真实密码、JWT密钥、数据库URI和模型密钥不得进入 Git 或发布包。HTTPS 启用后将 `COOKIE_SECURE` 改为 `true`。
+
+`AI_CENTER_RUNTIME_OWNER` 不属于业务配置，不得写入 `.env`。它只由正式 systemd 单元注入；Linux 生产进程还必须位于 `ai-consulting-center.service` cgroup，直接执行 Node 或 `npm start` 会在监听端口前失败。
 
 ## 构建与数据库
 
@@ -53,6 +56,8 @@ systemctl --user status ai-consulting-center.service
 ```bash
 curl -fsS http://127.0.0.1:3001/health
 ```
+
+不得用 Hermes、OpenClaw 或后台 shell 直接启动生产 Node 进程。正式发布和重启一律通过 `systemctl --user` 操作 `ai-consulting-center.service`。
 
 ## 反向代理
 
