@@ -2223,8 +2223,10 @@ select:focus-visible {
 .login-page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
   padding: 16px;
 }
@@ -2577,3 +2579,30 @@ select:focus-visible {
 .version-item strong { color: #2563eb; font-size: 14px; margin-right: 8px; }
 .version-item span { color: #1f2937; font-size: 14px; }
 .version-item small { display: block; color: #9ca3af; font-size: 12px; margin-top: 4px; }
+
+/* ========= 版权信息 ========= */
+.app-copyright {
+  margin-top: 32px;
+  padding: 16px 0 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  text-align: center;
+  border-top: 1px solid #e5e7eb;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.login-copyright {
+  margin: 20px 0 0;
+  padding: 0 8px;
+  color: #64748b;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.5;
+  position: relative;
+  z-index: 1;
+  max-width: 380px;
+}

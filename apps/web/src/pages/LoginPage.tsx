@@ -140,6 +140,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           </form>
         )}
       </div>
+      <p className="login-copyright">版权所有上海缘起卢卡智能科技有限公司</p>
     </div>
   );
 }

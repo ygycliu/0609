@@ -132,6 +132,9 @@ export default function App() {
         {page === "results" && (
           <ResultsPage consultations={consultations} employees={employees} />
         )}
+        <footer className="app-copyright" aria-label="版权信息">
+          版权所有上海缘起卢卡智能科技有限公司
+        </footer>
       </main>
     </div>
   );
