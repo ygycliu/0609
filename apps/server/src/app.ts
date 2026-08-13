@@ -38,6 +38,7 @@ import { createLogger } from "./shared/logger.js";
 import { query } from "./db/pool.js";
 import type { EmployeeRole, ModelProvider } from "./shared/types.js";
 import { generateQuote, getAvailableCertifications, INDUSTRY_OPTIONS, RISK_LEVEL_OPTIONS } from "./certification/quote.service.js";
+import { getVersionInfo } from "./version/version.service.js";
 
 const logger = createLogger();
 const upload = multer({
@@ -174,6 +175,11 @@ export function createApp() {
   // 公开端点：健康检查、登录、MFA 验证和刷新。
   app.get("/health", (_request, response) => {
     response.json({ status: "ok", service: "ai-digital-consulting-center" });
+  });
+
+  // 版本信息端点：只读查询，无需认证
+  app.get("/api/version", (_request, response) => {
+    response.json(getVersionInfo());
   });
 
   const publicApiPaths = new Set([
