@@ -19,3 +19,7 @@ apps/web/vitest.config.js
 apps/web/vitest.config.d.ts
 server-baseline-*/
 releases/local-pre-takeover-*.zip
+
+# Knowledge base runtime data (not in git)
+apps/server/data/audit_kb/
+apps/server/data/cnca-rules/
