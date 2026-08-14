@@ -11,6 +11,8 @@ import { DocumentsPage } from "./pages/DocumentsPage";
 import { KnowledgePage } from "./pages/KnowledgePage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ResultsPage } from "./pages/ResultsPage";
+import { AuditorPage } from "./pages/AuditorPage";
+import { FilesPage } from "./pages/FilesPage";
 import type {
   ConsultationRecord,
   Employee,
@@ -132,6 +134,8 @@ export default function App() {
         {page === "results" && (
           <ResultsPage consultations={consultations} employees={employees} />
         )}
+        {page === "auditor" && <AuditorPage />}
+        {page === "files" && <FilesPage />}
         <footer className="app-copyright" aria-label="版权信息">
           版权所有上海缘起卢卡智能科技有限公司
         </footer>

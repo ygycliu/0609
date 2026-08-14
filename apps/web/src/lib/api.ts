@@ -177,7 +177,7 @@ export const api = {
     }),
   certificationOptions: () =>
     request<{ industries: string[]; riskLevels?: any[]; certifications: CertificationOption[] }>(
-      "/certification/quote/options"
+      "/certification/options"
     ),
   certificationQuote: (input: any) =>
     request<CertificationQuote>("/certification/quote", {
