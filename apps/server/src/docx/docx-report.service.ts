@@ -162,13 +162,13 @@ function metadataTable(record: ConsultationRecord, branding: DocxBranding) {
       insideVertical: border()
     },
     rows: rows.map(
-      ([labelA, valueA, labelB, valueB]) =>
+      (row) =>
         new TableRow({
           children: [
-            tableCell(labelA, { heading: true, fill: COLORS.primaryLight, width: 1500 }),
-            tableCell(valueA, { width: 3000 }),
-            tableCell(labelB, { heading: true, fill: COLORS.primaryLight, width: 1500 }),
-            tableCell(valueB, { width: 3000 })
+            tableCell(String(row[0] ?? ""), { heading: true, fill: COLORS.primaryLight, width: 1500 }),
+            tableCell(String(row[1] ?? ""), { width: 3000 }),
+            tableCell(String(row[2] ?? ""), { heading: true, fill: COLORS.primaryLight, width: 1500 }),
+            tableCell(String(row[3] ?? ""), { width: 3000 })
           ]
         })
     )
@@ -181,7 +181,8 @@ function roleName(role: ConsultationRecord["role"]) {
     "solution-engineer": "方案工程师",
     trainer: "培训讲师",
     "knowledge-assistant": "知识助手",
-    "certification-expert": "认证专家"
+    "certification-expert": "认证专家",
+    "certification-auditor": "数字审核员"
   }[role];
 }
 

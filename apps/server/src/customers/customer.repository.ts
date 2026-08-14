@@ -131,4 +131,61 @@ export class CustomerRepository {
     await this.store.write(items);
     return record;
   }
+
+  /**
+   * 模糊搜索客户（按名称/编号）
+   * 使用 trgm 索引做相似度排序
+   */
+  async search(companyId: string, searchTerm: string, limit: number = 20): Promise<CustomerRecord[]> {
+    if (this.useDb) {
+      try {
+        // 利用 pg_trgm 索引 + ILIKE 模糊匹配
+        const r = await query<DbRow>(
+          `SELECT id, customer_code, name, industry, employee_count, region,
+                  contact_person, contact_phone, status, tags, created_at
+           FROM customer
+           WHERE company_id = $1 AND deleted_at IS NULL
+             AND (name ILIKE $2 OR customer_code ILIKE $2)
+           ORDER BY
+             CASE WHEN name = $3 THEN 0 ELSE 1 END,
+             CASE WHEN name ILIKE $4 THEN 0 ELSE 1 END,
+             created_at DESC
+           LIMIT $5`,
+          [companyId, `%${searchTerm}%`, searchTerm, `${searchTerm}%`, limit]
+        );
+        return r.rows.map(rowToRecord);
+      } catch (err) {
+        console.warn("DB customer search failed:", (err as Error).message);
+      }
+    }
+    // JSON fallback：内存过滤
+    const items = (await this.store.read()) as unknown as CustomerRecord[];
+    const q = searchTerm.toLowerCase();
+    return items
+      .filter(c => c.name.toLowerCase().includes(q) || c.customerCode.toLowerCase().includes(q))
+      .slice(0, limit);
+  }
+
+  /**
+   * 按 ID 查客户
+   */
+  async getById(companyId: string, id: string): Promise<CustomerRecord | null> {
+    if (this.useDb) {
+      try {
+        const r = await query<DbRow>(
+          `SELECT id, customer_code, name, industry, employee_count, region,
+                  contact_person, contact_phone, status, tags, created_at
+           FROM customer
+           WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [companyId, id]
+        );
+        if (r.rows.length === 0) return null;
+        return rowToRecord(r.rows[0]);
+      } catch (err) {
+        console.warn("DB customer getById failed:", (err as Error).message);
+      }
+    }
+    const items = (await this.store.read()) as unknown as CustomerRecord[];
+    return items.find(c => c.id === id) ?? null;
+  }
 }

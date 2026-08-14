@@ -3,7 +3,8 @@ export type EmployeeRole =
   | "solution-engineer"
   | "trainer"
   | "knowledge-assistant"
-  | "certification-expert";
+  | "certification-expert"
+  | "certification-auditor";
 
 export type ModelProvider = "demo" | "openai" | "ollama";
 

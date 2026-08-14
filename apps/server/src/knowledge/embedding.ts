@@ -3,6 +3,7 @@
  * - 通过 HTTP 调用 Python microservice
  * - 失败 fallback 到 fake embedding（避免完全宕机）
  */
+import { createHash } from "node:crypto";
 
 const EMBEDDING_SERVICE_URL = process.env.EMBEDDING_SERVICE_URL || "http://localhost:8765";
 const TIMEOUT_MS = 30000;
@@ -35,11 +36,10 @@ export async function fakeEmbeddingText(text: string, dim: number = 768): Promis
 }
 
 function fakeEmbeddingTextLocal(text: string, dim: number): number[] {
-  const crypto = require("crypto") as typeof import("crypto");
   let raw = Buffer.alloc(0);
   let s = text;
   while (raw.length < dim) {
-    raw = Buffer.concat([raw, crypto.createHash("sha256").update(s).digest()]);
+    raw = Buffer.concat([raw, createHash("sha256").update(s).digest()]);
     s = raw.toString("latin1");
   }
   const full: number[] = [];

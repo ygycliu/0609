@@ -5,7 +5,9 @@ export type Page =
   | "documents"
   | "results"
   | "certification-quote"
-  | "knowledge-review";
+  | "knowledge-review"
+  | "auditor"
+  | "files";
 
 export interface ReviewItem {
   id: string;
