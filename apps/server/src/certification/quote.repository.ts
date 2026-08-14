@@ -8,7 +8,7 @@ import { JsonStore } from "../shared/json-store.js";
 import { query, pingDatabase } from "../db/pool.js";
 import type { QuoteResult, QuoteInput } from "./quote.service.js";
 
-const AI_CONSULT_CUSTOMER_ID = "7a27c8e2-66cb-46c4-98a5-6f8722a824ef";
+const AI_CONSULT_CUSTOMER_ID = config.aiConsultCustomerId;
 
 /** 把任意字符串转换为稳定 UUID v5-like（用 SHA-1 取前 16 字节） */
 function stringToUuid(input: string): string {

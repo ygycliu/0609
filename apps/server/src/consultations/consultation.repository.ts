@@ -9,7 +9,7 @@ import { JsonStore } from "../shared/json-store.js";
 import { query, pingDatabase } from "../db/pool.js";
 import type { ConsultationRecord } from "../shared/types.js";
 
-const AI_CONSULT_CUSTOMER_ID = "7a27c8e2-66cb-46c4-98a5-6f8722a824ef";
+const AI_CONSULT_CUSTOMER_ID = config.aiConsultCustomerId;
 
 interface DbRow {
   id: string;

@@ -28,6 +28,7 @@ export const config = {
   dataDir: path.join(projectRoot, "data"),
   uploadsDir: path.join(projectRoot, "data", "uploads"),
   webDist: path.join(projectRoot, "apps", "web", "dist"),
+  aiConsultCustomerId: process.env.AI_CONSULT_CUSTOMER_ID ?? "7a27c8e2-66cb-46c4-98a5-6f8722a824ef",
   openai: {
     baseUrl: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
     apiKey: process.env.OPENAI_API_KEY ?? "",
