@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquareText,
+  Moon,
+  Sun,
   X
 } from "lucide-react";
 import type { Page } from "../types";
@@ -39,6 +41,8 @@ interface SidebarProps {
   onClose: () => void;
   currentUser?: { username: string; role: string; displayName?: string };
   onLogout?: () => void | Promise<void>;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
 }
 
 export function Sidebar({
@@ -48,7 +52,9 @@ export function Sidebar({
   onOpen,
   onClose,
   currentUser,
-  onLogout
+  onLogout,
+  theme,
+  onToggleTheme
 }: SidebarProps) {
   return (
     <>
@@ -91,6 +97,14 @@ export function Sidebar({
         </nav>
 
         <div className="sidebar-status">
+          <button
+            className="theme-toggle"
+            onClick={onToggleTheme}
+            aria-label="切换主题"
+          >
+            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+            {theme === "dark" ? "浅色" : "深色"}
+          </button>
           {currentUser && (
             <div className="sidebar-user">
               <div className="user-info">

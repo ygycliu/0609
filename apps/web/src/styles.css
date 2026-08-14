@@ -3606,3 +3606,309 @@ select:focus-visible {
   color: #fff;
   border-color: var(--accent);
 }
+/* ============================================================ */
+/* =========  暗色模式（[data-theme="dark"]）  ============== */
+/* ============================================================ */
+
+[data-theme="dark"] {
+  --ink: #e6ede8;
+  --muted: #8b9590;
+  --line: #2d3833;
+  --surface: #1a221f;
+  --surface-muted: #232c28;
+  --accent: #d97a55;
+  --accent-dark: #b85d3a;
+  --green: #4a9079;
+  --nav: #0f1714;
+  color: #e6ede8;
+  background: #0f1714;
+}
+
+[data-theme="dark"] html {
+  background: #0f1714;
+}
+
+[data-theme="dark"] body {
+  color: #e6ede8;
+  background: #0f1714;
+}
+
+[data-theme="dark"] .sidebar {
+  background: #0a100d;
+  border-right-color: #1a221f;
+}
+
+[data-theme="dark"] .cert-card,
+[data-theme="dark"] .card,
+[data-theme="dark"] .files-table,
+[data-theme="dark"] .audit-steps,
+[data-theme="dark"] .files-toolbar,
+[data-theme="dark"] .files-loading,
+[data-theme="dark"] .files-empty {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .audit-toolbar,
+[data-theme="dark"] .audit-step,
+[data-theme="dark"] .stat,
+[data-theme="dark"] .cert-group,
+[data-theme="dark"] .combobox-dropdown,
+[data-theme="dark"] .attachment-item,
+[data-theme="dark"] .audit-step,
+[data-theme="dark"] .stat,
+[data-theme="dark"] .surface-muted,
+[data-theme="dark"] .surface,
+[data-theme="dark"] .stat,
+[data-theme="dark"] .file-action-btn,
+[data-theme="dark"] .files-table td,
+[data-theme="dark"] .files-table th {
+  background-color: var(--surface-muted);
+}
+
+[data-theme="dark"] .files-table tr:hover,
+[data-theme="dark"] .checklist-table tr:hover,
+[data-theme="dark"] .cert-item:hover,
+[data-theme="dark"] .audit-step.active {
+  background: var(--surface-muted);
+}
+
+[data-theme="dark"] .form-field input,
+[data-theme="dark"] .form-field select,
+[data-theme="dark"] .form-field textarea,
+[data-theme="dark"] .notes-input,
+[data-theme="dark"] .result-select,
+[data-theme="dark"] .combobox-wrapper input,
+[data-theme="dark"] .mkdir-form input {
+  background: var(--surface-muted);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .checkbox-label {
+  background: var(--surface-muted);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .checkbox-label:hover {
+  background: rgba(217, 122, 85, 0.15);
+}
+
+[data-theme="dark"] .error-banner {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+[data-theme="dark"] .stat-major {
+  background: rgba(220, 38, 38, 0.15);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .stat-minor {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+[data-theme="dark"] .stat-obs {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .ref-tag {
+  background: rgba(74, 144, 121, 0.2);
+  color: #6dbfa3;
+}
+
+[data-theme="dark"] .item-code {
+  background: rgba(217, 122, 85, 0.15);
+  color: #f0a989;
+}
+
+[data-theme="dark"] .upload-btn {
+  background: var(--surface-muted);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+[data-theme="dark"] .upload-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+[data-theme="dark"] .cat-label {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+[data-theme="dark"] .danger {
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .danger:hover {
+  background: rgba(220, 38, 38, 0.15);
+}
+
+[data-theme="dark"] .sidebar-scrim {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.theme-toggle:hover {
+  background: var(--surface-muted);
+  color: var(--accent);
+}
+
+/* ============================================================ */
+/* =========  移动端响应式  ============================== */
+/* ============================================================ */
+
+@media (max-width: 768px) {
+  :root {
+    /* 移动端紧凑间距 */
+    --page-padding: 16px;
+  }
+
+  .page,
+  .files-page,
+  .auditor-page {
+    padding: var(--page-padding);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .page-header h1 {
+    font-size: 22px;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .cert-card,
+  .card {
+    padding: 16px;
+  }
+
+  .audit-steps {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .audit-step {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .checklist-table {
+    font-size: 12px;
+  }
+
+  .checklist-table th,
+  .checklist-table td {
+    padding: 8px;
+  }
+
+  .question-cell {
+    min-width: 180px;
+  }
+
+  .summary-stats {
+    gap: 8px;
+  }
+
+  .stat {
+    padding: 8px 12px;
+    min-width: 80px;
+  }
+
+  .stat strong {
+    font-size: 18px;
+  }
+
+  .files-table {
+    font-size: 12px;
+  }
+
+  .files-table th,
+  .files-table td {
+    padding: 8px;
+  }
+
+  .files-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .report-attachments-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    flex-wrap: wrap;
+  }
+
+  /* combobox 在小屏幕自适应 */
+  .combobox-dropdown {
+    max-height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header h1 {
+    font-size: 18px;
+  }
+
+  .page-subtitle {
+    font-size: 12px;
+  }
+
+  .checkbox-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .breadcrumb {
+    font-size: 12px;
+  }
+}

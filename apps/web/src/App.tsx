@@ -25,12 +25,24 @@ export default function App() {
   const [auth, setAuth] = useState<{ user: any } | null>(null);
   const [page, setPage] = useState<Page>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const saved = typeof window !== "undefined" && window.localStorage.getItem("ai-center-theme");
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("ai-center-theme", theme);
+    }
+  }, [theme]);
 
   useEffect(() => {
     api.me()
@@ -107,6 +119,8 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         currentUser={auth.user}
         onLogout={handleLogout}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <main className="main-content">
         {page === "overview" && (
