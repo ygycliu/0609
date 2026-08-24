@@ -11,7 +11,8 @@ export type Page =
   | "pdf-to-word"
   | "customer-list"
   | "customer-detail"
-  | "finance-dashboard";
+  | "finance-dashboard"
+  | "follow-up";
 
 export interface ReviewItem {
   id: string;

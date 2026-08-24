@@ -19,6 +19,8 @@ import { generateAuditPlan, generateChecklist, detectNonConformances, generateAu
 import { QuoteRepository } from "./certification/quote.repository.js";
 import { CustomerRepository } from "./customers/customer.repository.js";
 import { FinanceRepository } from "./finance/finance.repository.js";
+import { ARRepository } from "./finance/ar.repository.js";
+import { FollowUpRepository, FOLLOW_UP_STAGES } from "./follow_up/follow_up.repository.js";
 import { login, logout, createUser, listUsers, resetPassword, changeOwnPassword, setUserActive, authMiddleware, refresh as refreshToken, verifyMfa, enableMfa, disableMfa } from "./auth/auth.service.js";
 import type { UserRecord } from "./auth/auth.service.js";
 import { ACCESS_COOKIE, MFA_COOKIE, REFRESH_COOKIE, clearAuthCookies, readCookie, setMfaCookie, setSessionCookies } from "./auth/session.js";
@@ -138,6 +140,8 @@ export function createApp() {
   });
   const customerRepository = new CustomerRepository();
   const financeRepository = new FinanceRepository();
+  const arRepository = new ARRepository();
+  const followUpRepository = new FollowUpRepository();
   customerRepository.init().catch((err) => {
     console.warn("CustomerRepository init failed:", err?.message ?? err);
   });
@@ -2145,6 +2149,240 @@ export function createApp() {
         endDate: (request.query.end_date as string) || ""
       });
       response.json({ data: result });
+    } catch (error) { next(error); }
+  });
+
+  // ============== 客户跟进 (Follow-up) ==============
+
+  // 阶段字典
+  app.get("/api/follow-up/stages", async (_request, response, next) => {
+    try {
+      response.json({ data: FOLLOW_UP_STAGES });
+    } catch (error) { next(error); }
+  });
+
+  // 列表
+  app.get("/api/follow-up", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "50"), 1), 200);
+      const result = await followUpRepository.listFollowUps(u.companyId, {
+        customerId: (request.query.customer_id as string) || "",
+        stage: (request.query.stage as string) || "",
+        year: request.query.year ? parseInt(request.query.year as string, 10) : undefined,
+        isArchived: request.query.archived === "1" || request.query.archived === "true"
+                       ? true : (request.query.archived === "0" ? false : undefined),
+        offset,
+        limit
+      });
+      response.json({ data: result.items, total: result.total });
+    } catch (error) { next(error); }
+  });
+
+  // 详情
+  app.get("/api/follow-up/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const fu = await followUpRepository.getFollowUp(u.companyId, request.params.id);
+      if (!fu) throw new NotFoundError("跟进记录");
+      const logs = await followUpRepository.getFollowUpLogs(u.companyId, request.params.id);
+      response.json({ data: { ...fu, logs } });
+    } catch (error) { next(error); }
+  });
+
+  // 创建
+  app.post("/api/follow-up", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.customerId) throw new ValidationError("客户必填");
+      const created = await followUpRepository.createFollowUp(u.companyId, {
+        customerId: body.customerId as string,
+        projectId: (body.projectId as string) || null,
+        certificationType: (body.certificationType as string) || null,
+        stage: (body.stage as string) || "expired",
+        year: body.year ? Number(body.year) : new Date().getFullYear(),
+        expectedDate: (body.expectedDate as string) || null,
+        expectedAmount: body.expectedAmount ? Number(body.expectedAmount) : null,
+        contractAmount: body.contractAmount ? Number(body.contractAmount) : null,
+        notes: (body.notes as string) || null,
+        metadata: body.metadata || null,
+        ownerUserId: (body.ownerUserId as string) || u.id
+      });
+      response.status(201).json({ data: created });
+    } catch (error) { next(error); }
+  });
+
+  // 更新基础信息
+  app.patch("/api/follow-up/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const allowedKeys = ["projectId", "certificationType", "year", "expectedDate", "expectedAmount", "contractAmount", "notes", "metadata", "ownerUserId"];
+      const update: Record<string, unknown> = {};
+      for (const k of allowedKeys) {
+        if (k in body) update[k] = body[k];
+      }
+      const updated = await followUpRepository.updateFollowUp(u.companyId, request.params.id, update);
+      if (!updated) throw new NotFoundError("跟进记录");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  // 推进阶段
+  app.post("/api/follow-up/:id/advance", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.stage) throw new ValidationError("目标阶段必填");
+      const updated = await followUpRepository.advanceStage(
+        u.companyId,
+        request.params.id,
+        body.stage as string,
+        (body.notes as string) || null,
+        u.id
+      );
+      if (!updated) throw new NotFoundError("跟进记录");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  // 删除
+  app.delete("/api/follow-up/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const ok = await followUpRepository.deleteFollowUp(u.companyId, request.params.id);
+      if (!ok) throw new NotFoundError("跟进记录");
+      response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  // 年度归档
+  app.post("/api/follow-up/archive-year/:year", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const year = parseInt(request.params.year, 10);
+      const count = await followUpRepository.archiveYear(u.companyId, year);
+      response.json({ data: { year, archived_count: count } });
+    } catch (error) { next(error); }
+  });
+
+  // 为客户在某年自动创建跟进
+  app.post("/api/follow-up/ensure-for-customer", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.customerId) throw new ValidationError("客户必填");
+      const year = body.year ? Number(body.year) : new Date().getFullYear();
+      const created = await followUpRepository.ensureCustomerForForYear(
+        u.companyId,
+        body.customerId as string,
+        year,
+        (body.certificationType as string) || null,
+        (body.expectedDate as string) || null
+      );
+      response.status(201).json({ data: created });
+    } catch (error) { next(error); }
+  });
+
+  // ============== 应收账款 (AR) ==============
+
+  app.get("/api/finance/ar", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "50"), 1), 200);
+      const result = await arRepository.listAR(u.companyId, {
+        customerId: (request.query.customer_id as string) || "",
+        status: (request.query.status as string) || "",
+        overdueOnly: request.query.overdue_only === "1" || request.query.overdue_only === "true",
+        offset,
+        limit
+      });
+      response.json({ data: result.items, total: result.total, totalAmount: result.totalAmount, remainingAmount: result.remainingAmount });
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/finance/ar/top-by-customer", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "10"), 1), 100);
+      const top = await arRepository.getARTopByCustomer(u.companyId, limit);
+      response.json({ data: top });
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/finance/ar/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const ar = await arRepository.getAR(u.companyId, request.params.id);
+      if (!ar) throw new NotFoundError("应收账单");
+      const payments = await arRepository.getARPayments(request.params.id);
+      response.json({ data: { ...ar, payments } });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/finance/ar", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.customerId) throw new ValidationError("客户必填");
+      if (!body.title) throw new ValidationError("标题必填");
+      if (!body.totalAmount) throw new ValidationError("金额必填");
+      const created = await arRepository.createAR(u.companyId, {
+        customerId: body.customerId as string,
+        projectId: (body.projectId as string) || null,
+        arNo: (body.arNo as string) || `AR-${Date.now()}`,
+        title: body.title as string,
+        description: (body.description as string) || null,
+        totalAmount: Number(body.totalAmount),
+        issueDate: (body.issueDate as string) || new Date().toISOString(),
+        dueDate: (body.dueDate as string) || new Date().toISOString(),
+        status: (body.status as string) || "pending",
+        ownerUserId: (body.ownerUserId as string) || u.id
+      });
+      response.status(201).json({ data: created });
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/finance/ar/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const allowedKeys = ["customerId", "projectId", "arNo", "title", "description", "totalAmount", "issueDate", "dueDate", "status", "ownerUserId"];
+      const update: Record<string, unknown> = {};
+      for (const k of allowedKeys) {
+        if (k in body) update[k] = body[k];
+      }
+      const updated = await arRepository.updateAR(u.companyId, request.params.id, update);
+      if (!updated) throw new NotFoundError("应收账单");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/finance/ar/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const ok = await arRepository.deleteAR(u.companyId, request.params.id);
+      if (!ok) throw new NotFoundError("应收账单");
+      response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/finance/ar/:id/payments", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.amount) throw new ValidationError("金额必填");
+      const payment = await arRepository.addPayment(u.companyId, request.params.id, {
+        amount: Number(body.amount),
+        paymentDate: (body.paymentDate as string) || new Date().toISOString(),
+        paymentMethod: (body.paymentMethod as string) || null,
+        reference: (body.reference as string) || null,
+        notes: (body.notes as string) || null
+      });
+      response.status(201).json({ data: payment });
     } catch (error) { next(error); }
   });
 

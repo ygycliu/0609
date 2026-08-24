@@ -17,6 +17,7 @@ import { PdfToWordPage } from "./pages/PdfToWordPage";
 import { CustomerListPage } from "./pages/CustomerListPage";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { FinanceDashboard } from "./pages/FinanceDashboard";
+import { FollowUpPage } from "./pages/FollowUpPage";
 import type {
   ConsultationRecord,
   Employee,

@@ -9,6 +9,7 @@ import {
   ClipboardList,
   FileSearch,
   FolderOpen,
+  Activity,
   History,
   LayoutDashboard,
   Menu,
@@ -53,6 +54,7 @@ const navigation: NavGroup[] = [
       { id: "certification-quote", label: "认证报价", icon: Calculator },
       { id: "auditor", label: "数字审核员", icon: ClipboardList },
       { id: "customer-list", label: "客户管理", icon: Users },
+      { id: "follow-up", label: "客户跟进", icon: Activity },
       { id: "finance-dashboard", label: "财务管理", icon: Banknote }
     ]
   },

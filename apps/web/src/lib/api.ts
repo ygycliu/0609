@@ -240,6 +240,97 @@ export const api = {
     return request<any>(path);
   },
 
+  // ===== 应收账款 AR =====
+  listAR: async (params: {
+    customer_id?: string;
+    status?: string;
+    overdue_only?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.customer_id) qs.set("customer_id", params.customer_id);
+    if (params.status) qs.set("status", params.status);
+    if (params.overdue_only) qs.set("overdue_only", "1");
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    const response = await fetch(`${API_BASE_URL}/finance/ar?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`ar list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number; totalAmount: number; remainingAmount: number };
+  },
+  getARTopByCustomer: (limit: number = 10) => {
+    return request<any>(`/finance/ar/top-by-customer?limit=${limit}`);
+  },
+  getAR: (id: string) => request<any>(`/finance/ar/${id}`),
+  createAR: (input: any) =>
+    request<any>("/finance/ar", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateAR: (id: string, input: any) =>
+    request<any>(`/finance/ar/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deleteAR: (id: string) =>
+    request<{ data: { id: string; deleted: boolean } }>(`/finance/ar/${id}`, {
+      method: "DELETE"
+    }),
+  addARPayment: (arId: string, input: any) =>
+    request<any>(`/finance/ar/${arId}/payments`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+
+  // ===== 客户跟进 Follow-up =====
+  listFollowUps: async (params: {
+    customer_id?: string;
+    stage?: string;
+    year?: number;
+    archived?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.customer_id) qs.set("customer_id", params.customer_id);
+    if (params.stage) qs.set("stage", params.stage);
+    if (params.year) qs.set("year", String(params.year));
+    if (params.archived !== undefined) qs.set("archived", params.archived ? "1" : "0");
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    const response = await fetch(`${API_BASE_URL}/follow-up?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`follow-up list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number };
+  },
+  getFollowUp: (id: string) => request<any>(`/follow-up/${id}`),
+  getFollowUpStages: () => request<any>("/follow-up/stages"),
+  createFollowUp: (input: any) =>
+    request<any>("/follow-up", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateFollowUp: (id: string, input: any) =>
+    request<any>(`/follow-up/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  advanceFollowUp: (id: string, stage: string, notes?: string) =>
+    request<any>(`/follow-up/${id}/advance`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stage, notes: notes || null })
+    }),
+  deleteFollowUp: (id: string) =>
+    request<{ data: { id: string; deleted: boolean } }>(`/follow-up/${id}`, {
+      method: "DELETE"
+    }),
+  archiveFollowUpYear: (year: number) =>
+    request<any>(`/follow-up/archive-year/${year}`, { method: "POST" }),
+  ensureFollowUpForCustomer: (customerId: string, year?: number, certificationType?: string) =>
+    request<any>("/follow-up/ensure-for-customer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customer_id: customerId, year, certificationType })
+    }),
+
   // ===== Customers =====
   listCustomers: async (params: {
     q?: string;
@@ -461,3 +552,7 @@ export const api = {
 };
 
 export { API_BASE_URL };
+
+// 暴露部分 API 方法作为独立导出
+export const listTransactions = api.listTransactions;
+export const getCustomer = (id: string) => request<any>(`/customers/${id}`);

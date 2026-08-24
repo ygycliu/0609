@@ -4945,3 +4945,127 @@ select:focus-visible {
 [data-theme="dark"] .customer-row.clickable:hover svg {
   color: #4d97e3;
 }
+
+
+/* ============================================================ */
+/* =========  客户跟进（Follow-up） ========== */
+/* ============================================================ */
+
+.follow-up-funnel {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.funnel-step {
+  flex: 1;
+  min-width: 90px;
+  padding: 14px 10px;
+  background: var(--surface-muted);
+  border-radius: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-top: 3px solid var(--line);
+  transition: all 200ms ease;
+}
+
+.funnel-step:hover { transform: translateY(-2px); }
+
+.funnel-orange { border-top-color: #f97316; }
+.funnel-blue { border-top-color: #3b82f6; }
+.funnel-purple { border-top-color: #a855f7; }
+.funnel-cyan { border-top-color: #06b6d4; }
+.funnel-indigo { border-top-color: #6366f1; }
+.funnel-teal { border-top-color: #14b8a6; }
+.funnel-green { border-top-color: #22c55e; }
+
+.funnel-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.funnel-count {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+}
+
+.toolbar-select {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  background: #fff;
+}
+
+.cert-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--primary-bg);
+  color: var(--primary);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.archived-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.status-completed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-info {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-default {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+[data-theme="dark"] .funnel-step {
+  background: #222e2a;
+}
+[data-theme="dark"] .cert-tag {
+  background: #1e3a5f;
+  color: #4d97e3;
+}
+[data-theme="dark"] .archived-tag {
+  background: #2d3a35;
+  color: #92a09c;
+}
+[data-theme="dark"] .status-completed {
+  background: #14532d;
+  color: #86efac;
+}
+[data-theme="dark"] .status-info {
+  background: #1e3a5f;
+  color: #4d97e3;
+}
+[data-theme="dark"] .status-default {
+  background: #2d3a35;
+  color: #92a09c;
+}

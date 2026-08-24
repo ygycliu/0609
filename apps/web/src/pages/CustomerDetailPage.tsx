@@ -7,7 +7,7 @@ import {
   Trash2,
   User
 } from "lucide-react";
-import { api } from "../lib/api";
+import { api, listTransactions } from "../lib/api";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "活跃" },
