@@ -2551,6 +2551,408 @@ export function createApp() {
     } catch (error) { next(error); }
   });
 
+  // ============================================================
+  // Todo (待办) 模块
+  // ============================================================
+
+  // 列出 Todo
+  app.get("/api/todo", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const status = (request.query.status as string) || "";
+      const category = (request.query.category as string) || "";
+      const limit = Math.min(parseInt((request.query.limit as string) || "100"), 500);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+
+      const conditions: string[] = ["t.company_id = $1", "t.deleted_at IS NULL"];
+      const params: any[] = [u.companyId];
+      let paramIdx = 2;
+      if (status) {
+        conditions.push(`t.status = $${paramIdx}`);
+        params.push(status);
+        paramIdx++;
+      }
+      if (category) {
+        conditions.push(`t.category = $${paramIdx}`);
+        params.push(category);
+        paramIdx++;
+      }
+
+      const items = await query<any>(
+        `SELECT t.*, c.name AS customer_name
+         FROM todo t LEFT JOIN customer c ON c.id = t.customer_id
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY t.completed_at NULLS FIRST,
+                  CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
+                  t.due_at NULLS LAST, t.created_at DESC
+         LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+        [...params, limit, offset]
+      );
+      const total = await query<{ count: string }>(
+        `SELECT count(*) FROM todo t WHERE ${conditions.join(" AND ")}`,
+        params
+      );
+      response.json({ data: items.rows, total: parseInt(total.rows[0].count, 10) });
+    } catch (error) { next(error); }
+  });
+
+  // 创建 Todo
+  app.post("/api/todo", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.title) throw new ValidationError("标题必填");
+      const r = await query<{ id: string }>(
+        `INSERT INTO todo
+          (company_id, owner_user_id, assigned_to, title, description, category,
+           source, source_ref, recording_id, due_at, remind_at, status, priority,
+           customer_id, follow_up_id, tags, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         RETURNING id`,
+        [
+          u.companyId,
+          u.id,
+          (body.assignedTo as string) || u.id,
+          body.title,
+          (body.description as string) || null,
+          (body.category as string) || "general",
+          (body.source as string) || "manual",
+          (body.sourceRef as string) || null,
+          (body.recordingId as string) || null,
+          body.dueAt || null,
+          body.remindAt || null,
+          (body.status as string) || "pending",
+          (body.priority as string) || "normal",
+          (body.customerId as string) || null,
+          (body.followUpId as string) || null,
+          body.tags ? JSON.stringify(body.tags) : null,
+          body.metadata ? JSON.stringify(body.metadata) : null
+        ]
+      );
+      const item = await query<any>("SELECT * FROM todo WHERE id = $1", [r.rows[0].id]);
+      response.status(201).json({ data: item.rows[0] });
+    } catch (error) { next(error); }
+  });
+
+  // 更新 Todo（标完成/改状态等）
+  app.patch("/api/todo/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const map: Record<string, string> = {
+        title: "title",
+        description: "description",
+        category: "category",
+        status: "status",
+        priority: "priority",
+        dueAt: "due_at",
+        remindAt: "remind_at",
+        assignedTo: "assigned_to",
+        customerId: "customer_id"
+      };
+      const fields: string[] = [];
+      const params: any[] = [];
+      let paramIdx = 1;
+      for (const [k, col] of Object.entries(map)) {
+        if (k in body) {
+          fields.push(`${col} = $${paramIdx}`);
+          params.push(body[k]);
+          paramIdx++;
+        }
+      }
+      // 完成状态自动写 completed_at
+      if (body.status === "done") {
+        fields.push(`completed_at = NOW(), completed_by = $${paramIdx}`);
+        params.push(u.id);
+        paramIdx++;
+      }
+      if (fields.length === 0) return response.json({ data: null });
+
+      fields.push(`updated_at = NOW()`);
+      params.push(u.companyId);
+      params.push(request.params.id);
+      await query(
+        `UPDATE todo SET ${fields.join(", ")}
+         WHERE company_id = $${paramIdx} AND id = $${paramIdx + 1} AND deleted_at IS NULL`,
+        params
+      );
+      const item = await query<any>("SELECT * FROM todo WHERE id = $1", [request.params.id]);
+      response.json({ data: item.rows[0] });
+    } catch (error) { next(error); }
+  });
+
+  // 删除 Todo（软删）
+  app.delete("/api/todo/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      await query(
+        `UPDATE todo SET deleted_at = NOW(), updated_at = NOW()
+         WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL`,
+        [u.companyId, request.params.id]
+      );
+      response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  // ============================================================
+  // YoooClaw 录音转写智能导入
+  // ============================================================
+
+  // 导入一条录音转写
+  // 入参：recordingId, recordingName, transcript (string), summary?, durationSec?
+  // 路由智能：自动建 todo / knowledge_document / follow-up
+  app.post("/api/yoooclaw/import-recording", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const recordingId = (body.recordingId as string || "").trim();
+      const recordingName = (body.recordingName as string || "").trim();
+      const transcript = (body.transcript as string || "").trim();
+      const summary = (body.summary as string || "").trim();
+      const durationSec = body.durationSec ? Number(body.durationSec) : null;
+
+      if (!recordingId) throw new ValidationError("recordingId 必填");
+      if (!transcript) throw new ValidationError("transcript 必填");
+
+      // 检查是否已导入
+      const exists = await query<{ id: string }>(
+        "SELECT id FROM yoooclaw_recording_import WHERE company_id = $1 AND recording_id = $2",
+        [u.companyId, recordingId]
+      );
+      if (exists.rows.length > 0) {
+        response.status(200).json({
+          data: { alreadyImported: true, importId: exists.rows[0].id }
+        });
+        return;
+      }
+
+      // 解析路线
+      const routes = {
+        knowledge: [] as Array<{ id: string; title: string }>,
+        todo: [] as Array<{ id: string; title: string }>,
+        follow_up: [] as Array<{ id: string; customer: string }>
+      };
+
+      // 1) 知识库（短摘要作为知识条目）
+      if (summary || transcript.length < 5000) {
+        const knowledgeId = (await query<{ id: string }>(
+          "SELECT uuid_generate_v4() AS id"
+        )).rows[0].id;
+        const knowledgeTitle = summary
+          ? `${recordingName} - ${recordingId.slice(0, 8)}`
+          : `录音转写 - ${recordingName}`;
+        const content = summary
+          ? `## 摘要\n${summary}\n\n## 录音转写\n${transcript}`
+          : transcript;
+        await query(
+          `INSERT INTO knowledge_document
+            (id, company_id, doc_code, title, category, subcategory, file_path, file_type, file_size,
+             content_text, confidentiality, business_value, source, status, current_version, tags, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 1, $15, NOW(), NOW())`,
+          [
+            knowledgeId,
+            u.companyId,
+            `YOO-${recordingId.slice(0, 8).toUpperCase()}`,
+            knowledgeTitle,
+            "yoooclaw_recording",
+            recordingName,
+            `yoooclaw://${recordingId}`,
+            "md",
+            transcript.length,
+            content.slice(0, 100000),
+            "internal",
+            "medium",
+            "yoooclaw",
+            "active",
+            ["yoooclaw", "recording", "transcript"]
+          ]
+        );
+        routes.knowledge.push({ id: knowledgeId, title: knowledgeTitle });
+      }
+
+      // 2) 待办（如果指定 todos）
+      const todos = (body.todos as Array<{
+        title: string;
+        description?: string;
+        dueAt?: string;
+        priority?: string;
+        category?: string;
+        customerName?: string;
+      }> || []);
+      for (const t of todos) {
+        if (!t.title) continue;
+        // 找客户
+        let customerId: string | null = null;
+        if (t.customerName) {
+          const custRes = await query<{ id: string }>(
+            "SELECT id FROM customer WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1",
+            [u.companyId, t.customerName.trim()]
+          );
+          if (custRes.rows.length > 0) customerId = custRes.rows[0].id;
+        }
+        const todoId = (await query<{ id: string }>(
+          "SELECT uuid_generate_v4() AS id"
+        )).rows[0].id;
+        await query(
+          `INSERT INTO todo
+            (id, company_id, owner_user_id, title, description, category, source, source_ref, recording_id,
+             due_at, status, priority, customer_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            todoId,
+            u.companyId,
+            u.id,
+            t.title.slice(0, 200),
+            t.description || null,
+            t.category || "general",
+            "yoooclaw_recording",
+            recordingId,
+            recordingId,
+            t.dueAt || null,
+            "pending",
+            t.priority || "normal",
+            customerId
+          ]
+        );
+        routes.todo.push({ id: todoId, title: t.title });
+      }
+
+      // 3) 跟进（如果指定 followUps）
+      const followUps = (body.followUps as Array<{
+        customerName: string;
+        customerPhone?: string;
+        stage?: string;
+        year?: number;
+        expectedDate?: string;
+        contractAmount?: number;
+        certificationType?: string;
+        issuingBody?: string;
+        summary?: string;
+      }> || []);
+      if (followUps.length > 0) {
+        // 复用 import-from-notifications 逻辑
+        const innerRes = await (async () => {
+          const results = { created: [] as any[], updated: [] as any[], skipped: [] as any[], newCustomers: 0 };
+          for (const notif of followUps) {
+            const customerName = (notif.customerName || "").trim();
+            if (!customerName) continue;
+
+            let customerId: string | null = null;
+            const custRes = await query<{ id: string }>(
+              "SELECT id FROM customer WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1",
+              [u.companyId, customerName]
+            );
+            if (custRes.rows.length > 0) {
+              customerId = custRes.rows[0].id;
+            } else {
+              const newId = (await query<{ id: string }>(
+                "SELECT uuid_generate_v4() AS id"
+              )).rows[0].id;
+              const codeRes = await query<{ max_code: number }>(
+                "SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code FROM 2) AS INTEGER)), 0) AS max_code FROM customer WHERE company_id = $1 AND customer_code ~ '^C[0-9]+$'",
+                [u.companyId]
+              );
+              const newCode = `C${String((codeRes.rows[0].max_code || 0) + 1).padStart(5, "0")}`;
+              await query(
+                `INSERT INTO customer (id, company_id, customer_code, name, region, status, service_stage, contact_phone, notes, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, '宁夏', 'active', 'potential', $5, $6, NOW(), NOW())`,
+                [newId, u.companyId, newCode, customerName, notif.customerPhone || null,
+                 `从录音转写导入${recordingId}: ${(notif.summary || transcript).slice(0, 200)}`]
+              );
+              customerId = newId;
+              results.newCustomers++;
+            }
+
+            const year = notif.year || new Date().getFullYear();
+            const certType = notif.certificationType || null;
+            const issuingBody = notif.issuingBody || "zhongren";
+            const existingRes = await query<{ id: string }>(
+              `SELECT id FROM customer_follow_up
+               WHERE company_id = $1 AND customer_id = $2
+                 AND year = $3 AND certification_type IS NOT DISTINCT FROM $4
+                 AND issuing_body = $5
+                 AND deleted_at IS NULL LIMIT 1`,
+              [u.companyId, customerId, year, certType, issuingBody]
+            );
+            const stage = notif.stage || "expired";
+            let followUpId: string;
+            if (existingRes.rows.length > 0) {
+              followUpId = existingRes.rows[0].id;
+              await query(
+                `UPDATE customer_follow_up
+                 SET notes = COALESCE(notes || ' / ', '') || $1,
+                     expected_date = COALESCE($2, expected_date),
+                     contract_amount = COALESCE($3, contract_amount),
+                     updated_at = NOW()
+                 WHERE id = $4`,
+                [`录音(${recordingId}): ${(notif.summary || transcript).slice(0, 200)}`,
+                 notif.expectedDate || null,
+                 notif.contractAmount ?? null,
+                 followUpId]
+              );
+              results.updated.push({ customerId, followUpId, customerName });
+            } else {
+              const fuRes = await query<{ id: string }>(
+                `INSERT INTO customer_follow_up
+                  (id, company_id, customer_id, certification_type, issuing_body,
+                   stage, year, expected_date, contract_amount, notes, created_at, updated_at)
+                 VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+                 RETURNING id`,
+                [u.companyId, customerId, certType, issuingBody, stage, year,
+                 notif.expectedDate || null, notif.contractAmount ?? null,
+                 `从录音转写导入${recordingId}: ${(notif.summary || transcript).slice(0, 300)}`]
+              );
+              followUpId = fuRes.rows[0].id;
+              results.created.push({ customerId, followUpId, customerName });
+            }
+            routes.follow_up.push({ id: followUpId, customer: customerName });
+          }
+          return results;
+        })();
+        // 加上 innerRes 信息
+        routes.follow_up.push(...innerRes.created.map((x: any) => ({ id: x.followUpId, customer: x.customerName, action: 'created' })));
+        routes.follow_up.push(...innerRes.updated.map((x: any) => ({ id: x.followUpId, customer: x.customerName, action: 'updated' })));
+      }
+
+      // 4) 记录导入历史
+      await query(
+        `INSERT INTO yoooclaw_recording_import
+          (company_id, recording_id, recording_name, transcript, summary, duration_sec, routes, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'processed')`,
+        [u.companyId, recordingId, recordingName, transcript, summary || null, durationSec,
+         JSON.stringify(routes)]
+      );
+
+      response.status(201).json({
+        data: {
+          recordingId,
+          routes,
+          summary: {
+            knowledge: routes.knowledge.length,
+            todo: routes.todo.length,
+            follow_up: routes.follow_up.length
+          }
+        }
+      });
+    } catch (error) { next(error); }
+  });
+
+  // 列出已导入的录音
+  app.get("/api/yoooclaw/imported-recordings", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const limit = Math.min(parseInt((request.query.limit as string) || "50"), 200);
+      const r = await query<any>(
+        `SELECT id, recording_id, recording_name, duration_sec, status, imported_at, routes
+         FROM yoooclaw_recording_import
+         WHERE company_id = $1
+         ORDER BY imported_at DESC LIMIT $2`,
+        [u.companyId, limit]
+      );
+      response.json({ data: r.rows });
+    } catch (error) { next(error); }
+  });
+
   // 从财务历史自动生成跟进（用 last_service_at 推断）
   app.post("/api/follow-up/auto-from-history", async (request, response, next) => {
     try {

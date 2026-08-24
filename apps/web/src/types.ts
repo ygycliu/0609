@@ -12,7 +12,8 @@ export type Page =
   | "customer-list"
   | "customer-detail"
   | "finance-dashboard"
-  | "follow-up";
+  | "follow-up"
+  | "todo";
 
 export interface ReviewItem {
   id: string;

@@ -18,6 +18,7 @@ import { CustomerListPage } from "./pages/CustomerListPage";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { FinanceDashboard } from "./pages/FinanceDashboard";
 import { FollowUpPage } from "./pages/FollowUpPage";
+import { TodoPage } from "./pages/TodoPage";
 import type {
   ConsultationRecord,
   Employee,
@@ -161,6 +162,7 @@ export default function App() {
             onOpenCustomer={(id) => setPage(`customer-detail:${id}` as Page)}
           />
         )}
+        {page === "todo" && <TodoPage />}
         {page === "customer-list" && (
           <CustomerListPage
             onOpen={(id) => setPage(`customer-detail:${id}` as Page)}

@@ -603,3 +603,44 @@ export { API_BASE_URL };
 // 暴露部分 API 方法作为独立导出
 export const listTransactions = api.listTransactions;
 export const getCustomer = (id: string) => request<any>(`/customers/${id}`);
+
+// ===== Todo (待办) =====
+export function listTodos(params: { status?: string; category?: string; limit?: number; offset?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.category) qs.set("category", params.category);
+  qs.set("limit", String(params.limit ?? 100));
+  qs.set("offset", String(params.offset ?? 0));
+  return request<{ data: any[]; total: number }>(`/todo?${qs.toString()}`);
+}
+export function createTodo(input: any) {
+  return request<any>("/todo", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+  });
+}
+export function updateTodo(id: string, input: any) {
+  return request<any>(`/todo/${id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+  });
+}
+export function deleteTodo(id: string) {
+  return request<{ data: { id: string; deleted: boolean } }>(`/todo/${id}`, { method: "DELETE" });
+}
+
+// ===== YoooClaw 录音导入 =====
+export function importYoooclawRecording(payload: {
+  recordingId: string;
+  recordingName?: string;
+  transcript: string;
+  summary?: string;
+  durationSec?: number;
+  todos?: Array<any>;
+  followUps?: Array<any>;
+}) {
+  return request<any>("/yoooclaw/import-recording", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+  });
+}
+export function listImportedRecordings(limit = 50) {
+  return request<{ data: any[] }>(`/yoooclaw/imported-recordings?limit=${limit}`);
+}
