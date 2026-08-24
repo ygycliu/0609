@@ -1866,6 +1866,18 @@ export function createApp() {
     }
   });
 
+  // 轻量客户名列表（用于 AI 扫描客户名匹配）
+  app.get("/api/customers/names", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query<{ id: string; name: string }>(
+        "SELECT id, name FROM customer WHERE company_id = $1 AND deleted_at IS NULL ORDER BY name",
+        [u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (error) { next(error); }
+  });
+
   // 导出客户为 CSV
   app.get("/api/customers/export.csv", async (request, response, next) => {
     try {
@@ -2716,7 +2728,7 @@ export function createApp() {
 
       // 检查是否已导入
       const exists = await query<{ id: string }>(
-        "SELECT id FROM yoooclaw_recording_import WHERE company_id = $1 AND recording_id = $2",
+        "SELECT id FROM yoooclaw_recording_import WHERE company_id = $1 AND recording_id = $2 AND status = 'processed'",
         [u.companyId, recordingId]
       );
       if (exists.rows.length > 0) {
@@ -2748,7 +2760,12 @@ export function createApp() {
           `INSERT INTO knowledge_document
             (id, company_id, doc_code, title, category, subcategory, file_path, file_type, file_size,
              content_text, confidentiality, business_value, source, status, current_version, tags, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 1, $15, NOW(), NOW())`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 1, $15, NOW(), NOW())
+           ON CONFLICT (company_id, doc_code) DO UPDATE SET
+             content_text = EXCLUDED.content_text,
+             title = EXCLUDED.title,
+             updated_at = NOW(),
+             deleted_at = NULL`,
           [
             knowledgeId,
             u.companyId,
