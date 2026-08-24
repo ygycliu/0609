@@ -2583,11 +2583,12 @@ export function createApp() {
 
         await fs.writeFile(pdfPath, request.file.buffer);
 
-        // 用 pdftotext + python-docx 实现（LibreOffice headless 在此环境无 PDF 导入过滤器）
-        const pythonScript = path.resolve("./src/pdf_to_docx.py");
+        // 使用 pdftotext + LLM 重排版（识别标题/段落/表格/列表）
+        const model = String(request.body?.model || "ollama");
+        const pythonScript = path.resolve("./src/pdf_to_docx_llm.py");
         const venvPython = "/home/ygycliu/ComfyUI/.venv/bin/python";
         try {
-          await execFile(venvPython, [pythonScript, pdfPath, docxPath], { timeout: 60_000 });
+          await execFile(venvPython, [pythonScript, pdfPath, docxPath, model], { timeout: 120_000 });
         } catch (err) {
           throw new AppError(`转换失败: ${(err as Error).message}`, "PDF_CONVERT_ERROR", 500);
         }

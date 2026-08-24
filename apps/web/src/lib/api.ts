@@ -299,9 +299,10 @@ export const api = {
   },
 
   // ===== PDF 转 Word =====
-  pdfToDocx: async (file: File): Promise<{ blob: Blob; filename: string }> => {
+  pdfToDocx: async (file: File, model: string = "ollama"): Promise<{ blob: Blob; filename: string }> => {
     const form = new FormData();
     form.append("file", file);
+    form.append("model", model);
     const r = await fetch(`${API_BASE_URL}/pdf/to-docx`, {
       method: "POST",
       body: form,
