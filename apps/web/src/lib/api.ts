@@ -160,13 +160,46 @@ export const api = {
     requestBlob("/templates/digital-transformation-solution.pptx"),
 
   // ===== Customers =====
-  listCustomers: () => request<any[]>("/customers"),
+  listCustomers: async (params: {
+    q?: string;
+    status?: string;
+    service_stage?: string;
+    industry?: string;
+    tags?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.status) qs.set("status", params.status);
+    if (params.service_stage) qs.set("service_stage", params.service_stage);
+    if (params.industry) qs.set("industry", params.industry);
+    if (params.tags) qs.set("tags", params.tags);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    // 后端返回 { data: [...], total }
+    // request 会自动解包 data 字段，所以这里再 fetch 一次拿到完整响应
+    const response = await fetch(`${API_BASE_URL}/customers?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`customers list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number };
+  },
   searchCustomers: (q: string, limit = 20) =>
     request<any[]>(`/customers?q=${encodeURIComponent(q)}&limit=${limit}`),
   getCustomer: (id: string) => request<any>(`/customers/${id}`),
   createCustomer: (input: any) =>
     request<any>("/customers", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateCustomer: (id: string, input: any) =>
+    request<any>(`/customers/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deleteCustomer: (id: string) =>
+    request<{ data: { id: string; deleted: boolean } }>(`/customers/${id}`, {
+      method: "DELETE"
     }),
 
   // ===== Quotes =====
