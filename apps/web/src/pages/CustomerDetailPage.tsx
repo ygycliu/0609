@@ -107,6 +107,19 @@ export function CustomerDetailPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [projects, setProjects] = useState<Array<{
+    id: string;
+    projectCode: string;
+    name: string;
+    status: string;
+    contractAmount: number;
+    startedAt: string | null;
+    completedAt: string | null;
+    notes: string | null;
+  }>>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsTotal, setProjectsTotal] = useState(0);
+  const [projectsAmount, setProjectsAmount] = useState(0);
 
   useEffect(() => {
     if (customerId === null) {
@@ -155,6 +168,31 @@ export function CustomerDetailPage({
   function setField<K extends keyof CustomerDetail>(key: K, value: CustomerDetail[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  // 加载客户的项目（历史认证）
+  useEffect(() => {
+    if (customerId === null) {
+      setProjects([]);
+      return;
+    }
+    setProjectsLoading(true);
+    api.listProjects({ customer_id: customerId, limit: 100 })
+      .then((r) => {
+        setProjects(r.data || []);
+        setProjectsTotal(r.total || 0);
+        const sum = (r.data || []).reduce(
+          (s: number, p: any) => s + Number(p.contractAmount || 0),
+          0
+        );
+        setProjectsAmount(sum);
+      })
+      .catch(() => {
+        setProjects([]);
+        setProjectsTotal(0);
+        setProjectsAmount(0);
+      })
+      .finally(() => setProjectsLoading(false));
+  }, [customerId]);
 
   async function handleSave() {
     if (!form.name.trim()) {
@@ -476,6 +514,85 @@ export function CustomerDetailPage({
             </label>
           </div>
         </fieldset>
+
+        {/* 历史认证项目子表（来自 finance_project）*/}
+        {!isNew && (
+          <fieldset className="form-section">
+            <legend>
+              <span className="legend-icon">📜</span> 历史认证项目
+              <span className="legend-meta">
+                {projectsTotal > 0 && `· ${projectsTotal} 个项目 / 合计 ¥${projectsAmount.toLocaleString()}`}
+              </span>
+            </legend>
+            <div className="cert-history">
+              {projectsLoading ? (
+                <div className="loading-row">
+                  <LoaderCircle className="spin" size={18} /> 加载认证历史...
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="empty-row">
+                  <span className="muted">该客户暂无历史认证项目</span>
+                  <small>可从财务流水或项目管理中创建</small>
+                </div>
+              ) : (
+                <table className="cert-history-table">
+                  <thead>
+                    <tr>
+                      <th>项目编号</th>
+                      <th>认证项目</th>
+                      <th>认证金额</th>
+                      <th>起始日期</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projects.map((p) => {
+                      // 名称格式："客户名 | 描述"
+                      const parts = (p.name || "").split(" | ");
+                      const certName = parts.length > 1 ? parts.slice(1).join(" | ") : p.name;
+                      return (
+                        <tr key={p.id}>
+                          <td className="mono">{p.projectCode}</td>
+                          <td>
+                            <strong>{certName}</strong>
+                            {p.notes && (
+                              <small className="muted">{p.notes}</small>
+                            )}
+                          </td>
+                          <td className="amount">
+                            ¥{Number(p.contractAmount || 0).toLocaleString()}
+                          </td>
+                          <td className="mono">
+                            {p.startedAt
+                              ? new Date(p.startedAt).toLocaleDateString("zh-CN")
+                              : "—"}
+                          </td>
+                          <td>
+                            <span className={`status-pill status-${p.status === "completed" ? "completed" : p.status === "in_progress" ? "active" : "default"}`}>
+                              {p.status === "completed" ? "已完成"
+                                : p.status === "in_progress" ? "进行中"
+                                : p.status === "cancelled" ? "已取消"
+                                : p.status || "—"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {projects.length > 0 && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={2} className="mono">合计</td>
+                        <td className="amount"><strong>¥{projectsAmount.toLocaleString()}</strong></td>
+                        <td colSpan={2} className="muted">{projectsTotal} 个项目</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              )}
+            </div>
+          </fieldset>
+        )}
       </section>
     </div>
   );

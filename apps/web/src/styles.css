@@ -5200,3 +5200,120 @@ select:focus-visible {
   background: rgba(245, 158, 11, 0.12);
   color: #fcd34d;
 }
+
+
+/* ============================================================ */
+/* =========  客户详情：历史认证项目子表 ========== */
+/* ============================================================ */
+
+.legend-icon {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+.legend-meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 10px;
+}
+
+.cert-history {
+  padding: 4px 0;
+}
+
+.cert-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.cert-history-table thead th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.cert-history-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.cert-history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cert-history-table tbody tr:hover {
+  background: var(--surface-muted);
+}
+
+.cert-history-table tbody td strong {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cert-history-table tbody td small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cert-history-table .amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cert-history-table tfoot td {
+  padding: 10px;
+  border-top: 2px solid var(--line);
+  background: var(--surface-muted);
+  font-size: 13px;
+}
+
+.cert-history-table tfoot .amount strong {
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cert-history .empty-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 12px;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.cert-history .empty-row small {
+  font-size: 11px;
+}
+
+.cert-history .loading-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+[data-theme="dark"] .cert-history-table thead th,
+[data-theme="dark"] .cert-history-table tfoot td {
+  background: #222e2a;
+}
+
+[data-theme="dark"] .cert-history-table tbody tr:hover {
+  background: #2d3a35;
+}
