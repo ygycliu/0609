@@ -39,8 +39,9 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
+  // 默认覆盖所有历史数据（2024-2025）
   const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2024-12-31");
+  const [endDate, setEndDate] = useState("2025-12-31");
   const [page, setPage] = useState(0);
 
   useEffect(() => {
