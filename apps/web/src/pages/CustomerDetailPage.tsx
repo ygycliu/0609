@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Archive,
   ArrowLeft,
   Check,
   LoaderCircle,
@@ -260,6 +261,25 @@ export function CustomerDetailPage({
     }
   }
 
+  async function handleArchiveToggle() {
+    if (isNew || !customerId) return;
+    const nextStatus = form.status === "archived" ? "active" : "archived";
+    const verb = nextStatus === "archived" ? "归档" : "恢复";
+    if (!window.confirm(`确认${verb}客户「${form.name}」？`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.updateCustomer(customerId, { status: nextStatus });
+      setForm((prev) => ({ ...prev, status: nextStatus }));
+      setSuccess(`${verb}成功`);
+      setTimeout(() => setSuccess(""), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${verb}失败`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="loading-row">
@@ -280,14 +300,26 @@ export function CustomerDetailPage({
         </div>
         <div className="header-actions">
           {!isNew && (
-            <button
-              className="danger-button"
-              onClick={handleDelete}
-              disabled={saving}
-              type="button"
-            >
-              <Trash2 size={16} /> 删除
-            </button>
+            <>
+              <button
+                className="ghost-button"
+                onClick={handleArchiveToggle}
+                disabled={saving}
+                type="button"
+                title={form.status === "archived" ? "恢复为活跃" : "归档此客户"}
+              >
+                {form.status === "archived" ? <Check size={16} /> : <Archive size={16} />}
+                {form.status === "archived" ? "恢复" : "归档"}
+              </button>
+              <button
+                className="danger-button"
+                onClick={handleDelete}
+                disabled={saving}
+                type="button"
+              >
+                <Trash2 size={16} /> 删除
+              </button>
+            </>
           )}
           <button
             className="primary-button"

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   ChevronRight,
+  Download,
   LoaderCircle,
   Plus,
   Search,
@@ -61,6 +62,38 @@ export function CustomerListPage({ onOpen, onCreate }: CustomerListPageProps) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await api.exportCustomers({
+        q: q.trim() || undefined,
+        status: status || undefined,
+        service_stage: stage || undefined
+      });
+      if (!response.ok) throw new Error(`导出失败: ${response.status}`);
+
+      // 从响应头拿文件名
+      const disposition = response.headers.get("content-disposition") || "";
+      const m = disposition.match(/filename\*=UTF-8''([^;]+)/);
+      const filename = m ? decodeURIComponent(m[1]) : `客户列表_${new Date().toISOString().slice(0, 10)}.csv`;
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "导出失败");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -85,13 +118,15 @@ export function CustomerListPage({ onOpen, onCreate }: CustomerListPageProps) {
 
   const stats = useMemo(() => {
     const active = items.filter((c) => c.status === "active").length;
+    const inactive = items.filter((c) => c.status === "inactive").length;
+    const archived = items.filter((c) => c.status === "archived").length;
     const stageMap = new Map<string, number>();
     for (const c of items) {
       if (c.serviceStage) {
         stageMap.set(c.serviceStage, (stageMap.get(c.serviceStage) ?? 0) + 1);
       }
     }
-    return { active, stageMap };
+    return { active, inactive, archived, stageMap };
   }, [items]);
 
   return (
@@ -102,9 +137,15 @@ export function CustomerListPage({ onOpen, onCreate }: CustomerListPageProps) {
           <h1>客户管理</h1>
           <p>管理你服务过的所有客户档案，作为业务基础数据被报价、咨询、审核等模块引用。</p>
         </div>
-        <button className="primary-button" onClick={onCreate}>
-          <Plus size={18} /> 新建客户
-        </button>
+        <div className="page-header-actions">
+          <button className="ghost-button" onClick={handleExport} disabled={exporting}>
+            {exporting ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+            导出 CSV
+          </button>
+          <button className="primary-button" onClick={onCreate}>
+            <Plus size={18} /> 新建客户
+          </button>
+        </div>
       </header>
 
       <section className="customer-toolbar">
@@ -163,9 +204,37 @@ export function CustomerListPage({ onOpen, onCreate }: CustomerListPageProps) {
       </section>
 
       <section className="customer-stats">
-        <div className="stat-card">
-          <span>当前活跃</span>
+        <div
+          className={`stat-card clickable ${status === "" ? "active" : ""}`}
+          onClick={() => { setPage(0); setStatus(""); }}
+          title="显示所有状态"
+        >
+          <span>全部</span>
+          <strong>{total}</strong>
+        </div>
+        <div
+          className={`stat-card clickable status-active ${status === "active" ? "active" : ""}`}
+          onClick={() => { setPage(0); setStatus("active"); }}
+          title="只显示活跃客户"
+        >
+          <span>活跃</span>
           <strong>{stats.active}</strong>
+        </div>
+        <div
+          className={`stat-card clickable status-inactive ${status === "inactive" ? "active" : ""}`}
+          onClick={() => { setPage(0); setStatus("inactive"); }}
+          title="只显示暂停客户"
+        >
+          <span>暂停</span>
+          <strong>{stats.inactive}</strong>
+        </div>
+        <div
+          className={`stat-card clickable status-archived ${status === "archived" ? "active" : ""}`}
+          onClick={() => { setPage(0); setStatus("archived"); }}
+          title="只显示已归档客户"
+        >
+          <span>归档</span>
+          <strong>{stats.archived}</strong>
         </div>
         {Array.from(stats.stageMap.entries())
           .slice(0, 4)

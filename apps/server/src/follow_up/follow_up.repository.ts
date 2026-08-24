@@ -25,6 +25,7 @@ export interface FollowUpRecord {
   projectId: string | null;
   projectCode?: string | null;
   certificationType: string | null;
+  issuingBody: string | null;
   stage: string;
   year: number;
   expectedDate: string | null;
@@ -39,6 +40,19 @@ export interface FollowUpRecord {
   archivedYear: number | null;
   createdAt: string;
   updatedAt: string | null;
+}
+
+// 出证机构字典
+export const ISSUING_BODIES = [
+  { key: "zhongren",  label: "中认认证有限公司", short: "中认" },
+  { key: "huazhong",  label: "华中检测",         short: "华中" },
+  { key: "other",     label: "其他",             short: "其他" },
+];
+
+export function getIssuingBodyLabel(key: string | null): string {
+  if (!key) return "中认认证有限公司";
+  const found = ISSUING_BODIES.find(b => b.key === key);
+  return found?.label || key;
 }
 
 export interface FollowUpLogRecord {
@@ -59,6 +73,7 @@ function rowToFollowUp(r: any): FollowUpRecord {
     projectId: r.project_id,
     projectCode: r.project_code,
     certificationType: r.certification_type,
+    issuingBody: r.issuing_body,
     stage: r.stage,
     year: r.year,
     expectedDate: r.expected_date,
@@ -92,10 +107,12 @@ export class FollowUpRepository {
     stage?: string;
     year?: number;
     isArchived?: boolean;
+    issuingBody?: string;
+    includeArchivedCustomers?: boolean;  // 默认 false 排除 archived 客户
     offset?: number;
     limit?: number;
   } = {}): Promise<{ items: FollowUpRecord[]; total: number; totalAll: number }> {
-    const { customerId, stage, year, isArchived, offset = 0, limit = 50 } = options;
+    const { customerId, stage, year, isArchived, issuingBody, includeArchivedCustomers = false, offset = 0, limit = 50 } = options;
     const conditions: string[] = ["f.company_id = $1", "f.deleted_at IS NULL"];
     const params: any[] = [companyId];
     let paramIdx = 2;
@@ -119,6 +136,15 @@ export class FollowUpRepository {
       conditions.push(`f.is_archived = $${paramIdx}`);
       params.push(isArchived);
       paramIdx++;
+    }
+    if (issuingBody && issuingBody.trim()) {
+      conditions.push(`f.issuing_body = $${paramIdx}`);
+      params.push(issuingBody);
+      paramIdx++;
+    }
+    // 默认排除 archived 客户（除非显式 include）
+    if (!includeArchivedCustomers) {
+      conditions.push(`(c.id IS NULL OR c.status != 'archived')`);
     }
 
     const where = conditions.join(" AND ");
@@ -171,16 +197,17 @@ export class FollowUpRepository {
   async createFollowUp(companyId: string, input: Partial<FollowUpRecord>): Promise<FollowUpRecord | null> {
     const r = await query<{ id: string }>(
       `INSERT INTO customer_follow_up
-        (company_id, customer_id, project_id, certification_type,
+        (company_id, customer_id, project_id, certification_type, issuing_body,
          stage, year, expected_date, expected_amount, contract_amount,
          notes, metadata, owner_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id`,
       [
         companyId,
         input.customerId,
         input.projectId || null,
         input.certificationType || null,
+        input.issuingBody || "zhongren",
         input.stage || "expired",
         input.year || new Date().getFullYear(),
         input.expectedDate || null,
@@ -322,15 +349,14 @@ export class FollowUpRepository {
 
   /**
    * 为某客户在某年创建一组跟进（如果不存在）
-   * 用于"新年开始"自动从去年合同到期数据创建跟进
    */
   async ensureCustomerForForYear(
     companyId: string,
     customerId: string,
     year: number,
-    certificationType: string | null = null,
-    expectedDate: string | null = null
+    options: { certificationType?: string | null; expectedDate?: string | null; issuingBody?: string } = {}
   ): Promise<FollowUpRecord> {
+    const { certificationType, expectedDate, issuingBody } = options;
     // 查是否已有
     const existing = await query<{ id: string }>(
       `SELECT id FROM customer_follow_up
@@ -338,7 +364,7 @@ export class FollowUpRepository {
          AND deleted_at IS NULL
          AND ($4::text IS NULL OR certification_type = $4)
        LIMIT 1`,
-      [companyId, customerId, year, certificationType]
+      [companyId, customerId, year, certificationType || null]
     );
     if (existing.rows.length > 0) {
       return (await this.getFollowUp(companyId, existing.rows[0].id))!;
@@ -348,9 +374,98 @@ export class FollowUpRepository {
     return (await this.createFollowUp(companyId, {
       customerId,
       certificationType: certificationType || null,
+      issuingBody: issuingBody || "zhongren",
       stage: "expired",
       year,
-      expectedDate
+      expectedDate: expectedDate || null
     }))!;
+  }
+
+  /**
+   * 按出证机构聚合统计
+   */
+  async getStatsByIssuingBody(companyId: string, year?: number): Promise<{
+    year: number | null;
+    byIssuingBody: Array<{
+      issuingBody: string;
+      label: string;
+      count: number;
+      activeCount: number;
+      totalAmount: number;
+      archivedCount: number;
+    }>;
+    byStageAndIssuingBody: Array<{
+      issuingBody: string;
+      stage: string;
+      count: number;
+    }>;
+  }> {
+    // 按机构 + 年份汇总
+    const yearCondition = year ? `AND year = $2` : "";
+    const yearParams = year ? [companyId, year] : [companyId];
+
+    const byIbRows = await query<{
+      issuing_body: string;
+      count: string;
+      active_count: string;
+      total_amount: string;
+      archived_count: string;
+    }>(
+      `SELECT
+         COALESCE(issuing_body, 'zhongren') AS issuing_body,
+         COUNT(*) AS count,
+         SUM(CASE WHEN is_archived = FALSE THEN 1 ELSE 0 END) AS active_count,
+         COALESCE(SUM(COALESCE(contract_amount, expected_amount, 0)), 0) AS total_amount,
+         SUM(CASE WHEN is_archived = TRUE THEN 1 ELSE 0 END) AS archived_count
+       FROM customer_follow_up
+       WHERE company_id = $1
+         AND deleted_at IS NULL
+         ${yearCondition}
+       GROUP BY issuing_body
+       ORDER BY count DESC`,
+      yearParams
+    );
+
+    const byIbStageRows = await query<{
+      issuing_body: string;
+      stage: string;
+      count: string;
+    }>(
+      `SELECT
+         COALESCE(issuing_body, 'zhongren') AS issuing_body,
+         stage,
+         COUNT(*) AS count
+       FROM customer_follow_up
+       WHERE company_id = $1
+         AND deleted_at IS NULL
+         AND is_archived = FALSE
+         ${yearCondition}
+       GROUP BY issuing_body, stage
+       ORDER BY issuing_body, stage`,
+      yearParams
+    );
+
+    const labelMap: Record<string, string> = {
+      zhongren: "中认认证有限公司",
+      huazhong: "华中检测",
+      other: "其他"
+    };
+
+    return {
+      year: year ?? null,
+      byIssuingBody: byIbRows.rows.map(r => ({
+        issuingBody: r.issuing_body,
+        label: labelMap[r.issuing_body] || r.issuing_body,
+        count: parseInt(r.count, 10),
+        activeCount: parseInt(r.active_count, 10),
+        totalAmount: Number(r.total_amount),
+        archivedCount: parseInt(r.archived_count, 10)
+      })),
+      byStageAndIssuingBody: byIbStageRows.rows.map(r => ({
+        issuingBody: r.issuing_body,
+        stage: r.stage,
+        count: parseInt(r.count, 10)
+      }))
+    };
   }
 }
