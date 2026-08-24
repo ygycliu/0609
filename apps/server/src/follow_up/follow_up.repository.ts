@@ -169,9 +169,17 @@ export class FollowUpRepository {
     );
     const totalAll = parseInt(allYearTotal.rows[0].count, 10);
 
-    // 2) 当前筛选条件的计数
+    // 2) 当前筛选条件的计数（包含 archived 客户排除：用 EXISTS 检查）
+    // 因为 c.id/c.status 在 count query 中没有（没 JOIN），改用 f.customer_id IS NULL OR EXISTS
+    const countConditions = conditions.filter(c => !c.startsWith("(c."));
+    // 把 "(c.id IS NULL OR c.status != 'archived')" 替换为 EXISTS 子查询
+    const countWhere = countConditions.map(c =>
+      c === "(c.id IS NULL OR c.status != 'archived')"
+        ? "(f.customer_id IS NULL OR NOT EXISTS (SELECT 1 FROM customer WHERE id = f.customer_id AND status = 'archived'))"
+        : c
+    ).join(" AND ");
     const total = await query<{ count: string }>(
-      `SELECT count(*) FROM customer_follow_up f WHERE ${where}`,
+      `SELECT count(*) FROM customer_follow_up f WHERE ${countWhere}`,
       params
     );
 
