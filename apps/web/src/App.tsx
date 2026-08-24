@@ -170,12 +170,6 @@ export default function App() {
             }}
           />
         )}
-        <footer className="app-copyright" aria-label="版权信息">
-          版权所有上海缘起卢卡智能科技有限公司
-        </footer>
-      </main>
-    </div>
-  );
         {page === "finance-dashboard" && (
           <FinanceDashboard
             onOpenTransaction={(id) => {
@@ -183,4 +177,11 @@ export default function App() {
             }}
           />
         )}
+        <footer className="app-copyright" aria-label="版权信息">
+          版权所有上海缘起卢卡智能科技有限公司
+        </footer>
+      </main>
+    </div>
+  );
+        
 }
