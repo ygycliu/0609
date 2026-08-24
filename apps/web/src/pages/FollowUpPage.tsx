@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Archive,
+  Bell,
   Calendar,
   ChevronRight,
   LoaderCircle,
@@ -63,6 +64,15 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
   const [totalAll, setTotalAll] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importJson, setImportJson] = useState("");
+  const [importingNotifications, setImportingNotifications] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    created: number;
+    updated: number;
+    skipped: number;
+    newCustomers: number;
+  } | null>(null);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [stage, setStage] = useState<string>("");
   const [showArchived, setShowArchived] = useState(false);
@@ -98,6 +108,40 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
 
   const [importing, setImporting] = useState(false);
 
+  const handleImportNotifications = async () => {
+    let notifications: any[];
+    try {
+      notifications = JSON.parse(importJson);
+      if (!Array.isArray(notifications)) {
+        throw new Error("必须是 JSON 数组");
+      }
+    } catch (e) {
+      alert("JSON 解析失败：" + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
+
+    setImportingNotifications(true);
+    try {
+      const r = await api.importFollowUpsFromNotifications(notifications);
+      const data = r.data;
+      setImportResult({
+        created: data.created?.length ?? 0,
+        updated: data.updated?.length ?? 0,
+        skipped: data.skipped?.length ?? 0,
+        newCustomers: data.newCustomers ?? 0
+      });
+      // 刷新列表
+      const list = await api.listFollowUps({ year, archived: showArchived, limit: 100 });
+      setItems(list.data);
+      setTotal(list.total);
+      setTotalAll(list.totalAll);
+    } catch (e) {
+      alert("导入失败：" + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setImportingNotifications(false);
+    }
+  };
+
   const handleAutoImport = async () => {
     if (!confirm(`从客户历史数据自动导入"${year}"年的跟进（基于 last_service_at）？\n将跳过已存在的跟进。`)) return;
     setImporting(true);
@@ -125,6 +169,14 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           <p>跟踪客户从"到期→报价→合同→实施→出证→完成"全流程。每年归档以便来年继续跟进。</p>
         </div>
         <div className="page-header-actions">
+          <button
+            className="ghost-button"
+            onClick={() => setShowImportModal(true)}
+            title="从手机通知导入沟通信息"
+          >
+            <Bell size={16} />
+            通知导入
+          </button>
           <button
             className="ghost-button"
             onClick={handleAutoImport}
@@ -309,6 +361,85 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           </table>
         )}
       </section>
+
+      {/* 通知导入 Modal */}
+      {showImportModal && (
+        <div className="modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <Bell size={20} />
+              <h2>从手机通知导入跟进</h2>
+              <button className="ghost-button close-btn" onClick={() => setShowImportModal(false)}>
+                ×
+              </button>
+            </header>
+            <div className="modal-body">
+              <p className="modal-hint">
+                💡 将 YoooClaw 提取的通知数据粘贴到下方 JSON 数组。
+                每条通知包含客户名、沟通摘要、阶段、金额等字段。
+              </p>
+
+              <details className="schema-hint">
+                <summary>查看 JSON 格式示例</summary>
+                <pre>{`[
+  {
+    "customerName": "宁夏希望信息产业股份有限公司",
+    "customerPhone": "13800000001",
+    "stage": "quoted",
+    "year": 2026,
+    "certificationType": "QES",
+    "issuingBody": "zhongren",
+    "contractAmount": 85000,
+    "expectedDate": "2026-09-15",
+    "summary": "客户回复邮件同意 8.5 万报价",
+    "sourceApp": "Mail"
+  }
+]`}</pre>
+              </details>
+
+              <textarea
+                className="json-input"
+                value={importJson}
+                onChange={(e) => setImportJson(e.target.value)}
+                placeholder='粘贴 JSON 数组，例如：[{"customerName":"...","summary":"..."}]'
+                rows={12}
+              />
+
+              {importResult && (
+                <div className="import-result">
+                  <strong>导入结果：</strong>
+                  <span className="result-tag created">新建 {importResult.created} 条</span>
+                  {importResult.updated > 0 && (
+                    <span className="result-tag updated">更新 {importResult.updated} 条</span>
+                  )}
+                  {importResult.newCustomers > 0 && (
+                    <span className="result-tag new">新客户 {importResult.newCustomers} 个</span>
+                  )}
+                  {importResult.skipped > 0 && (
+                    <span className="result-tag skipped">跳过 {importResult.skipped} 条</span>
+                  )}
+                </div>
+              )}
+            </div>
+            <footer className="modal-footer">
+              <button
+                className="ghost-button"
+                onClick={() => setShowImportModal(false)}
+              >
+                关闭
+              </button>
+              <button
+                className="primary-button"
+                onClick={handleImportNotifications}
+                disabled={importingNotifications || !importJson.trim()}
+              >
+                {importingNotifications ? <LoaderCircle className="spin" size={16} /> : <Bell size={16} />}
+                导入
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

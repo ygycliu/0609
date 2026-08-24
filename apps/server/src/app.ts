@@ -20,7 +20,7 @@ import { QuoteRepository } from "./certification/quote.repository.js";
 import { CustomerRepository } from "./customers/customer.repository.js";
 import { FinanceRepository } from "./finance/finance.repository.js";
 import { ARRepository } from "./finance/ar.repository.js";
-import { FollowUpRepository, FOLLOW_UP_STAGES } from "./follow_up/follow_up.repository.js";
+import { FollowUpRepository, FOLLOW_UP_STAGES, ISSUING_BODIES } from "./follow_up/follow_up.repository.js";
 import { login, logout, createUser, listUsers, resetPassword, changeOwnPassword, setUserActive, authMiddleware, refresh as refreshToken, verifyMfa, enableMfa, disableMfa } from "./auth/auth.service.js";
 import type { UserRecord } from "./auth/auth.service.js";
 import { ACCESS_COOKIE, MFA_COOKIE, REFRESH_COOKIE, clearAuthCookies, readCookie, setMfaCookie, setSessionCookies } from "./auth/session.js";
@@ -1866,6 +1866,81 @@ export function createApp() {
     }
   });
 
+  // 导出客户为 CSV
+  app.get("/api/customers/export.csv", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const q = (request.query.q as string) || "";
+      const industry = (request.query.industry as string) || "";
+      const status = (request.query.status as string) || "";
+      const serviceStage = (request.query.service_stage as string) || "";
+      const tags = (request.query.tags as string) || "";
+
+      // 用 searchAdvanced，但 limit 提到最大
+      const result = await customerRepository.searchAdvanced(u.companyId, {
+        q: q.trim(),
+        industry,
+        status,
+        serviceStage,
+        tags: tags ? tags.split(",").filter(Boolean) : [],
+        offset: 0,
+        limit: 10000
+      });
+
+      // 生成 CSV (BOM + UTF-8)
+      const headers = [
+        "客户编号", "客户名称", "行业", "规模", "地区", "联系人",
+        "电话", "邮箱", "信用代码", "业务范围", "服务阶段", "状态",
+        "来源", "来源渠道", "标签", "累计营收", "服务次数",
+        "首次服务", "最近服务", "满意度", "备注", "创建时间"
+      ];
+      const esc = (v: any) => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        // 转义 CSV 特殊字符
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+      const rows = result.items.map((c: any) => [
+        c.customer_code,
+        c.name,
+        c.industry,
+        c.scale,
+        c.region,
+        c.contact_person,
+        c.contact_phone,
+        c.contact_email,
+        c.credit_code,
+        c.business_scope,
+        c.service_stage,
+        c.status,
+        c.source,
+        c.source_channel,
+        Array.isArray(c.tags) ? c.tags.join("; ") : "",
+        c.total_revenue ?? "",
+        c.service_count ?? "",
+        c.first_service_at,
+        c.last_service_at,
+        c.satisfaction_score,
+        c.notes,
+        c.created_at
+      ]);
+      const csv = [
+        "\uFEFF" + headers.map(esc).join(","),
+        ...rows.map(row => row.map(esc).join(","))
+      ].join("\r\n");
+
+      const filename = `客户列表_${new Date().toISOString().slice(0, 10)}.csv`;
+      response.setHeader("Content-Type", "text/csv; charset=utf-8");
+      response.setHeader("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      response.send(csv);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // 客户详情（含跟进统计）
   app.get("/api/customers/:id", async (request, response, next) => {
     try {
@@ -2161,6 +2236,23 @@ export function createApp() {
     } catch (error) { next(error); }
   });
 
+  // 出证机构字典
+  app.get("/api/follow-up/issuing-bodies", async (_request, response, next) => {
+    try {
+      response.json({ data: ISSUING_BODIES });
+    } catch (error) { next(error); }
+  });
+
+  // 按出证机构聚合统计
+  app.get("/api/follow-up/stats/by-issuing-body", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const year = request.query.year ? parseInt(request.query.year as string, 10) : undefined;
+      const result = await followUpRepository.getStatsByIssuingBody(u.companyId, year);
+      response.json({ data: result });
+    } catch (error) { next(error); }
+  });
+
   // 列表
   app.get("/api/follow-up", async (request, response, next) => {
     try {
@@ -2173,10 +2265,11 @@ export function createApp() {
         year: request.query.year ? parseInt(request.query.year as string, 10) : undefined,
         isArchived: request.query.archived === "1" || request.query.archived === "true"
                        ? true : (request.query.archived === "0" ? false : undefined),
+        issuingBody: (request.query.issuing_body as string) || undefined,
         offset,
         limit
       });
-      response.json({ data: result.items, total: result.total });
+      response.json({ data: result.items, total: result.total, totalAll: result.totalAll });
     } catch (error) { next(error); }
   });
 
@@ -2279,8 +2372,11 @@ export function createApp() {
         u.companyId,
         body.customerId as string,
         year,
-        (body.certificationType as string) || null,
-        (body.expectedDate as string) || null
+        {
+          certificationType: (body.certificationType as string) || null,
+          expectedDate: (body.expectedDate as string) || null,
+          issuingBody: (body.issuingBody as string) || "zhongren"
+        }
       );
       response.status(201).json({ data: created });
     } catch (error) { next(error); }
@@ -2295,6 +2391,7 @@ export function createApp() {
       if (customerIds.length === 0) throw new ValidationError("请选择至少一个客户");
       const year = body.year ? Number(body.year) : new Date().getFullYear();
       const certificationType = (body.certificationType as string) || null;
+      const issuingBody = (body.issuingBody as string) || "zhongren";
 
       const created: any[] = [];
       const skipped: string[] = [];
@@ -2305,8 +2402,7 @@ export function createApp() {
             u.companyId,
             cid,
             year,
-            certificationType,
-            null
+            { certificationType, issuingBody }
           );
           created.push(fu);
         } catch (e: any) {
@@ -2318,6 +2414,140 @@ export function createApp() {
         }
       }
       response.status(201).json({ data: { created: created.length, skipped: skipped.length, items: created } });
+    } catch (error) { next(error); }
+  });
+
+  // 从 YoooClaw 通知批量导入跟进
+  // 入参：notifications 数组，每项含 customerName, summary, stage, year, expectedDate, contractAmount, certificationType, issuingBody
+  app.post("/api/follow-up/import-from-notifications", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const notifications = (body.notifications as Array<{
+        customerName?: string;
+        customerPhone?: string;
+        stage?: string;
+        year?: number;
+        expectedDate?: string;
+        contractAmount?: number;
+        certificationType?: string;
+        issuingBody?: string;
+        summary?: string;
+        sourceApp?: string;
+        receivedAt?: string;
+      }>) || [];
+
+      if (notifications.length === 0) {
+        throw new ValidationError("通知列表不能为空");
+      }
+
+      const results = {
+        created: [] as any[],
+        updated: [] as any[],
+        skipped: [] as Array<{ customer: string; reason: string }>,
+        newCustomers: 0
+      };
+
+      for (const notif of notifications) {
+        const customerName = (notif.customerName || "").trim();
+        if (!customerName) {
+          results.skipped.push({ customer: "(空)", reason: "客户名为空" });
+          continue;
+        }
+
+        // 1. 找/建客户
+        let customerId: string | null = null;
+        const custRes = await query<{ id: string }>(
+          "SELECT id FROM customer WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1",
+          [u.companyId, customerName]
+        );
+        if (custRes.rows.length > 0) {
+          customerId = custRes.rows[0].id;
+        } else {
+          // 自动建客户
+          const newId = (await query<{ id: string }>(
+            "SELECT uuid_generate_v4() AS id"
+          )).rows[0].id;
+          const codeRes = await query<{ max_code: number }>(
+            "SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code FROM 2) AS INTEGER)), 0) AS max_code FROM customer WHERE company_id = $1 AND customer_code ~ '^C[0-9]+$'",
+            [u.companyId]
+          );
+          const newCode = `C${String((codeRes.rows[0].max_code || 0) + 1).padStart(5, "0")}`;
+          await query(
+            `INSERT INTO customer (id, company_id, customer_code, name, region, status, service_stage, contact_phone, notes, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, '宁夏', 'active', 'potential', $5, $6, NOW(), NOW())`,
+            [
+              newId,
+              u.companyId,
+              newCode,
+              customerName,
+              notif.customerPhone || null,
+              `从 YoooClaw 通知导入${notif.sourceApp ? ` (${notif.sourceApp})` : ""}${notif.summary ? ` - ${notif.summary.slice(0, 200)}` : ""}`
+            ]
+          );
+          customerId = newId;
+          results.newCustomers++;
+        }
+
+        // 2. 找现有跟进（按 customer + year + certType + issuingBody）
+        const year = notif.year || new Date().getFullYear();
+        const certType = notif.certificationType || null;
+        const issuingBody = notif.issuingBody || "zhongren";
+        const existingRes = await query<{ id: string }>(
+          `SELECT id FROM customer_follow_up
+           WHERE company_id = $1 AND customer_id = $2
+             AND year = $3 AND certification_type IS NOT DISTINCT FROM $4
+             AND issuing_body = $5
+             AND deleted_at IS NULL
+           LIMIT 1`,
+          [u.companyId, customerId, year, certType, issuingBody]
+        );
+
+        const stage = notif.stage || "expired";
+
+        if (existingRes.rows.length > 0) {
+          // 更新现有跟进（备注追加）
+          const fuId = existingRes.rows[0].id;
+          await query(
+            `UPDATE customer_follow_up
+             SET notes = COALESCE(notes || ' / ', '') || $1,
+                 expected_date = COALESCE($2, expected_date),
+                 contract_amount = COALESCE($3, contract_amount),
+                 updated_at = NOW()
+             WHERE id = $4`,
+            [
+              `通知(${notif.sourceApp || "?"}): ${(notif.summary || "").slice(0, 200)}`,
+              notif.expectedDate || null,
+              notif.contractAmount ?? null,
+              fuId
+            ]
+          );
+          results.updated.push({ customerId, followUpId: fuId, customerName });
+        } else {
+          // 创建新跟进
+          const fuRes = await query<{ id: string }>(
+            `INSERT INTO customer_follow_up
+              (id, company_id, customer_id, certification_type, issuing_body,
+               stage, year, expected_date, contract_amount, notes, created_at, updated_at)
+             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+             RETURNING id`,
+            [
+              u.companyId,
+              customerId,
+              certType,
+              issuingBody,
+              stage,
+              year,
+              notif.expectedDate || null,
+              notif.contractAmount ?? null,
+              `从 YoooClaw 通知导入${notif.sourceApp ? ` (${notif.sourceApp})` : ""}: ${(notif.summary || "").slice(0, 300)}`
+            ]
+          );
+          results.created.push({ customerId, followUpId: fuRes.rows[0].id, customerName });
+        }
+      }
+
+      response.status(201).json({ data: results });
     } catch (error) { next(error); }
   });
 
@@ -2355,8 +2585,7 @@ export function createApp() {
             u.companyId,
             c.customer_id,
             year,
-            null,
-            c.last_service_at
+            { certificationType: null, expectedDate: c.last_service_at, issuingBody: "zhongren" }
           );
           items.push(fu);
           created++;

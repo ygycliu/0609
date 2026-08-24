@@ -325,6 +325,22 @@ export const api = {
     }),
   archiveFollowUpYear: (year: number) =>
     request<any>(`/follow-up/archive-year/${year}`, { method: "POST" }),
+  importFollowUpsFromNotifications: (notifications: Array<{
+    customerName?: string;
+    customerPhone?: string;
+    stage?: string;
+    year?: number;
+    expectedDate?: string;
+    contractAmount?: number;
+    certificationType?: string;
+    issuingBody?: string;
+    summary?: string;
+    sourceApp?: string;
+  }>) =>
+    request<any>("/follow-up/import-from-notifications", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifications })
+    }),
   ensureFollowUpForCustomer: (customerId: string, year?: number, certificationType?: string) =>
     request<any>("/follow-up/ensure-for-customer", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -373,6 +389,25 @@ export const api = {
   searchCustomers: (q: string, limit = 20) =>
     request<any[]>(`/customers?q=${encodeURIComponent(q)}&limit=${limit}`),
   getCustomer: (id: string) => request<any>(`/customers/${id}`),
+  exportCustomers: (params: {
+    q?: string;
+    industry?: string;
+    status?: string;
+    service_stage?: string;
+    tags?: string;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.industry) qs.set("industry", params.industry);
+    if (params.status) qs.set("status", params.status);
+    if (params.service_stage) qs.set("service_stage", params.service_stage);
+    if (params.tags) qs.set("tags", params.tags);
+    const path = qs.toString() ? `/customers/export.csv?${qs.toString()}` : "/customers/export.csv";
+    return fetch(`${API_BASE_URL}${path}`, {
+      credentials: "include",
+      headers: { Accept: "text/csv" }
+    });
+  },
   createCustomer: (input: any) =>
     request<any>("/customers", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
