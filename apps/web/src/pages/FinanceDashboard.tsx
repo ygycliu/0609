@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   Banknote,
   ChevronRight,
   CircleDollarSign,
@@ -55,6 +56,24 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
   const [drillTx, setDrillTx] = useState<any[]>([]);
   const [drillLoading, setDrillLoading] = useState(false);
 
+  // 应收账款 Top 10
+  const [arTop, setArTop] = useState<Array<{
+    customerId: string;
+    customerName: string;
+    arCount: number;
+    totalAmount: number;
+    paidAmount: number;
+    remainingAmount: number;
+    maxOverdueDays: number;
+  }>>([]);
+  const [arLoading, setArLoading] = useState(false);
+  const [arDrill, setArDrill] = useState<{
+    customerId: string;
+    customerName: string;
+  } | null>(null);
+  const [arDrillList, setArDrillList] = useState<any[]>([]);
+  const [arDrillLoading, setArDrillLoading] = useState(false);
+
   useEffect(() => {
     setLoading(true);
     setError("");
@@ -100,6 +119,28 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
       .catch((e) => console.error("drill load failed:", e))
       .finally(() => setDrillLoading(false));
   }, [drillCustomer, startDate, endDate]);
+
+  // 加载应收账款 Top 10
+  useEffect(() => {
+    setArLoading(true);
+    api.getARTopByCustomer(10)
+      .then((r) => setArTop(r.data || []))
+      .catch(() => setArTop([]))
+      .finally(() => setArLoading(false));
+  }, []);
+
+  // 加载某客户应收账款明细
+  useEffect(() => {
+    if (!arDrill) {
+      setArDrillList([]);
+      return;
+    }
+    setArDrillLoading(true);
+    api.listAR({ customer_id: arDrill.customerId, limit: 50 })
+      .then((r) => setArDrillList(r.data))
+      .catch(() => setArDrillList([]))
+      .finally(() => setArDrillLoading(false));
+  }, [arDrill]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -279,6 +320,50 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
         </div>
       </section>
 
+      {/* 应收账款 Top 10 */}
+      <section className="finance-grid">
+        <div className="card ar-card">
+          <div className="card-header">
+            <h3>
+              <AlertCircle size={16} /> 应收账款 Top 10
+            </h3>
+            <span className="card-note">
+              未收回 ¥{arTop.reduce((s, c) => s + c.remainingAmount, 0).toLocaleString()}
+            </span>
+          </div>
+          <div className="card-body">
+            {arLoading ? (
+              <div className="loading-row">
+                <LoaderCircle className="spin" size={20} /> 加载中...
+              </div>
+            ) : arTop.length === 0 ? (
+              <div className="empty-row">暂无应收账款</div>
+            ) : (
+              arTop.map((c) => (
+                <div
+                  key={c.customerId}
+                  className="customer-row clickable ar-row"
+                  onClick={() => setArDrill({ customerId: c.customerId, customerName: c.customerName })}
+                  title="点击查看该客户的应收账款明细"
+                >
+                  <div className="ar-row-main">
+                    <span className="customer-name">{c.customerName}</span>
+                    <span className="ar-meta">
+                      {c.arCount} 笔
+                      {c.maxOverdueDays > 0 && (
+                        <span className="overdue-badge">逾期 {c.maxOverdueDays} 天</span>
+                      )}
+                    </span>
+                  </div>
+                  <span className="customer-amount">¥{c.remainingAmount.toLocaleString()}</span>
+                  <ChevronRight size={14} />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* 穿透查看抽屉 */}
       {drillCustomer && (
         <>
@@ -331,6 +416,80 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
                           </strong>
                         </td>
                         <td className="muted">{t.description || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* 应收账款穿透 drawer */}
+      {arDrill && (
+        <>
+          <div className="drawer-overlay" onClick={() => setArDrill(null)} />
+          <aside className="drawer">
+            <header className="drawer-header ar-drawer">
+              <div>
+                <span className="eyebrow">应收账款明细</span>
+                <h2>{arDrill.customerName}</h2>
+                <p>
+                  {arDrillList.length} 笔账单 · 未收回 ¥
+                  {arDrillList.reduce((s, x) => s + Number(x.remainingAmount || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <button className="ghost-button" onClick={() => setArDrill(null)} title="关闭">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="drawer-body">
+              {arDrillLoading ? (
+                <div className="loading-row">
+                  <LoaderCircle className="spin" size={20} /> 加载中...
+                </div>
+              ) : arDrillList.length === 0 ? (
+                <div className="empty-row">该客户暂无应收账款</div>
+              ) : (
+                <table className="drill-table">
+                  <thead>
+                    <tr>
+                      <th>账单号</th>
+                      <th>标题</th>
+                      <th>应收</th>
+                      <th>已收</th>
+                      <th>未收</th>
+                      <th>到期日</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {arDrillList.map((ar) => (
+                      <tr key={ar.id}>
+                        <td className="mono">{ar.arNo}</td>
+                        <td>{ar.title}</td>
+                        <td>¥{Number(ar.totalAmount).toLocaleString()}</td>
+                        <td>¥{Number(ar.paidAmount).toLocaleString()}</td>
+                        <td>
+                          <strong style={{ color: "var(--primary)" }}>
+                            ¥{Number(ar.remainingAmount).toLocaleString()}
+                          </strong>
+                        </td>
+                        <td className="mono">
+                          {ar.dueDate
+                            ? new Date(ar.dueDate).toLocaleDateString("zh-CN")
+                            : "—"}
+                        </td>
+                        <td>
+                          {ar.status === "paid" ? (
+                            <span className="status-pill status-completed">已收</span>
+                          ) : ar.overdueDays > 0 ? (
+                            <span className="status-pill status-overdue">逾期 {ar.overdueDays} 天</span>
+                          ) : (
+                            <span className="status-pill status-pending">待收</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
