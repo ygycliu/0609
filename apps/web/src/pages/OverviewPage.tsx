@@ -128,6 +128,36 @@ export function OverviewPage({
           )}
         </ol>
       </section>
+
+      {/* 业务入口：彩色分类卡片（参考认监委平台风格） */}
+      <section className="category-band">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">业务入口</span>
+            <h2>核心业务快速直达</h2>
+          </div>
+        </div>
+        <div className="category-grid">
+          {[
+            { key: "consult", label: "开始咨询", desc: "AI 多角色协同", color: "yellow", icon: "💬" },
+            { key: "certification-quote", label: "认证报价", desc: "QES 三体系", color: "purple", icon: "📋" },
+            { key: "auditor", label: "数字审核员", desc: "智能模拟外审", color: "pink", icon: "✓" },
+            { key: "customer-list", label: "客户管理", desc: "CRM 基础数据", color: "green", icon: "👥" },
+            { key: "files", label: "文件浏览", desc: "知识资产", color: "cyan", icon: "📁" },
+            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "blue", icon: "📚" }
+          ].map((item) => (
+            <button
+              key={item.key}
+              className={`category-card cat-${item.color}`}
+              onClick={() => onNavigate(item.key as Page)}
+            >
+              <span className="cat-icon">{item.icon}</span>
+              <strong>{item.label}</strong>
+              <small>{item.desc}</small>
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
