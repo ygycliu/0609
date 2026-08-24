@@ -14,6 +14,9 @@ import { ResultsPage } from "./pages/ResultsPage";
 import { AuditorPage } from "./pages/AuditorPage";
 import { FilesPage } from "./pages/FilesPage";
 import { PdfToWordPage } from "./pages/PdfToWordPage";
+import { CustomerListPage } from "./pages/CustomerListPage";
+import { CustomerDetailPage } from "./pages/CustomerDetailPage";
+import { FinanceDashboard } from "./pages/FinanceDashboard";
 import type {
   ConsultationRecord,
   Employee,
@@ -152,10 +155,32 @@ export default function App() {
         {page === "auditor" && <AuditorPage />}
         {page === "files" && <FilesPage />}
         {page === "pdf-to-word" && <PdfToWordPage />}
+        {page === "customer-list" && (
+          <CustomerListPage
+            onOpen={(id) => setPage(`customer-detail:${id}` as Page)}
+            onCreate={() => setPage("customer-detail")}
+          />
+        )}
+        {page.startsWith("customer-detail:") && (
+          <CustomerDetailPage
+            customerId={page === "customer-detail" ? null : page.replace("customer-detail:", "")}
+            onBack={() => setPage("customer-list")}
+            onChanged={() => {
+              /* 列表页会通过 page 切换重新加载 */
+            }}
+          />
+        )}
         <footer className="app-copyright" aria-label="版权信息">
           版权所有上海缘起卢卡智能科技有限公司
         </footer>
       </main>
     </div>
   );
+        {page === "finance-dashboard" && (
+          <FinanceDashboard
+            onOpenTransaction={(id) => {
+              window.alert(`交易 ${id} 详情页待实现`);
+            }}
+          />
+        )}
 }

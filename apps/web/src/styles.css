@@ -4558,3 +4558,210 @@ select:focus-visible {
 [data-theme="dark"] .primary-button {
   background: var(--primary);
 }
+
+
+/* ============================================================ */
+/* =========  财务管理（Finance）  ============== */
+/* ============================================================ */
+
+.finance-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.finance-metric-grid .metric {
+  position: relative;
+  overflow: hidden;
+}
+
+.finance-metric-grid .metric-icon {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.18;
+}
+
+.finance-metric-grid .metric strong {
+  font-size: 32px;
+  letter-spacing: -0.5px;
+}
+
+.finance-metric-grid .metric-income strong { color: var(--green); }
+.finance-metric-grid .metric-expense strong { color: #b03a3a; }
+.finance-metric-grid .metric-profit strong { color: var(--primary); }
+
+.finance-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.finance-toolbar .toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.finance-toolbar input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.type-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+}
+
+.type-pill:hover { background: var(--primary-bg); }
+
+.type-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.type-pill.green.active { background: var(--green); border-color: var(--green); }
+.type-pill.pink.active { background: #b03a3a; border-color: #b03a3a; }
+
+.finance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.card-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.card-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 90px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.bar-label {
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-track {
+  height: 8px;
+  background: var(--surface-muted);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 200ms ease;
+}
+
+.bar-fill.bar-green { background: linear-gradient(90deg, #10b981, #34d399); }
+.bar-fill.bar-pink { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+.bar-value {
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  text-align: right;
+  color: var(--ink);
+}
+
+.customer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 13px;
+}
+
+.customer-row:last-child { border-bottom: 0; }
+
+.customer-name {
+  color: var(--ink);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customer-amount {
+  font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 暗色模式 */
+[data-theme="dark"] .finance-toolbar,
+[data-theme="dark"] .card,
+[data-theme="dark"] .section-heading {
+  background: #1d2622;
+  border-color: #2d3a35;
+}
+
+[data-theme="dark"] .card-header {
+  background: #222e2a;
+  border-color: #2d3a35;
+}
+
+[data-theme="dark"] .type-pill {
+  background: #1d2622;
+  border-color: #2d3a35;
+  color: #92a09c;
+}

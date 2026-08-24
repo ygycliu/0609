@@ -159,6 +159,87 @@ export const api = {
   digitalTransformationPresentationTemplate: () =>
     requestBlob("/templates/digital-transformation-solution.pptx"),
 
+  // ===== Finance =====
+  listProjects: async (params: {
+    q?: string;
+    status?: string;
+    customer_id?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.status) qs.set("status", params.status);
+    if (params.customer_id) qs.set("customer_id", params.customer_id);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    const response = await fetch(`${API_BASE_URL}/finance/projects?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`projects list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number };
+  },
+  getProject: (id: string) => request<any>(`/finance/projects/${id}`),
+  createProject: (input: any) =>
+    request<any>("/finance/projects", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateProject: (id: string, input: any) =>
+    request<any>(`/finance/projects/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deleteProject: (id: string) =>
+    request<{ data: { id: string; deleted: boolean } }>(`/finance/projects/${id}`, {
+      method: "DELETE"
+    }),
+
+  listTransactions: async (params: {
+    type?: "income" | "expense";
+    category?: string;
+    project_id?: string;
+    customer_id?: string;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.type) qs.set("type", params.type);
+    if (params.category) qs.set("category", params.category);
+    if (params.project_id) qs.set("project_id", params.project_id);
+    if (params.customer_id) qs.set("customer_id", params.customer_id);
+    if (params.start_date) qs.set("start_date", params.start_date);
+    if (params.end_date) qs.set("end_date", params.end_date);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    const response = await fetch(`${API_BASE_URL}/finance/transactions?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`transactions list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number };
+  },
+  createTransaction: (input: any) =>
+    request<any>("/finance/transactions", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateTransaction: (id: string, input: any) =>
+    request<any>(`/finance/transactions/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deleteTransaction: (id: string) =>
+    request<{ data: { id: string; deleted: boolean } }>(`/finance/transactions/${id}`, {
+      method: "DELETE"
+    }),
+  getFinanceSummary: (params: { start_date?: string; end_date?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.start_date) qs.set("start_date", params.start_date);
+    if (params.end_date) qs.set("end_date", params.end_date);
+    const path = qs.toString() ? `/finance/summary?${qs.toString()}` : "/finance/summary";
+    return request<any>(path);
+  },
+
   // ===== Customers =====
   listCustomers: async (params: {
     q?: string;

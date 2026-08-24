@@ -18,6 +18,7 @@ import { ConsultationRepository } from "./consultations/consultation.repository.
 import { generateAuditPlan, generateChecklist, detectNonConformances, generateAuditReport } from "./auditor/auditor.service.js";
 import { QuoteRepository } from "./certification/quote.repository.js";
 import { CustomerRepository } from "./customers/customer.repository.js";
+import { FinanceRepository } from "./finance/finance.repository.js";
 import { login, logout, createUser, listUsers, resetPassword, changeOwnPassword, setUserActive, authMiddleware, refresh as refreshToken, verifyMfa, enableMfa, disableMfa } from "./auth/auth.service.js";
 import type { UserRecord } from "./auth/auth.service.js";
 import { ACCESS_COOKIE, MFA_COOKIE, REFRESH_COOKIE, clearAuthCookies, readCookie, setMfaCookie, setSessionCookies } from "./auth/session.js";
@@ -136,6 +137,7 @@ export function createApp() {
     console.warn("QuoteRepository init failed:", err?.message ?? err);
   });
   const customerRepository = new CustomerRepository();
+  const financeRepository = new FinanceRepository();
   customerRepository.init().catch((err) => {
     console.warn("CustomerRepository init failed:", err?.message ?? err);
   });
@@ -1838,16 +1840,23 @@ export function createApp() {
     try {
       const u = getUserFromReq(request);
       const q = (request.query.q as string) || "";
-      const limit = Math.min(parseInt((request.query.limit as string) || "20"), 100);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "50"), 1), 200);
+      const industry = (request.query.industry as string) || "";
+      const status = (request.query.status as string) || "";
+      const serviceStage = (request.query.service_stage as string) || "";
+      const tags = (request.query.tags as string) || "";
 
-      let customers;
-      if (q.trim()) {
-        // 用 trgm 索引搜索（ILIKE + 模糊）
-        customers = await customerRepository.search(u.companyId, q.trim(), limit);
-      } else {
-        customers = await customerRepository.list(u.companyId);
-      }
-      response.json({ data: customers });
+      const result = await customerRepository.searchAdvanced(u.companyId, {
+        q: q.trim(),
+        industry,
+        status,
+        serviceStage,
+        tags: tags ? tags.split(",").filter(Boolean) : [],
+        offset,
+        limit
+      });
+      response.json({ data: result.items, total: result.total });
     } catch (error) {
       next(error);
     }
@@ -1935,6 +1944,208 @@ export function createApp() {
     } catch (error) {
       next(error);
     }
+  });
+
+  app.patch("/api/customers/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const id = request.params.id;
+      const body = request.body as Record<string, unknown>;
+      if (!body || typeof body !== "object") throw new ValidationError("请求体不能为空");
+
+      // 提取允许的字段
+      const allowedKeys = [
+        "name", "customerCode", "industry", "employeeCount", "region", "address",
+        "contactPerson", "contactPhone", "contactEmail", "source", "notes",
+        "creditCode", "scale", "sourceChannel", "serviceStage", "businessScope",
+        "status", "tags", "satisfactionScore"
+      ];
+      const update: Record<string, unknown> = {};
+      for (const key of allowedKeys) {
+        if (key in body) update[key] = body[key];
+      }
+
+      const updated = await customerRepository.update(u.companyId, id, update);
+      if (!updated) throw new NotFoundError("客户");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/customers/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const id = request.params.id;
+      const ok = await customerRepository.softDelete(u.companyId, id);
+      if (!ok) throw new NotFoundError("客户");
+      response.json({ data: { id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  // ============== 财务管理 ==============
+
+  // ----- 项目 CRUD -----
+  app.get("/api/finance/projects", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "50"), 1), 200);
+      const result = await financeRepository.listProjects(u.companyId, {
+        q: (request.query.q as string) || "",
+        status: (request.query.status as string) || "",
+        customerId: (request.query.customer_id as string) || "",
+        offset,
+        limit
+      });
+      response.json({ data: result.items, total: result.total });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/finance/projects", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body || !body.name) throw new ValidationError("项目名称不能为空");
+      const created = await financeRepository.createProject(u.companyId, {
+        customerId: (body.customerId as string) || null,
+        projectCode: (body.projectCode as string) || "",
+        name: body.name as string,
+        certificationType: (body.certificationType as string) || null,
+        serviceType: (body.serviceType as string) || null,
+        contractAmount: Number(body.contractAmount) || 0,
+        status: (body.status as string) || "draft",
+        signedAt: (body.signedAt as string) || null,
+        startedAt: (body.startedAt as string) || null,
+        completedAt: (body.completedAt as string) || null,
+        deadlineAt: (body.deadlineAt as string) || null,
+        notes: (body.notes as string) || null,
+        ownerUserId: (body.ownerUserId as string) || u.id,
+        tags: (body.tags as string[]) || []
+      });
+      response.status(201).json({ data: created });
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/finance/projects/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const project = await financeRepository.getProject(u.companyId, request.params.id);
+      if (!project) throw new NotFoundError("项目");
+      response.json({ data: project });
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/finance/projects/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const allowedKeys = [
+        "customerId", "projectCode", "name", "certificationType", "serviceType",
+        "contractAmount", "status", "signedAt", "startedAt", "completedAt",
+        "deadlineAt", "notes", "ownerUserId", "tags"
+      ];
+      const update: Record<string, unknown> = {};
+      for (const k of allowedKeys) {
+        if (k in body) update[k] = body[k];
+      }
+      const updated = await financeRepository.updateProject(u.companyId, request.params.id, update);
+      if (!updated) throw new NotFoundError("项目");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/finance/projects/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const ok = await financeRepository.deleteProject(u.companyId, request.params.id);
+      if (!ok) throw new NotFoundError("项目");
+      response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  // ----- 交易流水 CRUD -----
+  app.get("/api/finance/transactions", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "50"), 1), 200);
+      const result = await financeRepository.listTransactions(u.companyId, {
+        type: request.query.type as "income" | "expense" | undefined,
+        category: (request.query.category as string) || "",
+        projectId: (request.query.project_id as string) || "",
+        customerId: (request.query.customer_id as string) || "",
+        startDate: (request.query.start_date as string) || "",
+        endDate: (request.query.end_date as string) || "",
+        offset,
+        limit
+      });
+      response.json({ data: result.items, total: result.total });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/finance/transactions", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      if (!body.type || !["income", "expense"].includes(body.type as string)) {
+        throw new ValidationError("type 必须是 income 或 expense");
+      }
+      if (!body.amount || isNaN(Number(body.amount))) {
+        throw new ValidationError("金额不能为空");
+      }
+      const created = await financeRepository.createTransaction(u.companyId, {
+        projectId: (body.projectId as string) || null,
+        customerId: (body.customerId as string) || null,
+        type: body.type as "income" | "expense",
+        category: (body.category as string) || "其他",
+        amount: Number(body.amount),
+        transDate: (body.transDate as string) || new Date().toISOString(),
+        description: (body.description as string) || null,
+        paymentMethod: (body.paymentMethod as string) || null,
+        reference: (body.reference as string) || null,
+        ps: (body.ps as string) || null,
+        invoiceNo: (body.invoiceNo as string) || null
+      });
+      response.status(201).json({ data: created });
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/finance/transactions/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const allowedKeys = [
+        "projectId", "customerId", "type", "category", "amount",
+        "transDate", "description", "paymentMethod", "reference", "ps", "invoiceNo"
+      ];
+      const update: Record<string, unknown> = {};
+      for (const k of allowedKeys) {
+        if (k in body) update[k] = body[k];
+      }
+      const updated = await financeRepository.updateTransaction(u.companyId, request.params.id, update);
+      if (!updated) throw new NotFoundError("交易");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/finance/transactions/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const ok = await financeRepository.deleteTransaction(u.companyId, request.params.id);
+      if (!ok) throw new NotFoundError("交易");
+      response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  // ----- 财务统计 -----
+  app.get("/api/finance/summary", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const result = await financeRepository.getSummary(u.companyId, {
+        startDate: (request.query.start_date as string) || "",
+        endDate: (request.query.end_date as string) || ""
+      });
+      response.json({ data: result });
+    } catch (error) { next(error); }
   });
 
   // 成果物列表（来自 consultation_project 的 deliverable）

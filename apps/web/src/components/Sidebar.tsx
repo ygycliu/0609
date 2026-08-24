@@ -1,5 +1,6 @@
 import {
   Award,
+  Banknote,
   BookOpen,
   BrainCircuit,
   Calculator,
@@ -14,6 +15,7 @@ import {
   MessageSquareText,
   Moon,
   Sun,
+  Users,
   X
 } from "lucide-react";
 import type { Page } from "../types";
@@ -49,7 +51,9 @@ const navigation: NavGroup[] = [
     items: [
       { id: "consult", label: "开始咨询", icon: MessageSquareText },
       { id: "certification-quote", label: "认证报价", icon: Calculator },
-      { id: "auditor", label: "数字审核员", icon: ClipboardList }
+      { id: "auditor", label: "数字审核员", icon: ClipboardList },
+      { id: "customer-list", label: "客户管理", icon: Users },
+      { id: "finance-dashboard", label: "财务管理", icon: Banknote }
     ]
   },
   {

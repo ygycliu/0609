@@ -30,9 +30,25 @@ export interface CustomerRecord {
   region: string | null;
   contactPerson: string | null;
   contactPhone: string | null;
+  contactEmail: string | null;
+  address: string | null;
+  source: string | null;
+  notes: string | null;
+  // 新增字段
+  creditCode: string | null;
+  scale: string | null;
+  sourceChannel: string | null;
+  serviceStage: string | null;
+  businessScope: string | null;
+  firstServiceAt: string | null;
+  lastServiceAt: string | null;
+  totalRevenue: number | null;
+  serviceCount: number | null;
+  satisfactionScore: number | null;
   status: string;
   tags: string[];
   createdAt: string;
+  updatedAt: string | null;
 }
 
 interface LegacyCustomer {
@@ -44,9 +60,63 @@ interface LegacyCustomer {
   status: string;
   tags: string[];
   createdAt: string;
+  // 可选字段（兼容老数据）
+  contactPerson?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  region?: string | null;
+  address?: string | null;
+  source?: string | null;
+  notes?: string | null;
+  creditCode?: string | null;
+  scale?: string | null;
+  sourceChannel?: string | null;
+  serviceStage?: string | null;
+  businessScope?: string | null;
+  firstServiceAt?: string | null;
+  lastServiceAt?: string | null;
+  totalRevenue?: number | null;
+  serviceCount?: number | null;
+  satisfactionScore?: number | null;
+  updatedAt?: string | null;
 }
 
-function rowToRecord(r: DbRow): CustomerRecord {
+
+interface DbCustomerRow extends Record<string, any> {}
+
+export interface CustomerSearchOptions {
+  q?: string;
+  industry?: string;
+  status?: string;
+  serviceStage?: string;
+  tags?: string[];
+  offset?: number;
+  limit?: number;
+}
+
+export interface CustomerInput {
+  customerCode?: string;
+  name: string;
+  industry?: string | null;
+  employeeCount?: number | null;
+  region?: string | null;
+  address?: string | null;
+  contactPerson?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  source?: string | null;
+  notes?: string | null;
+  creditCode?: string | null;
+  scale?: string | null;
+  sourceChannel?: string | null;
+  serviceStage?: string | null;
+  businessScope?: string | null;
+  status?: string;
+  tags?: string[];
+  satisfactionScore?: number | null;
+}
+
+function rowToRecord(r: any): CustomerRecord {
   return {
     id: r.id,
     customerCode: r.customer_code,
@@ -56,9 +126,24 @@ function rowToRecord(r: DbRow): CustomerRecord {
     region: r.region,
     contactPerson: r.contact_person,
     contactPhone: r.contact_phone,
-    status: r.status,
+    contactEmail: r.contact_email,
+    address: r.address,
+    source: r.source,
+    notes: r.notes,
+    creditCode: r.credit_code,
+    scale: r.scale,
+    sourceChannel: r.source_channel,
+    serviceStage: r.service_stage,
+    businessScope: r.business_scope,
+    firstServiceAt: r.first_service_at ? r.first_service_at.toISOString?.() || r.first_service_at : null,
+    lastServiceAt: r.last_service_at ? r.last_service_at.toISOString?.() || r.last_service_at : null,
+    totalRevenue: r.total_revenue ? Number(r.total_revenue) : null,
+    serviceCount: r.service_count ?? 0,
+    satisfactionScore: r.satisfaction_score,
+    status: r.status || "active",
     tags: r.tags ?? [],
-    createdAt: r.created_at?.toISOString() ?? new Date().toISOString()
+    createdAt: r.created_at?.toISOString?.() ?? r.created_at ?? new Date().toISOString(),
+    updatedAt: r.updated_at?.toISOString?.() || r.updated_at || null
   };
 }
 
@@ -78,9 +163,12 @@ export class CustomerRepository {
   async list(companyId: string): Promise<CustomerRecord[]> {
     if (this.useDb) {
       try {
-        const r = await query<DbRow>(
+        const r = await query<any>(
           `SELECT id, customer_code, name, industry, employee_count, region,
-                  contact_person, contact_phone, status, tags, created_at
+                  contact_person, contact_phone, contact_email, address, source, notes,
+                  credit_code, scale, source_channel, service_stage, business_scope,
+                  first_service_at, last_service_at, total_revenue, service_count,
+                  satisfaction_score, status, tags, created_at, updated_at
            FROM customer
            WHERE company_id = $1 AND deleted_at IS NULL
            ORDER BY created_at DESC LIMIT 500`,
@@ -94,10 +182,37 @@ export class CustomerRepository {
     return this.store.read() as unknown as CustomerRecord[];
   }
 
-  async create(companyId: string, input: Omit<CustomerRecord, "id" | "createdAt">): Promise<CustomerRecord> {
+  async create(companyId: string, input: Partial<Omit<CustomerRecord, "id" | "createdAt">>): Promise<CustomerRecord> {
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
-    const record: CustomerRecord = { id, ...input, createdAt };
+    const record: CustomerRecord = {
+      id,
+      customerCode: input.customerCode ?? "",
+      name: input.name ?? "",
+      industry: input.industry ?? null,
+      employeeCount: input.employeeCount ?? null,
+      region: input.region ?? null,
+      contactPerson: input.contactPerson ?? null,
+      contactPhone: input.contactPhone ?? null,
+      contactEmail: input.contactEmail ?? null,
+      address: input.address ?? null,
+      source: input.source ?? null,
+      notes: input.notes ?? null,
+      creditCode: input.creditCode ?? null,
+      scale: input.scale ?? null,
+      sourceChannel: input.sourceChannel ?? null,
+      serviceStage: input.serviceStage ?? null,
+      businessScope: input.businessScope ?? null,
+      firstServiceAt: input.firstServiceAt ?? null,
+      lastServiceAt: input.lastServiceAt ?? null,
+      totalRevenue: input.totalRevenue ?? null,
+      serviceCount: input.serviceCount ?? 0,
+      satisfactionScore: input.satisfactionScore ?? null,
+      status: input.status ?? "active",
+      tags: input.tags ?? [],
+      createdAt,
+      updatedAt: null
+    };
 
     if (this.useDb) {
       try {
@@ -140,9 +255,12 @@ export class CustomerRepository {
     if (this.useDb) {
       try {
         // 利用 pg_trgm 索引 + ILIKE 模糊匹配
-        const r = await query<DbRow>(
+        const r = await query<any>(
           `SELECT id, customer_code, name, industry, employee_count, region,
-                  contact_person, contact_phone, status, tags, created_at
+                  contact_person, contact_phone, contact_email, address, source, notes,
+                  credit_code, scale, source_channel, service_stage, business_scope,
+                  first_service_at, last_service_at, total_revenue, service_count,
+                  satisfaction_score, status, tags, created_at, updated_at
            FROM customer
            WHERE company_id = $1 AND deleted_at IS NULL
              AND (name ILIKE $2 OR customer_code ILIKE $2)
@@ -172,9 +290,12 @@ export class CustomerRepository {
   async getById(companyId: string, id: string): Promise<CustomerRecord | null> {
     if (this.useDb) {
       try {
-        const r = await query<DbRow>(
+        const r = await query<any>(
           `SELECT id, customer_code, name, industry, employee_count, region,
-                  contact_person, contact_phone, status, tags, created_at
+                  contact_person, contact_phone, contact_email, address, source, notes,
+                  credit_code, scale, source_channel, service_stage, business_scope,
+                  first_service_at, last_service_at, total_revenue, service_count,
+                  satisfaction_score, status, tags, created_at, updated_at
            FROM customer
            WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL`,
           [companyId, id]
@@ -188,4 +309,172 @@ export class CustomerRepository {
     const items = (await this.store.read()) as unknown as CustomerRecord[];
     return items.find(c => c.id === id) ?? null;
   }
+
+  /**
+   * 高级搜索：关键词 + 行业 + 状态 + 服务阶段 + 标签 + 分页
+   */
+  async searchAdvanced(companyId: string, options: CustomerSearchOptions): Promise<{ items: CustomerRecord[]; total: number }> {
+    const { q, status, serviceStage, tags, offset = 0, limit = 50 } = options;
+    const industry = options.industry;
+
+    if (this.useDb) {
+      try {
+        const conditions: string[] = ["company_id = $1", "deleted_at IS NULL"];
+        const params: any[] = [companyId];
+        let paramIdx = 2;
+
+        if (q && q.trim()) {
+          conditions.push(`(name ILIKE $${paramIdx} OR customer_code ILIKE $${paramIdx} OR credit_code ILIKE $${paramIdx})`);
+          params.push(`%${q.trim()}%`);
+          paramIdx++;
+        }
+
+        if (industry && industry.trim()) {
+          conditions.push(`industry = $${paramIdx}`);
+          params.push(industry);
+          paramIdx++;
+        }
+
+        if (status && status.trim()) {
+          conditions.push(`status = $${paramIdx}`);
+          params.push(status);
+          paramIdx++;
+        }
+
+        if (serviceStage && serviceStage.trim()) {
+          conditions.push(`service_stage = $${paramIdx}`);
+          params.push(serviceStage);
+          paramIdx++;
+        }
+
+        if (tags && tags.length > 0) {
+          conditions.push(`tags && $${paramIdx}::text[]`);
+          params.push(tags);
+          paramIdx++;
+        }
+
+        const whereClause = conditions.join(" AND ");
+        const offsetParam = paramIdx;
+        const limitParam = paramIdx + 1;
+
+        const itemsResult = await query<any>(
+          `SELECT id, customer_code, name, industry, employee_count, region,
+                  contact_person, contact_phone, contact_email, address, source, notes,
+                  credit_code, scale, source_channel, service_stage, business_scope,
+                  first_service_at, last_service_at, total_revenue, service_count,
+                  satisfaction_score, status, tags, created_at, updated_at
+           FROM customer
+           WHERE ${whereClause}
+           ORDER BY created_at DESC
+           LIMIT $${limitParam} OFFSET $${offsetParam}`,
+          [...params, offset, limit]
+        );
+
+        const totalResult = await query<{ count: string }>(
+          `SELECT count(*) FROM customer WHERE ${whereClause}`,
+          params
+        );
+
+        return {
+          items: itemsResult.rows.map(rowToRecord),
+          total: parseInt(totalResult.rows[0].count, 10)
+        };
+      } catch (err) {
+        console.warn("DB customer searchAdvanced failed:", (err as Error).message);
+      }
+    }
+    return { items: [], total: 0 };
+  }
+
+  /**
+   * 更新客户信息
+   */
+  async update(companyId: string, id: string, input: Partial<CustomerInput>): Promise<CustomerRecord | null> {
+    if (this.useDb) {
+      try {
+        const fields: string[] = [];
+        const params: any[] = [];
+        let paramIdx = 1;
+
+        const map: Record<string, string> = {
+          name: "name",
+          customerCode: "customer_code",
+          industry: "industry",
+          employeeCount: "employee_count",
+          region: "region",
+          address: "address",
+          contactPerson: "contact_person",
+          contactPhone: "contact_phone",
+          contactEmail: "contact_email",
+          source: "source",
+          notes: "notes",
+          creditCode: "credit_code",
+          scale: "scale",
+          sourceChannel: "source_channel",
+          serviceStage: "service_stage",
+          businessScope: "business_scope",
+          satisfactionScore: "satisfaction_score"
+        };
+
+        for (const [key, dbCol] of Object.entries(map)) {
+          if (key in input) {
+            fields.push(`${dbCol} = $${paramIdx}`);
+            params.push((input as any)[key]);
+            paramIdx++;
+          }
+        }
+
+        if ("tags" in input && input.tags) {
+          fields.push(`tags = $${paramIdx}::text[]`);
+          params.push(input.tags);
+          paramIdx++;
+        }
+
+        if ("status" in input && input.status) {
+          fields.push(`status = $${paramIdx}`);
+          params.push(input.status);
+          paramIdx++;
+        }
+
+        if (fields.length === 0) return null;
+
+        fields.push(`updated_at = NOW()`);
+        params.push(companyId);
+        params.push(id);
+
+        await query(
+          `UPDATE customer SET ${fields.join(", ")}
+           WHERE company_id = $${paramIdx} AND id = $${paramIdx + 1} AND deleted_at IS NULL`,
+          params
+        );
+
+        return await this.getById(companyId, id);
+      } catch (err) {
+        console.warn("DB customer update failed:", (err as Error).message);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 软删除客户
+   */
+  async softDelete(companyId: string, id: string): Promise<boolean> {
+    if (this.useDb) {
+      try {
+        const r = await query(
+          `UPDATE customer SET deleted_at = NOW(), updated_at = NOW()
+           WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL`,
+          [companyId, id]
+        );
+        return (r.rowCount ?? 0) > 0;
+      } catch (err) {
+        console.warn("DB customer softDelete failed:", (err as Error).message);
+        return false;
+      }
+    }
+    return false;
+  }
+
 }

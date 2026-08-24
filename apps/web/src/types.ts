@@ -8,7 +8,10 @@ export type Page =
   | "knowledge-review"
   | "auditor"
   | "files"
-  | "pdf-to-word";
+  | "pdf-to-word"
+  | "customer-list"
+  | "customer-detail"
+  | "finance-dashboard";
 
 export interface ReviewItem {
   id: string;
