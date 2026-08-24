@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import {
   Banknote,
+  ChevronRight,
   CircleDollarSign,
   Download,
   Filter,
   LoaderCircle,
   Receipt,
   TrendingDown,
-  TrendingUp
+  TrendingUp,
+  X
 } from "lucide-react";
 import { api } from "../lib/api";
 
@@ -44,6 +46,15 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
   const [endDate, setEndDate] = useState("2025-12-31");
   const [page, setPage] = useState(0);
 
+  // 客户穿透查看状态
+  const [drillCustomer, setDrillCustomer] = useState<{
+    id: string;
+    name: string;
+    type: "income" | "expense";
+  } | null>(null);
+  const [drillTx, setDrillTx] = useState<any[]>([]);
+  const [drillLoading, setDrillLoading] = useState(false);
+
   useEffect(() => {
     setLoading(true);
     setError("");
@@ -67,6 +78,28 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
       .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
       .finally(() => setLoading(false));
   }, [startDate, endDate, typeFilter, page]);
+
+  // 加载穿透客户的交易
+  useEffect(() => {
+    if (!drillCustomer) {
+      setDrillTx([]);
+      return;
+    }
+    setDrillLoading(true);
+    api.listTransactions({
+        type: drillCustomer.type,
+        customer_id: drillCustomer.id,
+        start_date: startDate,
+        end_date: endDate,
+        limit: 200,
+        offset: 0
+      })
+      .then((r) => {
+        setDrillTx(r.data);
+      })
+      .catch((e) => console.error("drill load failed:", e))
+      .finally(() => setDrillLoading(false));
+  }, [drillCustomer, startDate, endDate]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -208,9 +241,15 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
           </div>
           <div className="card-body">
             {summary?.incomeByCustomer.slice(0, 10).map((c) => (
-              <div key={c.customerId} className="customer-row">
+              <div
+                key={c.customerId}
+                className="customer-row clickable"
+                onClick={() => setDrillCustomer({ id: c.customerId, name: c.customerName ?? "未关联客户", type: "income" })}
+                title="点击查看该客户的所有收入明细"
+              >
                 <span className="customer-name">{c.customerName ?? "未关联客户"}</span>
                 <span className="customer-amount">¥{c.total.toLocaleString()}</span>
+                <ChevronRight size={14} />
               </div>
             ))}
           </div>
@@ -225,14 +264,82 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
           </div>
           <div className="card-body">
             {summary?.expenseByCustomer.slice(0, 10).map((c) => (
-              <div key={c.customerId} className="customer-row">
+              <div
+                key={c.customerId}
+                className="customer-row clickable"
+                onClick={() => setDrillCustomer({ id: c.customerId, name: c.customerName ?? "公司层面", type: "expense" })}
+                title="点击查看该客户的所有支出明细"
+              >
                 <span className="customer-name">{c.customerName ?? "公司层面"}</span>
                 <span className="customer-amount">¥{c.total.toLocaleString()}</span>
+                <ChevronRight size={14} />
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* 穿透查看抽屉 */}
+      {drillCustomer && (
+        <>
+          <div className="drawer-overlay" onClick={() => setDrillCustomer(null)} />
+          <aside className="drawer">
+            <header className="drawer-header">
+              <div>
+                <span className="eyebrow">{drillCustomer.type === "income" ? "客户收入明细" : "客户支出明细"}</span>
+                <h2>{drillCustomer.name}</h2>
+                <p>
+                  {startDate} ~ {endDate} · 共 {drillTx.length} 条
+                  {drillTx.length > 0 && (
+                    <> · 合计 ¥
+                      {drillTx.reduce((s, x) => s + Number(x.amount), 0).toLocaleString()}
+                    </>
+                  )}
+                </p>
+              </div>
+              <button className="ghost-button" onClick={() => setDrillCustomer(null)} title="关闭">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="drawer-body">
+              {drillLoading ? (
+                <div className="loading-row">
+                  <LoaderCircle className="spin" size={20} /> 加载中...
+                </div>
+              ) : drillTx.length === 0 ? (
+                <div className="empty-row">该客户在此期间没有 {drillCustomer.type === "income" ? "收入" : "支出"} 记录</div>
+              ) : (
+                <table className="drill-table">
+                  <thead>
+                    <tr>
+                      <th>日期</th>
+                      <th>分类</th>
+                      <th style={{ textAlign: "right" }}>金额</th>
+                      <th>描述</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drillTx.map((t) => (
+                      <tr key={t.id}>
+                        <td className="mono">
+                          {new Date(t.transDate).toLocaleDateString("zh-CN")}
+                        </td>
+                        <td>{t.category}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong style={{ color: t.type === "income" ? "var(--green)" : "#b03a3a" }}>
+                            {t.type === "income" ? "+" : "-"}¥{Number(t.amount).toLocaleString()}
+                          </strong>
+                        </td>
+                        <td className="muted">{t.description || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
 
       {/* 流水 */}
       <section className="section-heading">

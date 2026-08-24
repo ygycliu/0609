@@ -4765,3 +4765,183 @@ select:focus-visible {
   border-color: #2d3a35;
   color: #92a09c;
 }
+
+
+/* ============================================================ */
+/* =========  客户穿透抽屉（Drawer） ========== */
+/* ============================================================ */
+
+.customer-row.clickable {
+  cursor: pointer;
+  transition: background 120ms ease, padding 120ms ease;
+  padding: 8px 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-row.clickable:hover {
+  background: var(--primary-bg);
+  padding-left: 12px;
+}
+
+.customer-row.clickable .customer-amount {
+  flex: 0 0 auto;
+}
+
+.customer-row.clickable svg {
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease;
+  flex: 0 0 auto;
+}
+
+.customer-row.clickable:hover svg {
+  opacity: 1;
+  color: var(--primary);
+}
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  z-index: 90;
+  animation: drawer-fade-in 180ms ease;
+}
+
+@keyframes drawer-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 720px;
+  max-width: 100vw;
+  z-index: 100;
+  background: #ffffff;
+  box-shadow: -8px 0 32px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  animation: drawer-slide-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 28px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #fff;
+}
+
+.drawer-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 6px;
+  color: #fff;
+}
+
+.drawer-header .eyebrow {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.drawer-header p {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+}
+
+.drawer-header .ghost-button {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.drawer-header .ghost-button:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 28px;
+}
+
+.drill-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.drill-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.drill-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drill-table tr:hover td {
+  background: var(--surface-muted);
+}
+
+.drawer .empty-row,
+.drawer .loading-row {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* 暗色模式 */
+[data-theme="dark"] .drawer {
+  background: #1d2622;
+}
+
+[data-theme="dark"] .drawer-header {
+  background: linear-gradient(135deg, var(--primary) 0%, #1e3a5f 100%);
+}
+
+[data-theme="dark"] .drill-table th {
+  background: #222e2a;
+  border-color: #2d3a35;
+}
+
+[data-theme="dark"] .drill-table td {
+  border-color: #2d3a35;
+}
+
+[data-theme="dark"] .drill-table tr:hover td {
+  background: #222e2a;
+}
+
+[data-theme="dark"] .customer-row.clickable:hover {
+  background: #1e3a5f;
+}
+
+[data-theme="dark"] .customer-row.clickable:hover svg {
+  color: #4d97e3;
+}
