@@ -13,6 +13,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { AuditorPage } from "./pages/AuditorPage";
 import { FilesPage } from "./pages/FilesPage";
+import { PdfToWordPage } from "./pages/PdfToWordPage";
 import type {
   ConsultationRecord,
   Employee,
@@ -150,6 +151,7 @@ export default function App() {
         )}
         {page === "auditor" && <AuditorPage />}
         {page === "files" && <FilesPage />}
+        {page === "pdf-to-word" && <PdfToWordPage />}
         <footer className="app-copyright" aria-label="版权信息">
           版权所有上海缘起卢卡智能科技有限公司
         </footer>

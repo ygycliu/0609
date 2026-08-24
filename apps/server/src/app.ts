@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
+import { execFile as execFileCb } from "node:child_process";
+import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import cors from "cors";
 import express from "express";
@@ -9,6 +11,7 @@ import multer from "multer";
 import { pinoHttp } from "pino-http";
 import { z } from "zod";
 import { config } from "./config.js";
+const execFile = promisify(execFileCb);
 import { ConsultationService } from "./consultations/consultation.service.js";
 import { extractDocumentText } from "./documents/document.service.js";
 import { ConsultationRepository } from "./consultations/consultation.repository.js";
@@ -2562,14 +2565,60 @@ export function createApp() {
           references: knowledge.map(({ id, title, category }) => ({ id, title, category }))
         }
       });
+    } catch (error) { next(error); }
+  });
+
+  // ===== PDF 转 Word =====
+    app.post("/api/pdf/to-docx", upload.single("file"), async (request, response, next) => {
+      try {
+        if (!request.file) throw new ValidationError("请选择需要转换的 PDF 文件");
+        if (request.file.mimetype !== "application/pdf" && !request.file.originalname.toLowerCase().endsWith(".pdf")) {
+          throw new ValidationError("仅支持 PDF 文件");
+        }
+
+        const workDir = await fs.mkdtemp(path.join("/tmp", "pdf2docx-"));
+        const baseName = path.parse(request.file.originalname).name || "document";
+        const pdfPath = path.join(workDir, `${baseName}.pdf`);
+        const docxPath = path.join(workDir, `${baseName}.docx`);
+
+        await fs.writeFile(pdfPath, request.file.buffer);
+
+        // 用 pdftotext + python-docx 实现（LibreOffice headless 在此环境无 PDF 导入过滤器）
+        const pythonScript = path.resolve("./src/pdf_to_docx.py");
+        const venvPython = "/home/ygycliu/ComfyUI/.venv/bin/python";
+        try {
+          await execFile(venvPython, [pythonScript, pdfPath, docxPath], { timeout: 60_000 });
+        } catch (err) {
+          throw new AppError(`转换失败: ${(err as Error).message}`, "PDF_CONVERT_ERROR", 500);
+        }
+
+        try {
+          await fs.access(docxPath);
+        } catch {
+          throw new AppError("转换失败：未生成 docx 文件", "PDF_CONVERT_ERROR", 500);
+        }
+
+        const docxBuffer = await fs.readFile(docxPath);
+        const downloadName = `${baseName}.docx`;
+
+        // 异步清理工作目录
+        fs.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+
+        response.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        response.setHeader(
+          "Content-Disposition",
+          `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`
+        );
+        response.send(docxBuffer);
+      } catch (error) { next(error); }
+    });
 
   // ====== 飞书集成 ======
   app.post("/feishu/events", handleEvent);
   app.post("/api/feishu/push", pushMessage);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   if (fsSync.existsSync(config.webDist)) {
     app.use(express.static(config.webDist));

@@ -7,7 +7,8 @@ export type Page =
   | "certification-quote"
   | "knowledge-review"
   | "auditor"
-  | "files";
+  | "files"
+  | "pdf-to-word";
 
 export interface ReviewItem {
   id: string;

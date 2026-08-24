@@ -297,6 +297,29 @@ export const api = {
       return true;
     });
   },
+
+  // ===== PDF 转 Word =====
+  pdfToDocx: async (file: File): Promise<{ blob: Blob; filename: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const r = await fetch(`${API_BASE_URL}/pdf/to-docx`, {
+      method: "POST",
+      body: form,
+      credentials: "include"
+    });
+    if (!r.ok) {
+      let message = `convert failed: ${r.status}`;
+      try {
+        const errData = await r.json();
+        if (errData?.message) message = errData.message;
+      } catch { /* ignore */ }
+      throw new Error(message);
+    }
+    const dispo = r.headers.get("Content-Disposition") || "";
+    const match = dispo.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+    const filename = match ? decodeURIComponent(match[1]) : `${file.name.replace(/\.pdf$/i, "")}.docx`;
+    return { blob: await r.blob(), filename };
+  },
   filesMkdir: (path: string, name: string) =>
     request<{ name: string; path: string }>("/files/mkdir", {
       method: "POST",

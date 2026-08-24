@@ -74,6 +74,14 @@ const navigation: NavGroup[] = [
     page: "documents"
   },
   {
+    id: "tools",
+    label: "工具",
+    icon: FileSearch,
+    items: [
+      { id: "pdf-to-word", label: "PDF 转 Word", icon: FileSearch }
+    ]
+  },
+  {
     id: "results",
     label: "历史成果",
     icon: History,
