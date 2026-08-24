@@ -156,6 +156,11 @@ export default function App() {
         {page === "auditor" && <AuditorPage />}
         {page === "files" && <FilesPage />}
         {page === "pdf-to-word" && <PdfToWordPage />}
+        {page === "follow-up" && (
+          <FollowUpPage
+            onOpenCustomer={(id) => setPage(`customer-detail:${id}` as Page)}
+          />
+        )}
         {page === "customer-list" && (
           <CustomerListPage
             onOpen={(id) => setPage(`customer-detail:${id}` as Page)}
