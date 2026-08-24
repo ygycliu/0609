@@ -460,6 +460,41 @@ export class CustomerRepository {
   /**
    * 软删除客户
    */
+
+  /**
+   * 重新计算客户的累计营收统计
+   * 在交易创建/删除时调用
+   */
+  async recomputeCustomerTotals(customerId: string): Promise<void> {
+    const r = await query<{ total: string, cnt: string, first_at: string | null, last_at: string | null }>(
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS total,
+         COUNT(*) FILTER (WHERE type = 'income') AS cnt,
+         MIN(trans_date) AS first_at,
+         MAX(trans_date) AS last_at
+       FROM finance_transaction
+       WHERE customer_id = $1 AND deleted_at IS NULL`,
+      [customerId]
+    );
+    const row = r.rows[0];
+    await query(
+      `UPDATE customer SET
+         total_revenue = $1,
+         service_count = $2,
+         first_service_at = $3,
+         last_service_at = $4,
+         updated_at = NOW()
+       WHERE id = $5`,
+      [
+        Number(row.total) || 0,
+        Number(row.cnt) || 0,
+        row.first_at,
+        row.last_at,
+        customerId,
+      ]
+    );
+  }
+
   async softDelete(companyId: string, id: string): Promise<boolean> {
     if (this.useDb) {
       try {

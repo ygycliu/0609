@@ -2,6 +2,9 @@
  * 财务管理 - 项目 + 流水仓储
  */
 import { query } from "../db/pool.js";
+import { CustomerRepository } from "../customers/customer.repository.js";
+
+const customerRepository = new CustomerRepository();
 
 export interface ProjectRecord {
   id: string;
@@ -345,6 +348,51 @@ export class FinanceRepository {
   }
 
   async createTransaction(companyId: string, input: Partial<TransactionRecord>): Promise<TransactionRecord | null> {
+    // 自动按规则找/建项目（按 customer_id + description）
+    let resolvedProjectId = input.projectId || null;
+    if (!resolvedProjectId && input.customerId && input.description) {
+      const custRes = await query<{ name: string }>(
+        "SELECT name FROM customer WHERE id = $1",
+        [input.customerId]
+      );
+      const customerName = custRes.rows[0]?.name || "客户";
+      const projectName = `${customerName} | ${input.description}`;
+
+      // 找现有
+      const existing = await query<{ id: string }>(
+        "SELECT id FROM finance_project WHERE company_id = $1 AND customer_id = $2 AND name = $3 AND deleted_at IS NULL",
+        [companyId, input.customerId, projectName]
+      );
+      if (existing.rows.length > 0) {
+        resolvedProjectId = existing.rows[0].id;
+      } else {
+        // 新建（自动生成 project_code）
+        const maxCode = await query<{ max_code: string }>(
+          "SELECT COALESCE(MAX(CAST(SUBSTRING(project_code FROM 5) AS INTEGER)), 0) AS max_code FROM finance_project WHERE company_id = $1 AND project_code ~ '^PRJ-[0-9]+$'",
+          [companyId]
+        );
+        const nextNum = (parseInt(maxCode.rows[0]?.max_code || "0", 10) || 0) + 1;
+        const newCode = `PRJ-${String(nextNum).padStart(6, "0")}`;
+        const projRes = await query<{ id: string }>(
+          `INSERT INTO finance_project
+            (id, company_id, customer_id, project_code, name, status,
+             contract_amount, started_at, notes, created_at, updated_at)
+           VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), NOW())
+           RETURNING id`,
+          [
+            companyId,
+            input.customerId,
+            newCode,
+            projectName,
+            "in_progress",
+            0,
+            "自动从交易创建"
+          ]
+        );
+        resolvedProjectId = projRes.rows[0].id;
+      }
+    }
+
     const r = await query<any>(
       `INSERT INTO finance_transaction
         (company_id, project_id, customer_id, type, category, amount,
@@ -353,7 +401,7 @@ export class FinanceRepository {
        RETURNING *`,
       [
         companyId,
-        input.projectId || null,
+        resolvedProjectId,
         input.customerId || null,
         input.type || "income",
         input.category || "",
@@ -369,8 +417,13 @@ export class FinanceRepository {
     if (r.rows.length === 0) return null;
 
     // 重新计算项目总额
-    if (input.projectId) {
-      await this.recomputeProjectTotals(input.projectId);
+    if (resolvedProjectId) {
+      await this.recomputeProjectTotals(resolvedProjectId);
+    }
+
+    // 重新计算客户累计营收
+    if (r.rows[0].customer_id) {
+      await customerRepository.recomputeCustomerTotals(r.rows[0].customer_id);
     }
 
     return this.getTransaction(companyId, r.rows[0].id);
@@ -422,6 +475,11 @@ export class FinanceRepository {
       await this.recomputeProjectTotals(updated.projectId);
     }
 
+    // 重算客户累计营收
+    if (updated && updated.customerId) {
+      await customerRepository.recomputeCustomerTotals(updated.customerId);
+    }
+
     return updated;
   }
 
@@ -438,6 +496,9 @@ export class FinanceRepository {
 
     if (ok && old?.projectId) {
       await this.recomputeProjectTotals(old.projectId);
+    }
+    if (ok && old?.customerId) {
+      await customerRepository.recomputeCustomerTotals(old.customerId);
     }
     return ok;
   }
