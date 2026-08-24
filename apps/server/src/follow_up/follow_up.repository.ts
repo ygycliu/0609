@@ -94,7 +94,7 @@ export class FollowUpRepository {
     isArchived?: boolean;
     offset?: number;
     limit?: number;
-  } = {}): Promise<{ items: FollowUpRecord[]; total: number }> {
+  } = {}): Promise<{ items: FollowUpRecord[]; total: number; totalAll: number }> {
     const { customerId, stage, year, isArchived, offset = 0, limit = 50 } = options;
     const conditions: string[] = ["f.company_id = $1", "f.deleted_at IS NULL"];
     const params: any[] = [companyId];
@@ -129,6 +129,21 @@ export class FollowUpRepository {
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
       [...params, limit, offset]
     );
+
+    // 1) 全量计数（忽略 stage/customer/archived 过滤，仅按公司+年）
+    const allYearConditions: string[] = ["f.company_id = $1", "f.deleted_at IS NULL"];
+    const allYearParams: any[] = [companyId];
+    if (year) {
+      allYearConditions.push(`f.year = $2`);
+      allYearParams.push(year);
+    }
+    const allYearTotal = await query<{ count: string }>(
+      `SELECT count(*) FROM customer_follow_up f WHERE ${allYearConditions.join(" AND ")}`,
+      allYearParams
+    );
+    const totalAll = parseInt(allYearTotal.rows[0].count, 10);
+
+    // 2) 当前筛选条件的计数
     const total = await query<{ count: string }>(
       `SELECT count(*) FROM customer_follow_up f WHERE ${where}`,
       params
@@ -136,7 +151,8 @@ export class FollowUpRepository {
 
     return {
       items: items.rows.map(rowToFollowUp),
-      total: parseInt(total.rows[0].count, 10)
+      total: parseInt(total.rows[0].count, 10),
+      totalAll: totalAll
     };
   }
 

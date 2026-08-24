@@ -6,7 +6,8 @@ import {
   LoaderCircle,
   Plus,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Wand2
 } from "lucide-react";
 import { api } from "../lib/api";
 
@@ -59,6 +60,7 @@ interface FollowUpPageProps {
 export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
   const [items, setItems] = useState<FollowUpItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalAll, setTotalAll] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -77,6 +79,7 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
       .then((r) => {
         setItems(r.data);
         setTotal(r.total);
+        setTotalAll(r.totalAll);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
       .finally(() => setLoading(false));
@@ -93,6 +96,26 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
     }
   };
 
+  const [importing, setImporting] = useState(false);
+
+  const handleAutoImport = async () => {
+    if (!confirm(`从客户历史数据自动导入"${year}"年的跟进（基于 last_service_at）？\n将跳过已存在的跟进。`)) return;
+    setImporting(true);
+    try {
+      const r = await api.autoFollowUpFromHistory(year, 200);
+      alert(`已扫描 ${r.data.scanned} 个有历史交易的客户，创建 ${r.data.created} 条跟进`);
+      // 刷新
+      const list = await api.listFollowUps({ year, archived: showArchived, limit: 100 });
+      setItems(list.data);
+      setTotal(list.total);
+      setTotalAll(list.totalAll);
+    } catch (e) {
+      alert("导入失败：" + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="page-stack">
       <header className="page-header">
@@ -102,6 +125,15 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           <p>跟踪客户从"到期→报价→合同→实施→出证→完成"全流程。每年归档以便来年继续跟进。</p>
         </div>
         <div className="page-header-actions">
+          <button
+            className="ghost-button"
+            onClick={handleAutoImport}
+            disabled={importing}
+            title="从客户的历史交易记录自动导入跟进"
+          >
+            {importing ? <LoaderCircle className="spin" size={16} /> : <Wand2 size={16} />}
+            从历史导入
+          </button>
           <button className="ghost-button" onClick={handleArchive}>
             <Archive size={16} /> 归档 {year} 年
           </button>
@@ -152,7 +184,10 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           </label>
         </div>
         <div className="toolbar-group" style={{ marginLeft: "auto" }}>
-          <span>共 <strong>{total}</strong> 条</span>
+          <span>
+            共 <strong>{totalAll}</strong> 条
+            {total < totalAll && <>（已筛选 <strong>{total}</strong> 条）</>}
+          </span>
         </div>
       </section>
 
@@ -164,19 +199,34 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           <h3>
             <Sparkles size={16} /> {year} 年阶段漏斗
           </h3>
+          <span className="card-note">
+            进行中 <strong>{items.filter(i => !i.isArchived).length}</strong>
+            {totalAll > items.filter(i => !i.isArchived).length && (
+              <> · 归档 <strong>{totalAll - items.filter(i => !i.isArchived).length}</strong></>
+            )}
+          </span>
         </div>
         <div className="card-body">
           <div className="follow-up-funnel">
             {STAGE_FALLBACK.map(s => {
-              const count = items.filter(i => i.stage === s.key).length;
+              const active = items.filter(i => i.stage === s.key && !i.isArchived).length;
+              const archived = items.filter(i => i.stage === s.key && i.isArchived).length;
               return (
                 <div key={s.key} className={`funnel-step funnel-${s.color}`}>
                   <span className="funnel-label">{s.label}</span>
-                  <span className="funnel-count">{count}</span>
+                  <span className="funnel-count">{active}</span>
+                  {archived > 0 && (
+                    <span className="funnel-archived">归档 {archived}</span>
+                  )}
                 </div>
               );
             })}
           </div>
+          {totalAll === 0 && (
+            <div className="funnel-note">
+              💡 {year} 年暂无跟进。点击页面右上角 <strong>「从历史导入」</strong> 自动从客户历史交易生成跟进，或在「客户管理」中为单个客户创建跟进。
+            </div>
+          )}
         </div>
       </section>
 

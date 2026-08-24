@@ -2286,6 +2286,90 @@ export function createApp() {
     } catch (error) { next(error); }
   });
 
+  // 批量为客户在某年创建跟进（客户 ID 数组）
+  app.post("/api/follow-up/batch-ensure", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const customerIds = (body.customerIds as string[]) || [];
+      if (customerIds.length === 0) throw new ValidationError("请选择至少一个客户");
+      const year = body.year ? Number(body.year) : new Date().getFullYear();
+      const certificationType = (body.certificationType as string) || null;
+
+      const created: any[] = [];
+      const skipped: string[] = [];
+
+      for (const cid of customerIds) {
+        try {
+          const fu = await followUpRepository.ensureCustomerForForYear(
+            u.companyId,
+            cid,
+            year,
+            certificationType,
+            null
+          );
+          created.push(fu);
+        } catch (e: any) {
+          if (e.code === "23505" || /duplicate key/i.test(String(e.message))) {
+            skipped.push(cid);
+          } else {
+            throw e;
+          }
+        }
+      }
+      response.status(201).json({ data: { created: created.length, skipped: skipped.length, items: created } });
+    } catch (error) { next(error); }
+  });
+
+  // 从财务历史自动生成跟进（用 last_service_at 推断）
+  app.post("/api/follow-up/auto-from-history", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const year = request.query.year ? parseInt(request.query.year as string, 10) : new Date().getFullYear();
+      const limit = Math.min(parseInt((request.query.limit as string) || "50"), 500);
+
+      // 找所有去年（year-1）有交易的客户
+      const customers = await query<{
+        customer_id: string;
+        customer_name: string;
+        last_service_at: string;
+        service_count: string;
+      }>(
+        `SELECT id AS customer_id, name AS customer_name,
+                last_service_at, service_count
+         FROM customer
+         WHERE company_id = $1
+           AND deleted_at IS NULL
+           AND last_service_at IS NOT NULL
+           AND EXTRACT(YEAR FROM last_service_at) = $2
+         ORDER BY last_service_at DESC
+         LIMIT $3`,
+        [u.companyId, year - 1, limit]
+      );
+
+      let created = 0;
+      const items: any[] = [];
+      for (const c of customers.rows) {
+        try {
+          const fu = await followUpRepository.ensureCustomerForForYear(
+            u.companyId,
+            c.customer_id,
+            year,
+            null,
+            c.last_service_at
+          );
+          items.push(fu);
+          created++;
+        } catch (e: any) {
+          if (!/duplicate/i.test(String(e.message))) {
+            // 跳过重复，其他继续
+          }
+        }
+      }
+      response.json({ data: { scanned: customers.rows.length, created, items } });
+    } catch (error) { next(error); }
+  });
+
   // ============== 应收账款 (AR) ==============
 
   app.get("/api/finance/ar", async (request, response, next) => {

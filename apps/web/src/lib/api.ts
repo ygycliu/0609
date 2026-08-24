@@ -303,7 +303,7 @@ export const api = {
       headers: { Accept: "application/json" }
     });
     if (!response.ok) throw new ApiError(`follow-up list failed: ${response.status}`, response.status);
-    return (await response.json()) as { data: any[]; total: number };
+    return (await response.json()) as { data: any[]; total: number; totalAll: number };
   },
   getFollowUp: (id: string) => request<any>(`/follow-up/${id}`),
   getFollowUpStages: () => request<any>("/follow-up/stages"),
@@ -330,6 +330,18 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ customer_id: customerId, year, certificationType })
     }),
+  batchEnsureFollowUp: (customerIds: string[], year?: number, certificationType?: string) =>
+    request<any>("/follow-up/batch-ensure", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customer_ids: customerIds, year, certification_type: certificationType })
+    }),
+  autoFollowUpFromHistory: (year?: number, limit?: number) => {
+    const qs = new URLSearchParams();
+    if (year) qs.set("year", String(year));
+    if (limit) qs.set("limit", String(limit));
+    const path = qs.toString() ? `/follow-up/auto-from-history?${qs.toString()}` : "/follow-up/auto-from-history";
+    return request<any>(path, { method: "POST" });
+  },
 
   // ===== Customers =====
   listCustomers: async (params: {
