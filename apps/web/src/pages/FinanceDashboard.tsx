@@ -57,7 +57,9 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
       })
     ])
       .then(([sumRes, txRes]) => {
-        setSummary(sumRes.data);
+        // api.getFinanceSummary 用 request() 自动解包，所以 sumRes 直接是 data
+        // api.listTransactions 用 fetch() 自己解析，所以 txRes 是 {data, total}
+        setSummary(sumRes);
         setTransactions(txRes.data);
         setTotal(txRes.total);
       })
