@@ -8,8 +8,10 @@ import {
   LoaderCircle,
   MessageSquarePlus,
   Plus,
+  PowerOff,
   RefreshCw,
   Sparkles,
+  Trash2,
   Wand2
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -89,6 +91,14 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
   const [continueStage, setContinueStage] = useState("expired");
   const [continueNotes, setContinueNotes] = useState("");
   const [continueSaving, setContinueSaving] = useState(false);
+
+  // 关闭跟进 Modal（整页模式）
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeAction, setCloseAction] = useState<"complete" | "archive_all" | "delete_all">("complete");
+  const [closeSaving, setCloseSaving] = useState(false);
+
+  // 删除单条
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -201,6 +211,14 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           </button>
           <button className="ghost-button" onClick={handleArchive}>
             <Archive size={16} /> 归档 {year} 年
+          </button>
+          <button
+            className="ghost-button danger-action"
+            onClick={() => setShowCloseModal(true)}
+            title="关闭跟进功能（批量操作）"
+          >
+            <PowerOff size={16} />
+            关闭跟进
           </button>
           <button
             className="ghost-button primary-action"
@@ -474,6 +492,26 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
               </div>
             </div>
             <footer className="drawer-footer">
+              <button
+                className="danger-button"
+                onClick={async () => {
+                  if (!confirm(`确认删除跟进「${detailItem.customerName} · ${detailItem.year}年」？\\n删除后无法恢复。`)) return;
+                  setDeleting(true);
+                  try {
+                    await api.deleteFollowUp(detailItem.id);
+                    setDetailItem(null);
+                    window.location.reload();
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : "删除失败");
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+              >
+                {deleting ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}
+                删除
+              </button>
               <button className="ghost-button" onClick={() => setDetailItem(null)}>关闭</button>
               <button
                 className="primary-button"
@@ -572,6 +610,125 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
               >
                 {continueSaving ? <LoaderCircle className="spin" size={16} /> : <MessageSquarePlus size={16} />}
                 创建新跟进
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* 关闭跟进 Modal */}
+      {showCloseModal && (
+        <div className="modal-overlay" onClick={() => setShowCloseModal(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <PowerOff size={20} />
+              <h2>关闭跟进功能</h2>
+              <button className="ghost-button close-btn" onClick={() => setShowCloseModal(false)}>×</button>
+            </header>
+            <div className="modal-body">
+              <p className="modal-hint">
+                💡 关闭跟进功能将批量处理当前年度（<strong>{year} 年</strong>）的所有跟进记录
+              </p>
+
+              <div className="close-options">
+                <label className={`close-option ${closeAction === "complete" ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="closeAction"
+                    value="complete"
+                    checked={closeAction === "complete"}
+                    onChange={(e) => setCloseAction(e.target.value as any)}
+                  />
+                  <div className="close-option-content">
+                    <div className="close-option-title">✅ 全部标记为已完成</div>
+                    <div className="close-option-desc">
+                      将 <strong>{year} 年</strong> 所有跟进标记为"已完成"状态（stage = completed）
+                      <br />推荐：项目已全部交付，要关闭年度跟进
+                    </div>
+                  </div>
+                </label>
+
+                <label className={`close-option ${closeAction === "archive_all" ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="closeAction"
+                    value="archive_all"
+                    checked={closeAction === "archive_all"}
+                    onChange={(e) => setCloseAction(e.target.value as any)}
+                  />
+                  <div className="close-option-content">
+                    <div className="close-option-title">📦 全部归档</div>
+                    <div className="close-option-desc">
+                      将 <strong>{year} 年</strong> 所有跟进归档（is_archived = true）
+                      <br />数据保留，但不再显示在列表中
+                    </div>
+                  </div>
+                </label>
+
+                <label className={`close-option ${closeAction === "delete_all" ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="closeAction"
+                    value="delete_all"
+                    checked={closeAction === "delete_all"}
+                    onChange={(e) => setCloseAction(e.target.value as any)}
+                  />
+                  <div className="close-option-content">
+                    <div className="close-option-title">🗑️ 全部删除（软删除）</div>
+                    <div className="close-option-desc">
+                      将 <strong>{year} 年</strong> 所有跟进软删除
+                      <br />⚠️ 操作不可逆，请谨慎！
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <footer className="modal-footer">
+              <button className="ghost-button" onClick={() => setShowCloseModal(false)}>取消</button>
+              <button
+                className={closeAction === "delete_all" ? "danger-button" : "primary-button"}
+                disabled={closeSaving}
+                onClick={async () => {
+                  if (closeAction === "delete_all") {
+                    if (!confirm(`确认要删除 ${year} 年的所有跟进？\n此操作不可撤销！`)) return;
+                  } else {
+                    if (!confirm(`确认执行"${closeAction === 'complete' ? '全部标记为已完成' : '全部归档'}"？`)) return;
+                  }
+                  setCloseSaving(true);
+                  try {
+                    let count = 0;
+                    if (closeAction === "complete") {
+                      // 把所有未完成的标记为已完成
+                      const allItems = await api.listFollowUps({ year, limit: 500 });
+                      for (const item of allItems.data) {
+                        if (item.stage !== "completed") {
+                          await api.advanceFollowUp(item.id, "completed");
+                          count++;
+                        }
+                      }
+                      alert(`已将 ${count} 条跟进标记为已完成`);
+                    } else if (closeAction === "archive_all") {
+                      const r = await api.archiveFollowUpYear(year);
+                      alert(`已归档 ${year} 年，共 ${r.data?.archivedCount || "所有"} 条`);
+                    } else if (closeAction === "delete_all") {
+                      const allItems = await api.listFollowUps({ year, limit: 500 });
+                      for (const item of allItems.data) {
+                        await api.deleteFollowUp(item.id);
+                        count++;
+                      }
+                      alert(`已删除 ${count} 条跟进`);
+                    }
+                    setShowCloseModal(false);
+                    window.location.reload();
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : "操作失败");
+                  } finally {
+                    setCloseSaving(false);
+                  }
+                }}
+              >
+                {closeSaving ? <LoaderCircle className="spin" size={16} /> : <PowerOff size={16} />}
+                确认执行
               </button>
             </footer>
           </div>
