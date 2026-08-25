@@ -44,6 +44,22 @@ export interface QuoteResult {
   bundleTier: string;
   initialPrice: number;
   supervisionPrice: number;
+  /** 专家评审费：人日 × ¥500/天 */
+  expertReviewFee: number;
+  /** 三体系组长费（仅 QES 收取） */
+  groupLeaderFee: number;
+  /** 专业补贴（高风险/特殊行业） */
+  professionalSubsidy: number;
+  /** 专家差旅费（实报实销） */
+  travelFee: number;
+  /** 证书费（每套 200 元） */
+  certificateFee: number;
+  /** 审核员住宿费（异地） */
+  accommodationFee: number;
+  /** 总报价 */
+  totalPrice: number;
+  /** 估算总人日 */
+  totalAuditDays: number;
   priceIncludes: string[];
   priceExcludes: string[];
   estimatedAuditDays: number;
@@ -159,18 +175,20 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     const indFactor = rule.industry_factor[input.industry] ?? 1.0;
     const adjusted = Math.round(rule.base * indFactor);
 
-    // 查审核人日
+    // 查审核人日（多标准叠加）
     let initialDays = 0;
     let supervisionDays = 0;
     let recertDays = 0;
-    const standard = CERT_TO_STANDARD[certId];
-    if (auditTable && standard) {
-      const tableKey = `${standard}_${levelKey}`;
-      const row = auditTable[tableKey]?.[bracket];
-      if (row) {
-        initialDays = row["初审"] ?? 0;
-        supervisionDays = row["监督"] ?? 0;
-        recertDays = row["再认证"] ?? 0;
+    const standards = CERT_TO_STANDARDS[certId] || [];
+    if (auditTable && standards.length > 0) {
+      for (const std of standards) {
+        const tableKey = `${std}_${levelKey}`;
+        const row = auditTable[tableKey]?.[bracket];
+        if (row) {
+          initialDays += row["初审"] ?? 0;
+          supervisionDays += row["监督"] ?? 0;
+          recertDays += row["再认证"] ?? 0;
+        }
       }
     }
 
@@ -202,7 +220,53 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   const supervisionPrice = Math.round(initialPrice * 0.8);
 
   // 6) 审核人日（按查表实际值求和）
-  const estimatedAuditDays = items.reduce((sum, item) => sum + item.initialAuditDays, 0);
+  const totalAuditDays = items.reduce((sum, item) => sum + item.initialAuditDays, 0);
+  const supervisionDays = items.reduce((sum, item) => sum + item.supervisionAuditDays, 0);
+
+  // ============== 💰 新版报价构成（6部分） ==============
+
+  // 1) 专家评审费：人日 × ¥500/天
+  const expertReviewFee = Math.round(totalAuditDays * 500);
+
+  // 2) 三体系组长费：仅 QES 三体系 +¥200
+  const hasQES = input.certifications.includes("QES");
+  const groupLeaderFee = hasQES ? 200 : 0;
+
+  // 3) 专业补贴：高风险行业 / 特殊行业
+  let professionalSubsidy = 0;
+  const highSubsidyIndustries = ["化工", "石油", "医药", "矿业", "危化", "食品"];
+  const mediumSubsidyIndustries = ["制造业", "建筑", "施工"];
+  if (highSubsidyIndustries.includes(input.industry)) {
+    professionalSubsidy += 1000;
+  } else if (mediumSubsidyIndustries.includes(input.industry)) {
+    professionalSubsidy += 500;
+  }
+  // 风险级别也是高时再加 500
+  if (input.riskLevel === "high") {
+    professionalSubsidy += 500;
+  }
+
+  // 4) 专家差旅费：宁夏本地约 ¥2,000 / 异地约 ¥3,500 / 偏远 ¥5,000
+  let travelFee = 2000;
+  if (input.employeeCount > 100) {
+    travelFee = 3500;
+  }
+  // 高风险行业需要更多现场人员
+  if (input.riskLevel === "high") {
+    travelFee = 4000;
+  }
+
+  // 5) 证书费：每套 ¥200 × 体系数
+  const certificateFee = items.length * 200;
+
+  // 6) 审核员住宿费：异地 ¥300/天 × 人日（宁夏本地免）
+  const accommodationFee = input.employeeCount > 100
+    ? Math.round(totalAuditDays * 300)
+    : 0;
+
+  // 🎯 总报价
+  const totalPrice = expertReviewFee + groupLeaderFee + professionalSubsidy +
+                      travelFee + certificateFee + accommodationFee;
 
   return {
     companyName: input.companyName,
@@ -217,20 +281,30 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     bundleTier: bundle.tier,
     initialPrice,
     supervisionPrice,
+    expertReviewFee,
+    groupLeaderFee,
+    professionalSubsidy,
+    travelFee,
+    certificateFee,
+    accommodationFee,
+    totalPrice,
+    totalAuditDays,
     priceIncludes: [
-      "认证咨询费",
-      "审核费（含审核员费用）",
-      "证书费",
-      "首次监督审核费（次年）",
-      "内审员培训 1 次"
+      "1. 专家评审费：人日 × ¥500/天",
+      "2. 三体系组长费：QES 收取 ¥200",
+      "3. 专业补贴：高风险/特殊行业 ¥500-1000",
+      "4. 专家差旅费：食宿交通（实报实销）",
+      "5. 证书费：每套 ¥200（含中/英文）",
+      "6. 审核员住宿：异地 ¥300/天"
     ],
     priceExcludes: [
-      "差旅食宿（按实际发生报销）",
-      "特殊行业附加审核",
-      "证书英文版/其他语种翻译",
-      "加急审核（双倍审核费）"
+      "远距离企业差旅费（按实报销）",
+      "特殊行业附加审核（医疗/危化等）",
+      "证书副本加印（¥100/套）",
+      "加急审核（双倍审核费）",
+      "管理咨询/辅导培训服务"
     ],
-    estimatedAuditDays,
+    estimatedAuditDays: totalAuditDays,
     generatedAt: new Date().toISOString()
   };
 }
@@ -243,19 +317,36 @@ export function getAvailableCertifications(): Array<{ id: string; name: string; 
   }));
 }
 
-export const INDUSTRY_OPTIONS = ["制造业", "食品", "IT", "物业", "化工"];
+export const INDUSTRY_OPTIONS = [
+  "制造业", "食品", "IT", "物业", "化工",
+  "石油", "矿业", "医药", "建筑", "施工",
+  "销售", "科技", "服务", "其他"
+];
 export const RISK_LEVEL_OPTIONS = [
   { value: "medium", label: "中级审核员（常规）" },
   { value: "high", label: "高级审核员（高风险行业）" }
 ];
 
-/** 证书 → 标准类型（Q/R/OHS），用于查审核人日表 */
-const CERT_TO_STANDARD: Record<string, "Q" | "R" | "OHS"> = {
-  "QES": "Q", "Q": "Q", "QE": "Q", "QJES": "Q",
-  "27001": "OHS", "20000": "OHS", "双信息": "OHS",
-  "HACCP": "OHS", "食品安全管理": "OHS", "GAP": "OHS",
-  "商品售后服务": "Q", "餐饮服务": "Q",
-  "社会责任": "OHS", "能源": "R", "碳管理": "R", "绿色供应链": "R"
+/** 证书 → 标准类型数组（用于查审核人日表） */
+const CERT_TO_STANDARDS: Record<string, Array<"Q" | "R" | "OHS">> = {
+  // QES 三体系 = Q + R + OHS 三项叠加
+  "QES": ["Q", "R", "OHS"],
+  "Q": ["Q"],
+  "QE": ["Q", "R"],
+  "ES": ["R", "OHS"],
+  "QJES": ["Q", "OHS"],
+  "27001": ["OHS"],
+  "20000": ["OHS"],
+  "双信息": ["OHS", "OHS"],  // 27001+20000，两个 OHS
+  "HACCP": ["OHS"],
+  "食品安全管理": ["OHS"],
+  "GAP": ["OHS"],
+  "商品售后服务": ["Q"],
+  "餐饮服务": ["Q"],
+  "社会责任": ["OHS"],
+  "能源": ["R"],
+  "碳管理": ["R"],
+  "绿色供应链": ["R"]
 };
 
 const SIZE_BRACKETS = [

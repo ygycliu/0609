@@ -995,10 +995,12 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   );
 
   const calcRows = [
-    ["小计", `¥ ${quote.subtotal.toLocaleString()}`],
-    [`人数系数（${quote.sizeTier}）`, `× ${quote.sizeFactor}`],
-    ["小计 × 人数系数", `¥ ${quote.afterSizeFactor.toLocaleString()}`],
-    [`多证折扣（${quote.bundleTier}）`, `× ${quote.bundleDiscount}`]
+    [`1. 专家评审费（${quote.totalAuditDays} 人日 × ¥500）`, `¥ ${quote.expertReviewFee.toLocaleString()}`],
+    [`2. 三体系组长费（${quote.groupLeaderFee > 0 ? "QES" : "—"}）`, `¥ ${quote.groupLeaderFee.toLocaleString()}`],
+    [`3. 专业补贴（${quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
+    [`4. 专家差旅费（实报实销）`, `¥ ${quote.travelFee.toLocaleString()}`],
+    [`5. 证书费（${quote.certifications.length} 套 × ¥200）`, `¥ ${quote.certificateFee.toLocaleString()}`],
+    [`6. 审核员住宿${quote.accommodationFee > 0 ? "（异地 ¥300/天）" : "（本地免）"}`, `¥ ${quote.accommodationFee.toLocaleString()}`]
   ];
 
   const calcTable = new Table({
@@ -1020,13 +1022,13 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   });
   blocks.push(calcTable);
 
-  // 总价
+  // 总价（6 部分之和）
   blocks.push(
     new Paragraph({
       spacing: { before: 320, after: 100 },
       alignment: AlignmentType.CENTER,
       children: [
-        new TextRun({ text: "初审报价（包干价）", size: 22, color: COLORS.muted })
+        new TextRun({ text: "总报价（含 6 部分）", size: 22, color: COLORS.muted })
       ]
     })
   );
@@ -1036,7 +1038,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       alignment: AlignmentType.CENTER,
       children: [
         new TextRun({
-          text: `¥ ${quote.initialPrice.toLocaleString()}`,
+          text: `¥ ${quote.totalPrice.toLocaleString()}`,
           bold: true,
           size: 44,
           color: COLORS.accent,
