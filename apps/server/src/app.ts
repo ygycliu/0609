@@ -2353,6 +2353,52 @@ export function createApp() {
     } catch (error) { next(error); }
   });
 
+  // 关闭跟进（必须填写原因）
+  app.post("/api/follow-up/:id/close", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as Record<string, unknown>;
+      const reason = (body.closeReason as string || "").trim();
+      const notes = (body.closeNotes as string || "").trim();
+
+      if (!reason) throw new ValidationError("关闭原因必填");
+      if (!notes) throw new ValidationError("详细说明必填");
+
+      // 有效原因
+      const validReasons = [
+        "certified_and_delivered",
+        "customer_declined",
+        "price_too_high",
+        "unable_to_contact",
+        "customer_lost",
+        "competitor_chosen",
+        "duplicate",
+        "other"
+      ];
+      if (!validReasons.includes(reason)) {
+        throw new ValidationError(`关闭原因必须是以下之一：${validReasons.join(", ")}`);
+      }
+
+      const updated = await query<any>(
+        `UPDATE customer_follow_up
+         SET stage = 'completed',
+             is_archived = true,
+             archived_at = NOW(),
+             close_reason = $1,
+             closed_at = NOW(),
+             closed_by = $2,
+             notes = COALESCE(notes || ' / ', '') || $3,
+             updated_at = NOW()
+         WHERE company_id = $4 AND id = $5 AND deleted_at IS NULL
+         RETURNING *`,
+        [reason, u.id, `关闭原因(${reason}): ${notes}`, u.companyId, request.params.id]
+      );
+      if (updated.rows.length === 0) throw new NotFoundError("跟进记录");
+
+      response.json({ data: updated.rows[0] });
+    } catch (error) { next(error); }
+  });
+
   // 删除
   app.delete("/api/follow-up/:id", async (request, response, next) => {
     try {

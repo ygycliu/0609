@@ -319,6 +319,10 @@ export const api = {
     request<any>(`/follow-up/${id}/advance`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stage, notes: notes || null })
     }),
+  closeFollowUp: (id: string, closeReason: string, closeNotes: string) =>
+    request<any>(`/follow-up/${id}/close`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closeReason, closeNotes })
+    }),
   deleteFollowUp: (id: string) =>
     request<{ data: { id: string; deleted: boolean } }>(`/follow-up/${id}`, {
       method: "DELETE"

@@ -9,6 +9,7 @@ import {
   MessageSquarePlus,
   Plus,
   PowerOff,
+  Power,
   RefreshCw,
   Sparkles,
   Trash2,
@@ -99,6 +100,12 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
 
   // 删除单条
   const [deleting, setDeleting] = useState(false);
+
+  // 关闭跟进（单条，需填原因）
+  const [showCloseSingleModal, setShowCloseSingleModal] = useState(false);
+  const [closeReason, setCloseReason] = useState("certified_and_delivered");
+  const [closeNotes, setCloseNotes] = useState("");
+  const [closeSingleSaving, setCloseSingleSaving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -512,6 +519,19 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                 {deleting ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}
                 删除
               </button>
+              <button
+                className="ghost-button warning-action"
+                onClick={() => {
+                  setCloseReason("certified_and_delivered");
+                  setCloseNotes("");
+                  setShowCloseSingleModal(true);
+                }}
+                disabled={detailItem.stage === "completed"}
+                title={detailItem.stage === "completed" ? "已关闭" : "关闭跟进（需填原因）"}
+              >
+                <Power size={16} />
+                关闭跟进
+              </button>
               <button className="ghost-button" onClick={() => setDetailItem(null)}>关闭</button>
               <button
                 className="primary-button"
@@ -523,6 +543,84 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
               >
                 <MessageSquarePlus size={16} />
                 继续沟通
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* 关闭跟进（单条）Modal */}
+      {showCloseSingleModal && detailItem && (
+        <div className="modal-overlay" onClick={() => setShowCloseSingleModal(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header warning">
+              <PowerOff size={20} />
+              <h2>关闭跟进</h2>
+              <button className="ghost-button close-btn" onClick={() => setShowCloseSingleModal(false)}>×</button>
+            </header>
+            <div className="modal-body">
+              <p className="modal-hint warning">
+                ⚠️ 关闭跟进后，该记录将标记为已完成，且不再显示在跟进列表中。
+              </p>
+              <p className="modal-hint">
+                💡 <strong>客户：</strong>{detailItem.customerName}
+                <br />📅 <strong>年度：</strong>{detailItem.year}
+              </p>
+
+              <label className="field">
+                <span>关闭原因 <span className="required">*</span></span>
+                <select value={closeReason} onChange={(e) => setCloseReason(e.target.value)}>
+                  <option value="certified_and_delivered">✅ 出证交付完成</option>
+                  <option value="customer_declined">🚫 客户主动拒绝</option>
+                  <option value="price_too_high">💰 价格原因</option>
+                  <option value="unable_to_contact">📞 联系不上</option>
+                  <option value="customer_lost">💼 客户流失</option>
+                  <option value="competitor_chosen">🏆 选择竞争对手</option>
+                  <option value="duplicate">📋 重复跟进</option>
+                  <option value="other">📝 其他原因</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>详细说明 <span className="required">*</span></span>
+                <textarea
+                  value={closeNotes}
+                  onChange={(e) => setCloseNotes(e.target.value)}
+                  rows={4}
+                  placeholder="请说明关闭原因的具体情况（例如：QES 三体系证书已交付完成）"
+                  autoFocus
+                />
+              </label>
+            </div>
+            <footer className="modal-footer">
+              <button className="ghost-button" onClick={() => setShowCloseSingleModal(false)}>取消</button>
+              <button
+                className="warning-button"
+                onClick={async () => {
+                  if (!closeReason) {
+                    alert("请选择关闭原因");
+                    return;
+                  }
+                  if (!closeNotes.trim()) {
+                    alert("请填写详细说明（必填）");
+                    return;
+                  }
+                  setCloseSingleSaving(true);
+                  try {
+                    await api.closeFollowUp(detailItem.id, closeReason, closeNotes.trim());
+                    setShowCloseSingleModal(false);
+                    setDetailItem(null);
+                    window.location.reload();
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : "关闭失败");
+                  } finally {
+                    setCloseSingleSaving(false);
+                  }
+                }}
+                disabled={closeSingleSaving || !closeNotes.trim()}
+              >
+                {closeSingleSaving ? <LoaderCircle className="spin" size={16} /> : <PowerOff size={16} />}
+                确认关闭
               </button>
             </footer>
           </div>

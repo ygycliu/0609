@@ -5960,3 +5960,98 @@ select:focus-visible {
 .close-option-desc strong {
   color: var(--text);
 }
+
+
+/* ============================================================ */
+/* =========  关闭跟进样式（warning 色） ========== */
+/* ============================================================ */
+
+.ghost-button.warning-action {
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.ghost-button.warning-action:hover:not(:disabled) {
+  background: #fef3c7;
+  border-color: #fbbf24;
+}
+
+.ghost-button.warning-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .ghost-button.warning-action {
+  color: #fbbf24;
+  border-color: #78350f;
+}
+
+[data-theme="dark"] .ghost-button.warning-action:hover:not(:disabled) {
+  background: #422006;
+  border-color: #b45309;
+}
+
+.modal-header.warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #fff;
+}
+
+.modal-header.warning .eyebrow,
+.modal-header.warning h2 {
+  color: #fff;
+}
+
+.modal-header.warning .close-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+}
+
+.modal-header.warning .close-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.modal-hint.warning {
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  color: #92400e;
+}
+
+[data-theme="dark"] .modal-hint.warning {
+  background: #422006;
+  color: #fcd34d;
+}
+
+.warning-button {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.warning-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.warning-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.required {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.field .required {
+  margin-left: 2px;
+}
