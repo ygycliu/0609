@@ -176,6 +176,9 @@ export default function App() {
             onChanged={() => {
               /* 列表页会通过 page 切换重新加载 */
             }}
+            onOpenFollowUp={() => {
+              setPage("follow-up");
+            }}
           />
         )}
         {page === "finance-dashboard" && (

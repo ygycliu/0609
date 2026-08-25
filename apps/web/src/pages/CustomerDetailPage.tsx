@@ -3,8 +3,10 @@ import {
   Archive,
   ArrowLeft,
   Check,
+  ChevronRight,
   LoaderCircle,
   Save,
+  Target,
   Trash2,
   User
 } from "lucide-react";
@@ -96,11 +98,13 @@ const EMPTY: CustomerDetail = {
 export function CustomerDetailPage({
   customerId,
   onBack,
-  onChanged
+  onChanged,
+  onOpenFollowUp
 }: {
   customerId: string | null;
   onBack: () => void;
   onChanged: () => void;
+  onOpenFollowUp?: (customerId: string, customerName: string) => void;
 }) {
   const isNew = customerId === null;
   const [form, setForm] = useState<CustomerDetail>(EMPTY);
@@ -121,6 +125,17 @@ export function CustomerDetailPage({
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectsTotal, setProjectsTotal] = useState(0);
   const [projectsAmount, setProjectsAmount] = useState(0);
+
+  // 转为跟进 Modal
+  const [showFollowModal, setShowFollowModal] = useState(false);
+  const [followStage, setFollowStage] = useState("expired");
+  const [followYear, setFollowYear] = useState(new Date().getFullYear());
+  const [followCertType, setFollowCertType] = useState("");
+  const [followIssuingBody, setFollowIssuingBody] = useState("zhongren");
+  const [followAmount, setFollowAmount] = useState("");
+  const [followExpectedDate, setFollowExpectedDate] = useState("");
+  const [followNotes, setFollowNotes] = useState("");
+  const [followSaving, setFollowSaving] = useState(false);
 
   useEffect(() => {
     if (customerId === null) {
@@ -280,6 +295,48 @@ export function CustomerDetailPage({
     }
   }
 
+  function openFollowUpModal() {
+    if (isNew || !customerId) return;
+    setShowFollowModal(true);
+    setFollowStage("expired");
+    setFollowYear(new Date().getFullYear());
+    setFollowCertType("");
+    setFollowIssuingBody("zhongren");
+    setFollowAmount("");
+    setFollowExpectedDate("");
+    setFollowNotes(`从客户档案创建（${form.name}）`);
+  }
+
+  async function submitFollowUp() {
+    if (isNew || !customerId) return;
+    setFollowSaving(true);
+    setError("");
+    try {
+      await api.createFollowUp({
+        customerId,
+        customerName: form.name,
+        stage: followStage,
+        year: followYear,
+        certificationType: followCertType || null,
+        issuingBody: followIssuingBody,
+        contractAmount: followAmount ? Number(followAmount) : null,
+        expectedDate: followExpectedDate || null,
+        notes: followNotes || null
+      });
+      setSuccess("已转为跟进");
+      setTimeout(() => setSuccess(""), 2000);
+      setShowFollowModal(false);
+      // 跳转到跟进页面
+      setTimeout(() => {
+        onOpenFollowUp?.(customerId, form.name);
+      }, 800);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "创建跟进失败");
+    } finally {
+      setFollowSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="loading-row">
@@ -301,6 +358,15 @@ export function CustomerDetailPage({
         <div className="header-actions">
           {!isNew && (
             <>
+              <button
+                className="ghost-button primary-action"
+                onClick={openFollowUpModal}
+                disabled={saving}
+                type="button"
+                title="将客户转为项目跟进记录"
+              >
+                <Target size={16} /> 转为跟进
+              </button>
               <button
                 className="ghost-button"
                 onClick={handleArchiveToggle}
@@ -546,6 +612,98 @@ export function CustomerDetailPage({
             </label>
           </div>
         </fieldset>
+
+        {/* 转为跟进 Modal */}
+        {showFollowModal && (
+          <div className="modal-overlay" onClick={() => setShowFollowModal(false)}>
+            <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+              <header className="modal-header">
+                <Target size={20} />
+                <h2>转为项目跟进</h2>
+                <button className="ghost-button close-btn" onClick={() => setShowFollowModal(false)}>×</button>
+              </header>
+              <div className="modal-body">
+                <p className="modal-hint">
+                  💡 将 <strong>{form.name}</strong> 转为项目跟进记录。
+                  提交后会自动跳转到"客户跟进"页面。
+                </p>
+                <div className="form-grid two-col">
+                  <label className="field">
+                    <span>年度</span>
+                    <select value={followYear} onChange={(e) => setFollowYear(Number(e.target.value))}>
+                      {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>认证类型</span>
+                    <input
+                      value={followCertType}
+                      onChange={(e) => setFollowCertType(e.target.value)}
+                      placeholder="如：QES / Q / 27001 / HACCP"
+                    />
+                  </label>
+                </div>
+                <label className="field">
+                  <span>当前阶段</span>
+                  <select value={followStage} onChange={(e) => setFollowStage(e.target.value)}>
+                    <option value="expired">到期（证书需要续证）</option>
+                    <option value="quoted">已报价</option>
+                    <option value="contract_review">合同评审</option>
+                    <option value="contract_signed">合同签订</option>
+                    <option value="implementing">项目实施</option>
+                    <option value="certified">出证</option>
+                  </select>
+                </label>
+                <div className="form-grid two-col">
+                  <label className="field">
+                    <span>出证机构</span>
+                    <select value={followIssuingBody} onChange={(e) => setFollowIssuingBody(e.target.value)}>
+                      <option value="zhongren">中认认证有限公司</option>
+                      <option value="huazhong">华中检测</option>
+                      <option value="other">其他</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>预计金额（元）</span>
+                    <input
+                      type="number"
+                      value={followAmount}
+                      onChange={(e) => setFollowAmount(e.target.value)}
+                      placeholder="如：12000"
+                    />
+                  </label>
+                </div>
+                <label className="field">
+                  <span>预计完成日期</span>
+                  <input
+                    type="date"
+                    value={followExpectedDate}
+                    onChange={(e) => setFollowExpectedDate(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>备注</span>
+                  <textarea
+                    value={followNotes}
+                    onChange={(e) => setFollowNotes(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+              </div>
+              <footer className="modal-footer">
+                <button className="ghost-button" onClick={() => setShowFollowModal(false)}>取消</button>
+                <button
+                  className="primary-button"
+                  onClick={submitFollowUp}
+                  disabled={followSaving}
+                >
+                  {followSaving ? <LoaderCircle className="spin" size={16} /> : <Target size={16} />}
+                  转为跟进
+                </button>
+              </footer>
+            </div>
+          </div>
+        )}
 
         {/* 历史认证项目子表（来自 finance_project）*/}
         {!isNew && (

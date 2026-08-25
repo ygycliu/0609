@@ -5658,3 +5658,57 @@ select:focus-visible {
   font-size: 11px;
   color: var(--muted);
 }
+
+
+/* ============================================================ */
+/* =========  客户转跟进 按钮/Modal 样式 ========== */
+/* ============================================================ */
+
+.ghost-button.primary-action {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+
+.ghost-button.primary-action:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.ghost-button.primary-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .ghost-button.primary-action {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  color: #fff;
+}
+
+[data-theme="dark"] .ghost-button.primary-action:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
+}
+
+.modal-header .modal-hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 16px 0;
+  padding: 8px 12px;
+  background: var(--surface-muted);
+  border-radius: 6px;
+  border-left: 3px solid var(--primary);
+}
+
+.modal-header .modal-hint strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.modal-body .form-grid.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
