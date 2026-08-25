@@ -327,7 +327,7 @@ export class FollowUpRepository {
   async archiveYear(companyId: string, year: number): Promise<number> {
     const r = await query(
       `UPDATE customer_follow_up
-       SET is_archived = TRUE, archived_at = NOW(), archived_year = $3, updated_at = NOW()
+       SET is_archived = TRUE, archived_at = NOW(), archived_year = $2, updated_at = NOW()
        WHERE company_id = $1 AND year = $2 AND deleted_at IS NULL AND is_archived = FALSE`,
       [companyId, year]
     );
