@@ -107,6 +107,10 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
   const [closeNotes, setCloseNotes] = useState("");
   const [closeSingleSaving, setCloseSingleSaving] = useState(false);
 
+  // 继续沟通：客户历史认证类型建议
+  const [certTypeSuggestions, setCertTypeSuggestions] = useState<string[]>([]);
+  const [continueCertType, setContinueCertType] = useState("");
+
   useEffect(() => {
     setLoading(true);
     setError("");
@@ -535,10 +539,20 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
               <button className="ghost-button" onClick={() => setDetailItem(null)}>关闭</button>
               <button
                 className="primary-button"
-                onClick={() => {
+                onClick={async () => {
                   setContinueStage("quoted");
                   setContinueNotes(`基于 ${detailItem.year} 年跟进继续沟通`);
+                  setContinueCertType(detailItem.certificationType || "");
                   setShowContinueModal(true);
+                  // 加载该客户的历史认证类型建议
+                  if (detailItem.customerId) {
+                    try {
+                      const r = await api.getCustomerCertTypes(detailItem.customerId);
+                      setCertTypeSuggestions(r.data || []);
+                    } catch (e) {
+                      console.error("加载认证类型建议失败", e);
+                    }
+                  }
                 }}
               >
                 <MessageSquarePlus size={16} />
@@ -652,7 +666,17 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                 </label>
                 <label className="field">
                   <span>认证类型</span>
-                  <input value={detailItem.certificationType || ""} disabled />
+                  <input
+                    list="cert-type-suggestions"
+                    value={continueCertType}
+                    onChange={(e) => setContinueCertType(e.target.value)}
+                    placeholder={detailItem.certificationType || "如：QES / Q / 27001"}
+                  />
+                  <datalist id="cert-type-suggestions">
+                    {certTypeSuggestions.map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
                 </label>
               </div>
               <label className="field">
@@ -688,7 +712,7 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                       customerName: detailItem.customerName,
                       stage: continueStage,
                       year: detailItem.year + 1,
-                      certificationType: detailItem.certificationType || null,
+                      certificationType: continueCertType || null,
                       issuingBody: detailItem.issuingBody || "zhongren",
                       contractAmount: detailItem.contractAmount || null,
                       expectedDate: null,

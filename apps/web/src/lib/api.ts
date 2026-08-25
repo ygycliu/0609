@@ -323,6 +323,8 @@ export const api = {
     request<any>(`/follow-up/${id}/close`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closeReason, closeNotes })
     }),
+  getCustomerCertTypes: (customerId: string) =>
+    request<{ data: string[] }>(`/follow-up/customer-types/${customerId}`),
   deleteFollowUp: (id: string) =>
     request<{ data: { id: string; deleted: boolean } }>(`/follow-up/${id}`, {
       method: "DELETE"

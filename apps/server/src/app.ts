@@ -2296,6 +2296,61 @@ export function createApp() {
     } catch (error) { next(error); }
   });
 
+  // 获取客户历史认证类型（自动建议）
+  // 返回：
+  // - 从 finance_project.name 解析的认证项目（如 "QES监督一"）
+  // - 从 customer_follow_up.certification_type 字段
+  // - 系统常用类型
+  app.get("/api/follow-up/customer-types/:customerId", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+
+      // 1. 从 finance_project.name 解析（"客户名 | 描述"）
+      const projectNames = await query<{ name: string }>(
+        `SELECT name FROM finance_project
+         WHERE company_id = $1 AND customer_id = $2 AND deleted_at IS NULL`,
+        [u.companyId, request.params.customerId]
+      );
+
+      // 2. 从 customer_follow_up.certification_type
+      const fuTypes = await query<{ certification_type: string }>(
+        `SELECT DISTINCT certification_type FROM customer_follow_up
+         WHERE company_id = $1 AND customer_id = $2
+           AND deleted_at IS NULL AND certification_type IS NOT NULL`,
+        [u.companyId, request.params.customerId]
+      );
+
+      // 解析：取 "|" 后部分，去重
+      const suggestions = new Set<string>();
+      // 系统常用
+      const commonTypes = ["QES", "Q", "E", "S", "27001", "14001", "45001", "HACCP", "50430"];
+      commonTypes.forEach(t => suggestions.add(t));
+      // 跟进表的认证类型
+      fuTypes.rows.forEach(r => {
+        if (r.certification_type) suggestions.add(r.certification_type.trim());
+      });
+      // 项目名称解析
+      projectNames.rows.forEach(r => {
+        const name = r.name;
+        if (!name) return;
+        // "客户名 | 描述" 格式
+        const parts = name.split("|");
+        if (parts.length > 1) {
+          const desc = parts[1].trim();
+          // 提取"QES监督一" → 加 "QES监督一" + "QES"
+          if (desc) suggestions.add(desc);
+          // 提取开头的字母 + 数字组合
+          const prefixMatch = desc.match(/^([A-Z]+)/);
+          if (prefixMatch) suggestions.add(prefixMatch[1]);
+        }
+      });
+
+      response.json({
+        data: Array.from(suggestions).sort()
+      });
+    } catch (error) { next(error); }
+  });
+
   // 创建
   app.post("/api/follow-up", async (request, response, next) => {
     try {
