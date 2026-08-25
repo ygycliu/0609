@@ -4,7 +4,9 @@ import {
   Bell,
   Calendar,
   ChevronRight,
+  ExternalLink,
   LoaderCircle,
+  MessageSquarePlus,
   Plus,
   RefreshCw,
   Sparkles,
@@ -43,6 +45,7 @@ interface FollowUpItem {
   customerName?: string;
   projectCode?: string;
   certificationType?: string;
+  issuingBody?: string;
   stage: string;
   year: number;
   expectedDate?: string;
@@ -52,6 +55,7 @@ interface FollowUpItem {
   notes?: string;
   isArchived?: boolean;
   archivedYear?: number;
+  updatedAt?: string;
 }
 
 interface FollowUpPageProps {
@@ -76,6 +80,15 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [stage, setStage] = useState<string>("");
   const [showArchived, setShowArchived] = useState(false);
+
+  // 详情抽屉
+  const [detailItem, setDetailItem] = useState<FollowUpItem | null>(null);
+
+  // 继续沟通 Modal
+  const [showContinueModal, setShowContinueModal] = useState(false);
+  const [continueStage, setContinueStage] = useState("expired");
+  const [continueNotes, setContinueNotes] = useState("");
+  const [continueSaving, setContinueSaving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -188,6 +201,14 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           </button>
           <button className="ghost-button" onClick={handleArchive}>
             <Archive size={16} /> 归档 {year} 年
+          </button>
+          <button
+            className="ghost-button primary-action"
+            onClick={() => onOpenCustomer("")}
+            title="新建客户（不指定ID则进入新建页）"
+          >
+            <Plus size={16} />
+            新建客户
           </button>
         </div>
       </header>
@@ -310,10 +331,20 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                   <tr
                     key={f.id}
                     className="clickable-row"
-                    onClick={() => f.customerId && onOpenCustomer(f.customerId)}
+                    onClick={() => setDetailItem(f)}
                   >
                     <td>
-                      <strong>{f.customerName || "—"}</strong>
+                      <a
+                        className="customer-link"
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (f.customerId) onOpenCustomer(f.customerId);
+                        }}
+                      >
+                        <strong>{f.customerName || "—"}</strong>
+                      </a>
                       {f.projectCode && (
                         <small style={{ color: "var(--muted)", marginLeft: 6 }}>
                           {f.projectCode}
@@ -361,6 +392,191 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           </table>
         )}
       </section>
+
+      {/* 详情抽屉 */}
+      {detailItem && (
+        <div className="drawer-overlay" onClick={() => setDetailItem(null)}>
+          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <header className="drawer-header">
+              <div>
+                <span className="eyebrow">跟进详情 · {detailItem.year} 年</span>
+                <h2>
+                  {detailItem.customerName || "—"}
+                  <button
+                    className="ghost-button icon-only"
+                    onClick={() => {
+                      if (detailItem.customerId) {
+                        onOpenCustomer(detailItem.customerId);
+                        setDetailItem(null);
+                      }
+                    }}
+                    title="查看客户档案"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                </h2>
+              </div>
+              <button className="ghost-button close-btn" onClick={() => setDetailItem(null)}>×</button>
+            </header>
+            <div className="drawer-body">
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <span className="label">当前阶段</span>
+                  <span className="value">
+                    {(STAGE_FALLBACK.find(s => s.key === detailItem.stage) || STAGE_FALLBACK[0]).label}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="label">认证类型</span>
+                  <span className="value">{detailItem.certificationType || "—"}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="label">出证机构</span>
+                  <span className="value">
+                    {detailItem.issuingBody === "huazhong" ? "华中检测" :
+                     detailItem.issuingBody === "other" ? "其他" : "中认认证"}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="label">合同金额</span>
+                  <span className="value">
+                    {detailItem.contractAmount
+                      ? `¥${detailItem.contractAmount.toLocaleString()}`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="label">预计完成</span>
+                  <span className="value">
+                    {detailItem.expectedDate
+                      ? new Date(detailItem.expectedDate).toLocaleDateString("zh-CN")
+                      : "—"}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="label">项目编号</span>
+                  <span className="value">{detailItem.projectCode || "—"}</span>
+                </div>
+                {detailItem.updatedAt && (
+                  <div className="detail-item full">
+                    <span className="label">最近更新</span>
+                    <span className="value">
+                      {new Date(detailItem.updatedAt).toLocaleString("zh-CN")}
+                    </span>
+                  </div>
+                )}
+                {detailItem.notes && (
+                  <div className="detail-item full">
+                    <span className="label">备注</span>
+                    <span className="value notes">{detailItem.notes}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <footer className="drawer-footer">
+              <button className="ghost-button" onClick={() => setDetailItem(null)}>关闭</button>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setContinueStage("quoted");
+                  setContinueNotes(`基于 ${detailItem.year} 年跟进继续沟通`);
+                  setShowContinueModal(true);
+                }}
+              >
+                <MessageSquarePlus size={16} />
+                继续沟通
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* 继续沟通 Modal */}
+      {showContinueModal && detailItem && (
+        <div className="modal-overlay" onClick={() => setShowContinueModal(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <MessageSquarePlus size={20} />
+              <h2>继续沟通 - 新跟进</h2>
+              <button className="ghost-button close-btn" onClick={() => setShowContinueModal(false)}>×</button>
+            </header>
+            <div className="modal-body">
+              <p className="modal-hint">
+                💡 为 <strong>{detailItem.customerName}</strong> 创建新年度跟进（自动延续）
+              </p>
+              <div className="form-grid two-col">
+                <label className="field">
+                  <span>年度</span>
+                  <input
+                    type="number"
+                    value={detailItem.year + 1}
+                    onChange={() => {}}
+                    disabled
+                  />
+                </label>
+                <label className="field">
+                  <span>认证类型</span>
+                  <input value={detailItem.certificationType || ""} disabled />
+                </label>
+              </div>
+              <label className="field">
+                <span>当前阶段</span>
+                <select value={continueStage} onChange={(e) => setContinueStage(e.target.value)}>
+                  <option value="expired">到期（证书需要续证）</option>
+                  <option value="quoted">已报价</option>
+                  <option value="contract_review">合同评审</option>
+                  <option value="contract_signed">合同签订</option>
+                  <option value="implementing">项目实施</option>
+                  <option value="certified">出证</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>备注（沟通内容）</span>
+                <textarea
+                  value={continueNotes}
+                  onChange={(e) => setContinueNotes(e.target.value)}
+                  rows={4}
+                  placeholder="记录本次沟通的关键信息..."
+                />
+              </label>
+            </div>
+            <footer className="modal-footer">
+              <button className="ghost-button" onClick={() => setShowContinueModal(false)}>取消</button>
+              <button
+                className="primary-button"
+                onClick={async () => {
+                  setContinueSaving(true);
+                  try {
+                    await api.createFollowUp({
+                      customerId: detailItem.customerId,
+                      customerName: detailItem.customerName,
+                      stage: continueStage,
+                      year: detailItem.year + 1,
+                      certificationType: detailItem.certificationType || null,
+                      issuingBody: detailItem.issuingBody || "zhongren",
+                      contractAmount: detailItem.contractAmount || null,
+                      expectedDate: null,
+                      notes: continueNotes
+                    });
+                    setShowContinueModal(false);
+                    setDetailItem(null);
+                    // 刷新列表
+                    window.location.reload();
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : "创建失败");
+                  } finally {
+                    setContinueSaving(false);
+                  }
+                }}
+                disabled={continueSaving}
+              >
+                {continueSaving ? <LoaderCircle className="spin" size={16} /> : <MessageSquarePlus size={16} />}
+                创建新跟进
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {/* 通知导入 Modal */}
       {showImportModal && (
