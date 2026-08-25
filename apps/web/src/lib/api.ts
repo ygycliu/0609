@@ -325,6 +325,10 @@ export const api = {
     }),
   getCustomerCertTypes: (customerId: string) =>
     request<{ data: string[] }>(`/follow-up/customer-types/${customerId}`),
+  getAuditPlanByFollowUp: (followUpId: string) =>
+    request<{ data: any[] }>(`/follow-up/${followUpId}/audit-plan`),
+  listAuditTemplates: () =>
+    request<{ data: any[] }>("/audit-templates"),
   deleteFollowUp: (id: string) =>
     request<{ data: { id: string; deleted: boolean } }>(`/follow-up/${id}`, {
       method: "DELETE"

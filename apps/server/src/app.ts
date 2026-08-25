@@ -16,6 +16,7 @@ import { ConsultationService } from "./consultations/consultation.service.js";
 import { extractDocumentText } from "./documents/document.service.js";
 import { ConsultationRepository } from "./consultations/consultation.repository.js";
 import { generateAuditPlan, generateChecklist, detectNonConformances, generateAuditReport } from "./auditor/auditor.service.js";
+import { autoGenerateAuditPlan, listTemplates as listAuditTemplates } from "./follow_up/autoAuditPlan.js";
 import { QuoteRepository } from "./certification/quote.repository.js";
 import { CustomerRepository } from "./customers/customer.repository.js";
 import { FinanceRepository } from "./finance/finance.repository.js";
@@ -2351,6 +2352,31 @@ export function createApp() {
     } catch (error) { next(error); }
   });
 
+  // 列出审核计划模板
+  app.get("/api/audit-templates", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const templates = await listAuditTemplates(u.companyId);
+      response.json({ data: templates });
+    } catch (error) { next(error); }
+  });
+
+  // 根据跟进 ID 找审核计划
+  app.get("/api/follow-up/:id/audit-plan", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query<any>(
+        `SELECT s.*, count(i.id) AS item_count
+         FROM audit_session s
+         LEFT JOIN audit_checklist_item i ON i.session_id = s.id
+         WHERE s.follow_up_id = $1 AND s.company_id = $2
+         GROUP BY s.id`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (error) { next(error); }
+  });
+
   // 创建
   app.post("/api/follow-up", async (request, response, next) => {
     try {
@@ -2404,7 +2430,44 @@ export function createApp() {
         u.id
       );
       if (!updated) throw new NotFoundError("跟进记录");
-      response.json({ data: updated });
+
+      // 🎯 自动生成审核计划：当推进到"项目实施"阶段时
+      let auditPlan = null;
+      if ((body.stage as string) === "implementing") {
+        try {
+          const cert = updated.certificationType || "QES";
+            // 标准映射
+            const stdMap: Record<string, string[]> = {
+              "QES": ["iso9001","iso14001","iso45001"],
+              "Q":   ["iso9001"],
+              "E":   ["iso14001"],
+              "S":   ["iso45001"],
+              "27001": ["iso27001"],
+              "14001": ["iso14001"],
+              "45001": ["iso45001"],
+            };
+            const standards = stdMap[cert] || stdMap["QES"];
+            auditPlan = await autoGenerateAuditPlan({
+              followUpId: request.params.id,
+              companyId: u.companyId,
+              customerName: updated.customerName || "(未知客户)",
+              industry: undefined,
+              employeeCount: undefined,
+              auditType: "initial",
+              standards,
+              certificationType: cert,
+              createdBy: u.id
+            });
+            console.log(
+              `[auto-audit] follow_up=${request.params.id} → session=${auditPlan.sessionId} ` +
+              `(template=${auditPlan.templateCode}, items=${auditPlan.itemCount}, existed=${auditPlan.alreadyExisted})`
+            );
+        } catch (e) {
+          console.warn("[auto-audit] failed (non-fatal):", e instanceof Error ? e.message : e);
+        }
+      }
+
+      response.json({ data: updated, auditPlan });
     } catch (error) { next(error); }
   });
 

@@ -501,6 +501,11 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                   </div>
                 )}
               </div>
+
+              {/* 🎯 审核计划（项目实施阶段自动生成）*/}
+              {detailItem.stage === "implementing" && (
+                <AuditPlanSection followUpId={detailItem.id} customerName={detailItem.customerName || "—"} />
+              )}
             </div>
             <footer className="drawer-footer">
               <button
@@ -935,6 +940,84 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+/**
+ * 审核计划区块（仅项目实施阶段显示）
+ * 从 audit_session + audit_checklist_item 自动生成
+ */
+function AuditPlanSection({ followUpId, customerName }: { followUpId: string; customerName: string }) {
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.getAuditPlanByFollowUp(followUpId)
+      .then((r) => { if (!cancelled) setPlans(r.data || []); })
+      .catch(() => { if (!cancelled) setPlans([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [followUpId]);
+
+  if (loading) {
+    return (
+      <div className="audit-plan-section loading">
+        <div className="section-title">
+          <Sparkles size={16} />
+          <span>自动审核计划</span>
+        </div>
+        <LoaderCircle className="spin" size={16} /> 加载中...
+      </div>
+    );
+  }
+
+  if (plans.length === 0) {
+    return (
+      <div className="audit-plan-section empty">
+        <div className="section-title">
+          <Sparkles size={16} />
+          <span>自动审核计划</span>
+        </div>
+        <p className="muted">该项目实施阶段已到达，但暂无审核计划。请联系数字审核员手动创建。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="audit-plan-section">
+      <div className="section-title" onClick={() => setExpanded(!expanded)}>
+        <Sparkles size={16} className="auto-icon" />
+        <span>自动审核计划（{plans.length} 个 session / {plans.reduce((s, p) => s + parseInt(p.item_count || 0, 10), 0)} 项）</span>
+        <span className="toggle">{expanded ? "▼" : "▶"}</span>
+      </div>
+      <p className="muted">📌 项目进入"实施"阶段时由系统根据客户体系自动生成，无需手动勾选。</p>
+
+      {expanded && plans.map((p: any) => (
+        <div key={p.id} className="audit-plan-card">
+          <div className="audit-plan-header">
+            <strong>{p.customer_name}</strong>
+            <span className="auto-tag">自动</span>
+            <span className="audit-type-tag">{p.audit_type === 'initial' ? '初次' : p.audit_type === 'surveillance' ? '监督' : '再认证'}</span>
+          </div>
+          <div className="audit-plan-meta">
+            <span>📅 {p.scheduled_date ? new Date(p.scheduled_date).toLocaleDateString('zh-CN') : '未排期'}</span>
+            <span>📋 {p.item_count} 项</span>
+            <span>🏭 行业: {p.industry || '—'}</span>
+          </div>
+          <div className="audit-plan-standards">
+            {(p.standards || []).map((s: string) => (
+              <span key={s} className="standard-tag">{s.toUpperCase()}</span>
+            ))}
+          </div>
+          <details className="audit-plan-items">
+            <summary>查看 {p.item_count} 项审核清单</summary>
+            <div className="muted small">提示：审核清单详情可在"数字审核员"模块查看与勾选。</div>
+          </details>
+        </div>
+      ))}
     </div>
   );
 }

@@ -6055,3 +6055,167 @@ select:focus-visible {
 .field .required {
   margin-left: 2px;
 }
+
+
+/* ============================================================ */
+/* =========  审核计划区块（跟进抽屉） ========== */
+/* ============================================================ */
+
+.audit-plan-section {
+  margin-top: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 10px;
+  border-left: 4px solid #f59e0b;
+}
+
+[data-theme="dark"] .audit-plan-section {
+  background: linear-gradient(135deg, #422006 0%, #78350f 100%);
+  border-left-color: #fbbf24;
+}
+
+.audit-plan-section .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #92400e;
+  cursor: pointer;
+  user-select: none;
+}
+
+[data-theme="dark"] .audit-plan-section .section-title {
+  color: #fcd34d;
+}
+
+.audit-plan-section .section-title .auto-icon {
+  color: #d97706;
+}
+
+[data-theme="dark"] .audit-plan-section .section-title .auto-icon {
+  color: #fbbf24;
+}
+
+.audit-plan-section .toggle {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.audit-plan-section.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audit-plan-section .muted {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #b45309;
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .audit-plan-section .muted {
+  color: #fcd34d;
+}
+
+.audit-plan-card {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  border: 1px solid #f59e0b;
+}
+
+[data-theme="dark"] .audit-plan-card {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: #b45309;
+}
+
+.audit-plan-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.auto-tag {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.audit-type-tag {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .audit-type-tag {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+.audit-plan-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #78350f;
+  margin-bottom: 8px;
+}
+
+[data-theme="dark"] .audit-plan-meta {
+  color: #fde68a;
+}
+
+.audit-plan-standards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.standard-tag {
+  background: #fef3c7;
+  color: #b45309;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+[data-theme="dark"] .standard-tag {
+  background: #422006;
+  color: #fcd34d;
+}
+
+.audit-plan-items {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+[data-theme="dark"] .audit-plan-items {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.audit-plan-items summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.audit-plan-items .small {
+  font-size: 11px;
+  margin-top: 6px;
+  opacity: 0.7;
+}
