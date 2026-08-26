@@ -149,8 +149,8 @@ export function AuditorPage() {
   const handleSearchCustomers = async (query: string) => {
     setSearchingCustomers(true);
     try {
-      const results = await api.searchCustomers(query, 20);
-      setCustomerOptions(results || []);
+      const results: any = await api.searchCustomers(query, 20);
+      setCustomerOptions((results && results.data) || results || []);
     } catch (e) {
       console.error("搜索客户失败:", e);
       setCustomerOptions([]);

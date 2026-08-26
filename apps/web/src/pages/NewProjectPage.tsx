@@ -50,17 +50,19 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
   const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   useEffect(() => {
+    console.log("NewProjectPage useEffect start");
     Promise.all([
       api.listSignatories(),
       api.listServiceTypes(),
       api.listPartnerOrgs(),
       api.searchCustomers("", 100),
     ]).then(([sigs, svcs, parts, custs]: any) => {
+      console.log("APIs loaded", { sigs, svcs, parts, custs });
       setSignatories(sigs || []);
       setServiceTypes(svcs || []);
       setPartnerOrgs(parts || []);
-      setCustomers(custs || []);
-    }).catch((e) => console.error(e));
+      setCustomers((custs && custs.data) || custs || []);
+    }).catch((e) => console.error("load error", e));
   }, []);
 
   const selectedServiceType = serviceTypes.find((s) => s.id === serviceTypeId);
@@ -75,7 +77,7 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
     setSubmitting(true);
     setError("");
     try {
-      const result = await api.createCertificationProject({
+      const result: any = await api.createCertificationProject({
         customerId,
         serviceTypeId,
         signatoryId,
@@ -91,7 +93,8 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
         expectedCertDate: expectedCertDate || undefined,
         notes: notes || undefined,
       });
-      onCreated(result.data.id);
+      console.log("createProject result:", result);
+      onCreated(result.id);
     } catch (e: any) {
       setError(e?.message || "创建失败");
     } finally {
@@ -142,7 +145,7 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
       setNewCustomerPhone("");
       setNewCustomerIndustry("");
       // 自动加到客户列表 + 自动选中
-      const created = r || r.data;
+      const created = r;
       if (created && created.id) {
         setCustomers((prev) => [created, ...prev]);
         setCustomerId(created.id);

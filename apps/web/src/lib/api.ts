@@ -8,8 +8,13 @@ import type {
   KnowledgeItem,
   ModelOption,
   ModelProvider,
+  PartnerOrg,
+  Project,
+  ProjectTimelineEvent,
   RiskLevelOption,
-  ReviewItem
+  ReviewItem,
+  ServiceType,
+  Signatory
 } from "../types";
 
 // 报告级附件类型
@@ -399,7 +404,7 @@ export const api = {
     return (await response.json()) as { data: any[]; total: number };
   },
   searchCustomers: (q: string, limit = 20) =>
-    request<any[]>(`/customers?q=${encodeURIComponent(q)}&limit=${limit}`),
+    request<{ data: any[]; total: number }>(`/customers?q=${encodeURIComponent(q)}&limit=${limit}`),
   getCustomer: (id: string) => request<any>(`/customers/${id}`),
   exportCustomers: (params: {
     q?: string;
@@ -607,7 +612,30 @@ export const api = {
   expiringKnowledge: (days = 30) =>
     request<Array<{ doc_code: string; title: string; category: string; effective_to: string; days_remaining: number }>>(
       `/quality/expiring?days=${days}`
-    )
+    ),
+  listSignatories: () => request<{ data: Signatory[] }>("/signatories"),
+  listServiceTypes: () => request<{ data: ServiceType[] }>("/service-types"),
+  listPartnerOrgs: () => request<{ data: PartnerOrg[] }>("/partner-orgs"),
+  createPartnerOrg: (input: { name: string; contactPerson?: string; contactPhone?: string; address?: string; notes?: string; }) =>
+    request<{ data: PartnerOrg }>("/partner-orgs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+  listCertificationProjects: (filter: { status?: string; customerId?: string; ownerId?: string; overdue?: boolean; limit?: number; offset?: number; } = {}) => {
+    const qs = new URLSearchParams();
+    if (filter.status && filter.status !== "all") qs.set("status", filter.status);
+    if (filter.customerId) qs.set("customer_id", filter.customerId);
+    if (filter.ownerId) qs.set("owner_id", filter.ownerId);
+    if (filter.overdue) qs.set("overdue", "true");
+    if (filter.limit) qs.set("limit", String(filter.limit));
+    if (filter.offset) qs.set("offset", String(filter.offset));
+    return request<{ data: Project[]; total: number }>(`/projects?${qs}`);
+  },
+  getCertificationProjectStats: () => request<{ data: Record<string, number> }>("/projects/stats"),
+  listOverdueCertificationProjects: () => request<{ data: Project[] }>("/projects/overdue"),
+  listPendingPaymentCertificationProjects: () => request<{ data: Project[] }>("/projects/pending-payment"),
+  listPendingCertCertificationProjects: () => request<{ data: Project[] }>("/projects/pending-cert"),
+  getCertificationProject: (id: string) => request<{ data: Project }>(`/projects/${id}`),
+  createCertificationProject: (input: any) => request<{ data: Project }>("/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
+  changeCertificationProjectStatus: (id: string, status: string, reason?: string) => request<{ data: Project }>(`/projects/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, reason }) }),
+  getCertificationProjectTimeline: (id: string) => request<{ data: ProjectTimelineEvent[] }>(`/projects/${id}/timeline`),
 };
 
 export { API_BASE_URL };
