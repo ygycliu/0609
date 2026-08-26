@@ -2336,6 +2336,59 @@ export function createApp() {
          WHERE id = $1 AND company_id = $2`,
         [request.params.id, u.companyId]
       );
+
+      // 自动推进状态：收到首付款 → first_paid
+      const projRes = await query(
+        `SELECT status, project_code, customer_id FROM certification_project WHERE id = $1`,
+        [request.params.id]
+      );
+      const proj = projRes.rows[0];
+      if (proj && (proj.status === "contract_signed" || proj.status === "contract_archived" || proj.status === "first_pay_pending") && body.receivedAmount && body.paymentType === "deposit") {
+        await query(
+          `UPDATE certification_project SET status = 'first_paid', updated_at = NOW() WHERE id = $1 AND company_id = $2`,
+          [request.params.id, u.companyId]
+        );
+        await query(
+          `INSERT INTO project_event
+           (company_id, project_id, from_status, to_status, reason, operator_id, operator_name)
+           VALUES ($1, $2, $3::varchar, 'first_paid'::varchar, $4::text, $5, $6::varchar)`,
+          [u.companyId, request.params.id, proj.status, `收到首付款 ¥${body.receivedAmount}，系统自动推进`, u.id, u.username ?? "system"]
+        );
+        // 自动生成待办
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 14);
+        await query(
+          `INSERT INTO todo
+            (company_id, owner_user_id, assigned_to, title, description, category,
+             source, source_ref, status, priority, due_at, customer_id, tags, metadata)
+           VALUES ($1, $2, $2, $3, $4, 'project_followup', 'project_payment',
+                   $5, 'pending', 'medium', $6, $7, $8, $9)`,
+          [
+            u.companyId, u.id,
+            `首付款到账：启动项目准备（${proj.project_code}）`,
+            `首付款 ¥${body.receivedAmount} 已到账，请在 14 天内完成资料收集和评审准备`,
+            request.params.id,
+            dueDate.toISOString(),
+            proj.customer_id,
+            JSON.stringify(["project", "auto_advance"]),
+            JSON.stringify({ projectId: request.params.id, paymentAmount: body.receivedAmount, projectCode: proj.project_code })
+          ]
+        );
+      }
+      // 自动推进：收到尾款 → cert_pending
+      if (proj && body.paymentType === "balance" && body.receivedAmount) {
+        await query(
+          `UPDATE certification_project SET status = 'cert_pending', updated_at = NOW() WHERE id = $1 AND company_id = $2 AND status NOT IN ('certified','completed','cancelled','shipment_pending')`,
+          [request.params.id, u.companyId]
+        );
+        await query(
+          `INSERT INTO project_event
+           (company_id, project_id, from_status, to_status, reason, operator_id, operator_name)
+           VALUES ($1, $2, $3::varchar, 'cert_pending'::varchar, $4::text, $5, $6::varchar)`,
+          [u.companyId, request.params.id, proj.status, `收到尾款 ¥${body.receivedAmount}，系统自动推进到待出证`, u.id, u.username ?? "system"]
+        );
+      }
+
       response.status(201).json({ data: r.rows[0] });
     } catch (e) { next(e); }
   });
@@ -2377,6 +2430,62 @@ export function createApp() {
          WHERE id = $1 AND company_id = $2`,
         [request.params.id, u.companyId]
       );
+
+      // 自动推进状态：收到首付款 → first_paid；当前是 contract_signed/contract_archived/first_pay_pending
+      const projRes = await query(
+        `SELECT status, project_code, customer_id FROM certification_project WHERE id = $1`,
+        [request.params.id]
+      );
+      const proj = projRes.rows[0];
+      console.error(`[auto-advance] project=${proj?.project_code} status=${proj?.status} paymentType=${body.paymentType} receivedAmount=${body.receivedAmount}`);
+      if (proj && (proj.status === "contract_signed" || proj.status === "contract_archived" || proj.status === "first_pay_pending") && body.receivedAmount) {
+        console.error(`[auto-advance] advancing ${proj.project_code} to first_paid`);
+        await query(
+          `UPDATE certification_project SET status = 'first_paid', updated_at = NOW() WHERE id = $1 AND company_id = $2`,
+          [request.params.id, u.companyId]
+        );
+        await query(
+          `INSERT INTO project_event
+           (company_id, project_id, from_status, to_status, reason, operator_id, operator_name)
+           VALUES ($1, $2, $3::varchar, 'first_paid'::varchar, $4::text, $5, $6::varchar)`,
+          [u.companyId, request.params.id, proj.status, `收到首付款 ¥${body.receivedAmount}，系统自动推进`, u.id, u.username ?? "system"]
+        );
+        // 自动生成待办
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 14);
+        await query(
+          `INSERT INTO todo
+            (company_id, owner_user_id, assigned_to, title, description, category,
+             source, source_ref, status, priority, due_at, customer_id, tags, metadata)
+           VALUES ($1, $2, $2, $3, $4, 'project_followup', 'project_payment',
+                   $5, 'pending', 'medium', $6, $7, $8, $9)`,
+          [
+            u.companyId, u.id,
+            `首付款到账：启动项目准备（${proj.project_code}）`,
+            `首付款 ¥${body.receivedAmount} 已到账，请在 14 天内完成资料收集和评审准备`,
+            request.params.id,
+            dueDate.toISOString(),
+            proj.customer_id,
+            JSON.stringify(["project", "auto_advance"]),
+            JSON.stringify({ projectId: request.params.id, paymentAmount: body.receivedAmount, projectCode: proj.project_code })
+          ]
+        );
+      }
+
+      // 自动推进：收到尾款 → cert_pending → certified 自动链
+      if (proj && body.paymentType === "balance" && body.receivedAmount) {
+        await query(
+          `UPDATE certification_project SET status = 'cert_pending', updated_at = NOW() WHERE id = $1 AND company_id = $2 AND status NOT IN ('certified','completed','cancelled')`,
+          [request.params.id, u.companyId]
+        );
+        await query(
+          `INSERT INTO project_event
+           (company_id, project_id, from_status, to_status, reason, operator_id, operator_name)
+           VALUES ($1, $2, $3::varchar, 'cert_pending'::varchar, $4::text, $5, $6::varchar)`,
+          [u.companyId, request.params.id, proj.status, `收到尾款 ¥${body.receivedAmount}，系统自动推进到待出证`, u.id, u.username ?? "system"]
+        );
+      }
+
       response.json({ data: r.rows[0] });
     } catch (e) { next(e); }
   });

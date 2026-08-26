@@ -18,6 +18,17 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
   const [stats, setStats] = useState<Record<string, number>>({});
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+
+  interface Reminder {
+    id: string;
+    priority: "high" | "medium" | "low";
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    actionLabel: string;
+    action: () => void;
+  }
 
   const load = async () => {
     setLoading(true);
@@ -34,12 +45,98 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
       setPendingCert((c as any).data || c || []);
       setStats((s as any).data || s || {});
       const list = (p as any).data?.items || (p as any).data || (Array.isArray(p) ? p : []);
-      setProjects(Array.isArray(list) ? list : []);
+      const projectList = Array.isArray(list) ? list : [];
+      setProjects(projectList);
+      // 计算自动提醒
+      loadReminders(projectList);
     } catch (e) {
       console.error("load workspace failed", e);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 计算自动提醒（基于项目状态 + 业务规则）
+  const loadReminders = async (projectList: Project[]) => {
+    const r: Reminder[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const p of projectList) {
+      // 1. 线索超过 14 天未推进
+      if (p.status === "lead" && p.createdAt) {
+        const ageDays = Math.floor((today.getTime() - new Date(p.createdAt).getTime()) / 86400000);
+        if (ageDays >= 14) {
+          r.push({
+            id: `lead-stale-${p.id}`,
+            priority: "medium",
+            icon: "⏰",
+            title: `${p.projectCode} 线索停留 ${ageDays} 天`,
+            description: `${p.customerName} 未推进沟通`,
+            actionLabel: "去推进",
+            action: () => onOpenProject?.(p.id)
+          });
+        }
+      }
+      // 2. 已报价超过 30 天未签约
+      if (p.status === "quoted" && p.createdAt) {
+        const ageDays = Math.floor((today.getTime() - new Date(p.createdAt).getTime()) / 86400000);
+        if (ageDays >= 30) {
+          r.push({
+            id: `quote-stale-${p.id}`,
+            priority: "high",
+            icon: "⚠️",
+            title: `${p.projectCode} 报价停留 ${ageDays} 天`,
+            description: `${p.customerName} 需确认签约意向`,
+            actionLabel: "去跟进",
+            action: () => onOpenProject?.(p.id)
+          });
+        }
+      }
+      // 3. 合同已签未收首付款
+      if (p.status === "contract_signed" || p.status === "contract_archived") {
+        r.push({
+          id: `await-deposit-${p.id}`,
+          priority: "high",
+          icon: "💰",
+          title: `${p.projectCode} 待收首付款`,
+          description: `${p.customerName} 合同金额 ¥${Number(p.contractAmount || 0).toLocaleString()}`,
+          actionLabel: "去收首付款",
+          action: () => onOpenProject?.(p.id)
+        });
+      }
+      // 4. 整改中超过 30 天
+      if (p.status === "correcting" && p.createdAt) {
+        const ageDays = Math.floor((today.getTime() - new Date(p.createdAt).getTime()) / 86400000);
+        if (ageDays >= 30) {
+          r.push({
+            id: `correcting-stale-${p.id}`,
+            priority: "medium",
+            icon: "🔧",
+            title: `${p.projectCode} 整改 ${ageDays} 天`,
+            description: `${p.customerName} 整改周期过长`,
+            actionLabel: "去跟进",
+            action: () => onOpenProject?.(p.id)
+          });
+        }
+      }
+      // 5. 即将到期出证（剩 7 天）
+      if (p.expectedCertDate) {
+        const days = Math.floor((new Date(p.expectedCertDate).getTime() - today.getTime()) / 86400000);
+        if (days >= 0 && days <= 7 && p.status !== "certified" && p.status !== "completed") {
+          r.push({
+            id: `cert-soon-${p.id}`,
+            priority: "high",
+            icon: "📜",
+            title: `${p.projectCode} 即将出证（${days}天）`,
+            description: `${p.customerName} 预计出证日 ${p.expectedCertDate}`,
+            actionLabel: "去跟进",
+            action: () => onOpenProject?.(p.id)
+          });
+        }
+      }
+    }
+    setReminders(r);
   };
 
   useEffect(() => { load(); }, []);
@@ -198,6 +295,83 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
           </table>
         )}
       </section>
+
+      {/* 漏斗：转化率 */}
+      <section className="funnel-section">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">项目漏斗</span>
+            <h2>从线索到出证的转化率</h2>
+          </div>
+        </div>
+        <div className="funnel">
+          {[
+            { label: "线索", status: "lead", color: "#f59e0b" },
+            { label: "沟通中", status: "communicating", color: "#3b82f6" },
+            { label: "已报价", status: "quoted", color: "#6366f1" },
+            { label: "合同签订", status: ["contract_pending", "contract_signed", "contract_archived"], color: "#10b981" },
+            { label: "首付款", status: ["first_pay_pending", "first_paid"], color: "#0ea5e9" },
+            { label: "评审中", status: ["contract_review", "expert_review_pending", "expert_reviewing", "delivery_prep", "doc_collecting"], color: "#8b5cf6" },
+            { label: "整改中", status: "correcting", color: "#ec4899" },
+            { label: "待出证", status: ["final_pay_pending", "invoice_pending", "cert_pending"], color: "#f97316" },
+            { label: "已出证", status: ["certified", "shipment_pending"], color: "#22c55e" },
+            { label: "已完成", status: "completed", color: "#16a34a" },
+          ].map((stage, i) => {
+            const stageList = Array.isArray(stage.status) ? stage.status : [stage.status];
+            const stageCount = stageList.reduce((sum, s) => sum + (stats[s] || 0), 0);
+            const total = sum.total || 1;
+            const pct = (stageCount / total) * 100;
+            const prevTotal = i === 0 ? total : null;
+            const conversionFromPrev = prevTotal && stageCount > 0 && prevTotal > 0
+              ? null
+              : null;
+            return (
+              <div key={stage.label} className="funnel-stage">
+                <div className="funnel-bar" style={{ background: stage.color }}>
+                  <div className="funnel-fill" style={{ width: `${Math.max(pct, 2)}%` }}>
+                    <span className="funnel-label">{stage.label}</span>
+                    <span className="funnel-count">{stageCount}</span>
+                  </div>
+                </div>
+                {i > 0 && (
+                  <span className="funnel-conversion">
+                    {stageCount === 0 ? "—" : `${pct.toFixed(0)}%`}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 自动提醒：今日待办 */}
+      {reminders.length > 0 && (
+        <section className="reminders-section">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">自动提醒</span>
+              <h2>今日待办 ({reminders.length})</h2>
+            </div>
+            <button className="ghost-button" onClick={() => loadReminders(projects)}>
+              <RefreshCw size={14} /> 刷新
+            </button>
+          </div>
+          <div className="reminders-list">
+            {reminders.map((r) => (
+              <div key={r.id} className={`reminder-item reminder-${r.priority}`}>
+                <div className="reminder-icon">{r.icon}</div>
+                <div className="reminder-body">
+                  <div className="reminder-title">{r.title}</div>
+                  <div className="reminder-desc">{r.description}</div>
+                </div>
+                <button className="ghost-button small" onClick={() => r.action()}>
+                  {r.actionLabel}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
