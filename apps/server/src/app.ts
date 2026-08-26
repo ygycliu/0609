@@ -115,6 +115,7 @@ export const quoteExportPayloadSchema = z.object({
     expertReviewFee: z.number(),
     groupLeaderFee: z.number(),
     professionalSubsidy: z.number(),
+    expertCount: z.number(),
     managementAnnualFee: z.number(),
     basePrice: z.number(),
     taxFee: z.number(),

@@ -48,8 +48,10 @@ export interface QuoteResult {
   expertReviewFee: number;
   /** 三体系组长费（仅 QES 收取） */
   groupLeaderFee: number;
-  /** 专业补贴（高风险/特殊行业） */
+  /** 专业补贴（预估人日 / 专家人数 × ¥200） */
   professionalSubsidy: number;
+  /** 专家人数（专业补贴计算因子） */
+  expertCount: number;
   /** 管理注册年金（每体系 ¥1,100） */
   managementAnnualFee: number;
   /** 基础价（不含税/不含经营管理 = 6部分之和） */
@@ -236,19 +238,23 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   const hasQES = input.certifications.includes("QES");
   const groupLeaderFee = hasQES ? 280 : 0;
 
-  // 3) 专业补贴：高风险行业 / 特殊行业
-  let professionalSubsidy = 0;
+  // 3) 专业补贴：预估人日 / 专家人数 × ¥200
+  //     每个项目独立计算（高风险项目专家人数翻倍 → 补贴减半）
+  //     公式：专业补贴 = 预估人日 / 专家人数 × 200
+  //     例如：17 人日 / 2 专家 = 8.5 × 200 = ¥1,700
+  //           27 人日 / 3 专家 = 9 × 200 = ¥1,800
+  //           5 人日 / 1 专家 = 5 × 200 = ¥1,000
+  let expertCount = 1;  // 默认 1 个专家
   const highSubsidyIndustries = ["化工", "石油", "医药", "矿业", "危化", "食品"];
-  const mediumSubsidyIndustries = ["制造业", "建筑", "施工"];
   if (highSubsidyIndustries.includes(input.industry)) {
-    professionalSubsidy += 1000;
-  } else if (mediumSubsidyIndustries.includes(input.industry)) {
-    professionalSubsidy += 500;
+    expertCount = 3;  // 高风险行业需要 3 个专家
+  } else if (input.industry === "制造业" || input.industry === "建筑" || input.industry === "施工") {
+    expertCount = 2;  // 中风险行业需要 2 个专家
   }
-  // 风险级别也是高时再加 500
-  if (input.riskLevel === "high") {
-    professionalSubsidy += 500;
+  if (input.riskLevel === "high" && expertCount < 3) {
+    expertCount = 3;  // 高风险等级也至少 3 个专家
   }
+  const professionalSubsidy = Math.round((totalAuditDays / expertCount) * 200);
 
   // 4) 专家差旅费 + 5) 审核员住宿费 → 不含在报价内（实报实销另行结算）
 
@@ -295,6 +301,7 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     expertReviewFee,
     groupLeaderFee,
     professionalSubsidy,
+    expertCount,
     managementAnnualFee,
     basePrice,
     taxFee,
@@ -305,7 +312,7 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     priceIncludes: [
       "1. 专家评审费：人日 × ¥500/天",
       "2. 三体系组长费：QES 收取 ¥280",
-      "3. 专业补贴：高风险/特殊行业 ¥500-1000",
+      "3. 专业补贴：预估人日 / 专家人数 × ¥200",
       "4. 管理注册年金：每体系 ¥1,100（首年）",
       "5. 税费：基础价 × 8.7%（含税公式：基础价/0.92）",
       "6. 企业经营管理费：基础价 × 18%",

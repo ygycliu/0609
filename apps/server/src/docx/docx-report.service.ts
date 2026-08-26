@@ -1000,7 +1000,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       spacing: { before: 200, after: 120 },
       children: [
         new TextRun({
-          text: "💡 报价公式：基础价 = 人日×500 + 体系数×1,100 + 280（QES时） + 补贴（差旅/住宿不含）",
+          text: "💡 报价公式 = 人日×500 + 体系数×1,100 + 280（QES时）+ 专业补贴(人日/专家×200) + 税费 + 经营管理",
           italics: true,
           size: 18,
           color: COLORS.muted
@@ -1012,7 +1012,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   const calcRows = [
     [`1. 专家评审费（${quote.totalAuditDays} 人日 × ¥500）`, `¥ ${quote.expertReviewFee.toLocaleString()}`],
     [`2. 三体系组长费（${quote.groupLeaderFee > 0 ? "QES" : "—"}）`, `¥ ${quote.groupLeaderFee.toLocaleString()}`],
-    [`3. 专业补贴（${quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
+    [`3. 专业补贴（${quote.totalAuditDays} 人日 / ${quote.expertCount} 专家 × ¥200）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
     [`4. 管理注册年金（${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`],
     [`基础价（4 项直接相加）`, `¥ ${quote.basePrice.toLocaleString()}`],
     [`税费（基础价 / 0.92 × 8.7%）`, `¥ ${quote.taxFee.toLocaleString()}`],

@@ -89,6 +89,7 @@ export interface CertificationQuote {
   expertReviewFee: number;
   groupLeaderFee: number;
   professionalSubsidy: number;
+  expertCount: number;
   managementAnnualFee: number;
   basePrice: number;
   taxFee: number;

@@ -554,7 +554,7 @@ export function CertificationQuotePage() {
                 <td>¥ {quote.groupLeaderFee.toLocaleString()}</td>
               </tr>
               <tr>
-                <td colSpan={3}>3. 专业补贴（{quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）</td>
+                <td colSpan={3}>3. 专业补贴（{quote.totalAuditDays} 人日 / {quote.expertCount} 专家 × ¥200）</td>
                 <td>¥ {quote.professionalSubsidy.toLocaleString()}</td>
               </tr>
               <tr>
