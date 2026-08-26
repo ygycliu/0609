@@ -13,7 +13,11 @@ export type Page =
   | "customer-detail"
   | "finance-dashboard"
   | "follow-up"
-  | "todo";
+  | "todo"
+  | "project-workspace"
+  | "project-detail"
+  | "project-new"
+  | "base-data";
 
 export interface ReviewItem {
   id: string;
@@ -79,6 +83,7 @@ export interface CertificationQuote {
   employeeCount: number;
   sizeFactor: number;
   sizeTier: string;
+  certificationScope?: string;
   certifications: CertificationQuoteItem[];
   subtotal: number;
   afterSizeFactor: number;
@@ -143,4 +148,67 @@ export interface CertificationOptionsResponse {
   industries: string[];
   riskLevels: RiskLevelOption[];
   certifications: CertificationOption[];
+}
+
+// ===== 2.0-MVP 认证项目中心 =====
+export type ProjectStatus =
+  | "lead" | "communicating" | "quoted" | "contract_pending"
+  | "contract_signed" | "contract_archived" | "first_pay_pending" | "first_paid"
+  | "delivery_prep" | "doc_collecting" | "contract_review" | "expert_review_pending"
+  | "expert_reviewing" | "correcting" | "final_pay_pending" | "invoice_pending"
+  | "cert_pending" | "certified" | "shipment_pending" | "completed"
+  | "suspended" | "at_risk" | "cancelled";
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  lead: "线索", communicating: "沟通中", quoted: "已报价",
+  contract_pending: "待签合同", contract_signed: "合同已签",
+  contract_archived: "合同已归档", first_pay_pending: "待首付款",
+  first_paid: "已收首付款", delivery_prep: "交付准备",
+  doc_collecting: "资料收集中", contract_review: "合同评审中",
+  expert_review_pending: "待专家评审", expert_reviewing: "现场/远程评审中",
+  correcting: "整改中", final_pay_pending: "待尾款",
+  invoice_pending: "待开票", cert_pending: "待出证",
+  certified: "已出证", shipment_pending: "待邮寄", completed: "已完成",
+  suspended: "暂停", at_risk: "风险/待处理", cancelled: "取消",
+};
+
+export interface Signatory {
+  id: string;
+  entity_code?: string;
+  code?: string;
+  name: string; shortName?: string;
+  contactPerson?: string; contactPhone?: string; address?: string;
+  status: string; notes?: string;
+}
+export interface ServiceType {
+  id: string; code: string; name: string; description?: string;
+  config: any; status: string; sortOrder: number;
+}
+export interface PartnerOrg {
+  id: string; name: string; contactName?: string; contactPerson?: string; contactPhone?: string;
+  address?: string; cooperationStatus: string; status?: string; notes?: string; remark?: string;
+}
+export interface Project {
+  id: string; projectCode: string;
+  customerId: string; customerName: string;
+  contactPerson?: string; contactPhone?: string;
+  serviceTypeId: string; serviceTypeCode: string; serviceTypeName: string;
+  signatoryId: string; signatoryName: string;
+  partnerOrgId?: string; partnerOrgName?: string;
+  industry?: string; certificationScope?: string; certificationStandards?: string;
+  riskLevel?: string; salesSource?: string;
+  contractAmount?: number; paidAmount: number; invoiceAmount: number;
+  status: ProjectStatus;
+  isSuspended: boolean; isCancelled: boolean; cancelReason?: string;
+  expectedCertDate?: string; actualCertDate?: string;
+  firstPayDate?: string; finalPayDate?: string;
+  nextFollowupDate?: string; lastFollowupDate?: string;
+  groupName?: string;
+  salesName?: string; projectOwnerName?: string; consultantName?: string; reviewerName?: string;
+  notes?: string; createdAt: string; updatedAt: string;
+}
+export interface ProjectTimelineEvent {
+  at: string; type: "status" | "log";
+  action?: string; fromStatus?: string; toStatus?: string;
+  reason?: string; note?: any; operatorName?: string;
 }

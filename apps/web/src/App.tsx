@@ -19,6 +19,10 @@ import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { FinanceDashboard } from "./pages/FinanceDashboard";
 import { FollowUpPage } from "./pages/FollowUpPage";
 import { TodoPage } from "./pages/TodoPage";
+import { ProjectWorkspace } from "./pages/ProjectWorkspace";
+import { ProjectDetailPage } from "./pages/ProjectDetailPage";
+import { NewProjectPage } from "./pages/NewProjectPage";
+import { BaseDataPage } from "./pages/BaseDataPage";
 import type {
   ConsultationRecord,
   Employee,
@@ -163,6 +167,29 @@ export default function App() {
           />
         )}
         {page === "todo" && <TodoPage />}
+        {page === "project-workspace" && (
+          <ProjectWorkspace
+            onNavigate={(p) => setPage(p as Page)}
+            onOpenProject={(id) => setPage(`project-detail:${id}` as Page)}
+          />
+        )}
+        {page === "base-data" && (
+          <BaseDataPage
+            onOpenCustomer={(id) => setPage(`customer-detail:${id || ""}` as Page)}
+          />
+        )}
+        {page === "project-new" && (
+          <NewProjectPage
+            onBack={() => setPage("project-workspace")}
+            onCreated={(id) => setPage(`project-detail:${id}` as Page)}
+          />
+        )}
+        {page.startsWith("project-detail:") && (
+          <ProjectDetailPage
+            projectId={page.replace("project-detail:", "")}
+            onBack={() => setPage("project-workspace")}
+          />
+        )}
         {page === "customer-list" && (
           <CustomerListPage
             onOpen={(id) => setPage(`customer-detail:${id}` as Page)}

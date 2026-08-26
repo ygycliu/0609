@@ -3,11 +3,13 @@ import {
   Banknote,
   BookOpen,
   BrainCircuit,
+  Briefcase,
   Calculator,
   ChevronDown,
   CheckSquare,
   ClipboardCheck,
   ClipboardList,
+  Database,
   FileSearch,
   FolderOpen,
   Activity,
@@ -47,14 +49,23 @@ const navigation: NavGroup[] = [
     page: "overview"
   },
   {
+    id: "base-data-group",
+    label: "基础数据管理",
+    icon: Database,
+    items: [
+      { id: "base-data", label: "基础资料", icon: Database },
+      { id: "customer-list", label: "客户管理", icon: Users }
+    ]
+  },
+  {
     id: "biz-center",
     label: "认证业务中心",
     icon: Award,
     items: [
+      { id: "project-workspace", label: "项目工作台", icon: Briefcase },
       { id: "consult", label: "开始咨询", icon: MessageSquareText },
       { id: "certification-quote", label: "认证报价", icon: Calculator },
       { id: "auditor", label: "数字审核员", icon: ClipboardList },
-      { id: "customer-list", label: "客户管理", icon: Users },
       { id: "follow-up", label: "客户跟进", icon: Activity },
       { id: "todo", label: "待办事项", icon: CheckSquare },
       { id: "finance-dashboard", label: "财务管理", icon: Banknote }
