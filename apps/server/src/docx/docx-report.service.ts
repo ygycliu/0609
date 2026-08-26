@@ -999,9 +999,11 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     [`2. 三体系组长费（${quote.groupLeaderFee > 0 ? "QES" : "—"}）`, `¥ ${quote.groupLeaderFee.toLocaleString()}`],
     [`3. 专业补贴（${quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
     [`4. 专家差旅费（实报实销）`, `¥ ${quote.travelFee.toLocaleString()}`],
-    [`5. 证书费（${quote.certifications.length} 套 × ¥200）`, `¥ ${quote.certificateFee.toLocaleString()}`],
-    [`6. 审核员住宿${quote.accommodationFee > 0 ? "（异地 ¥300/天）" : "（本地免）"}`, `¥ ${quote.accommodationFee.toLocaleString()}`],
-    [`7. 管理注册年金（${quote.certifications.length} 项证书 / ${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`]
+    [`5. 审核员住宿${quote.accommodationFee > 0 ? "（异地 ¥300/天）" : "（本地免）"}`, `¥ ${quote.accommodationFee.toLocaleString()}`],
+    [`6. 管理注册年金（${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`],
+    [`基础价（6 部分之和）`, `¥ ${quote.basePrice.toLocaleString()}`],
+    [`税费（基础价 / 0.92 × 8.7%）`, `¥ ${quote.taxFee.toLocaleString()}`],
+    [`企业经营管理费（基础价 × 18%）`, `¥ ${quote.businessManagementFee.toLocaleString()}`]
   ];
 
   const calcTable = new Table({
@@ -1023,13 +1025,13 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   });
   blocks.push(calcTable);
 
-  // 总价（6 部分之和）
+  // 最终客户报价
   blocks.push(
     new Paragraph({
       spacing: { before: 320, after: 100 },
       alignment: AlignmentType.CENTER,
       children: [
-        new TextRun({ text: "总报价（含 6 部分）", size: 22, color: COLORS.muted })
+        new TextRun({ text: "最终客户报价（含税 + 经营管理）", size: 22, color: COLORS.muted })
       ]
     })
   );
@@ -1039,7 +1041,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       alignment: AlignmentType.CENTER,
       children: [
         new TextRun({
-          text: `¥ ${quote.totalPrice.toLocaleString()}`,
+          text: `¥ ${quote.finalPrice.toLocaleString()}`,
           bold: true,
           size: 44,
           color: COLORS.accent,
