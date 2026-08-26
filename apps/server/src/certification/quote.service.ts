@@ -56,6 +56,8 @@ export interface QuoteResult {
   certificateFee: number;
   /** 审核员住宿费（异地） */
   accommodationFee: number;
+  /** 管理注册年金（每体系 ¥1,100） */
+  managementAnnualFee: number;
   /** 总报价 */
   totalPrice: number;
   /** 估算总人日 */
@@ -228,9 +230,9 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   // 1) 专家评审费：人日 × ¥500/天
   const expertReviewFee = Math.round(totalAuditDays * 500);
 
-  // 2) 三体系组长费：仅 QES 三体系 +¥200
+  // 2) 三体系组长费：仅 QES 三体系 +¥280
   const hasQES = input.certifications.includes("QES");
-  const groupLeaderFee = hasQES ? 200 : 0;
+  const groupLeaderFee = hasQES ? 280 : 0;
 
   // 3) 专业补贴：高风险行业 / 特殊行业
   let professionalSubsidy = 0;
@@ -264,9 +266,16 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     ? Math.round(totalAuditDays * 300)
     : 0;
 
+  // 7) 管理注册年金：每体系 ¥1,100
+  //     QES 三体系 = 3 套 = ¥3,300
+  //     单体系 = 1 套 = ¥1,100
+  //     多证书按选中的体系数计算（不按标准叠加）
+  const managementAnnualFee = items.length * 1100;
+
   // 🎯 总报价
   const totalPrice = expertReviewFee + groupLeaderFee + professionalSubsidy +
-                      travelFee + certificateFee + accommodationFee;
+                      travelFee + certificateFee + accommodationFee +
+                      managementAnnualFee;
 
   return {
     companyName: input.companyName,
@@ -287,15 +296,17 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     travelFee,
     certificateFee,
     accommodationFee,
+    managementAnnualFee,
     totalPrice,
     totalAuditDays,
     priceIncludes: [
       "1. 专家评审费：人日 × ¥500/天",
-      "2. 三体系组长费：QES 收取 ¥200",
+      "2. 三体系组长费：QES 收取 ¥280",
       "3. 专业补贴：高风险/特殊行业 ¥500-1000",
       "4. 专家差旅费：食宿交通（实报实销）",
       "5. 证书费：每套 ¥200（含中/英文）",
-      "6. 审核员住宿：异地 ¥300/天"
+      "6. 审核员住宿：异地 ¥300/天",
+      "7. 管理注册年金：每体系 ¥1,100（首年）"
     ],
     priceExcludes: [
       "远距离企业差旅费（按实报销）",
