@@ -6219,3 +6219,199 @@ select:focus-visible {
   margin-top: 6px;
   opacity: 0.7;
 }
+
+.quote-row-divider td {
+  border-top: 2px solid #cbd5e1 !important;
+  background: #f1f5f9 !important;
+  font-weight: 600;
+  color: #475569;
+  padding: 8px 12px;
+}
+
+[data-theme=\"dark\"] .quote-row-divider td {
+  border-top-color: #475569 !important;
+  background: #1e293b !important;
+  color: #cbd5e1;
+}
+
+.quote-row-divider td[colspan=\"4\"] {
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+
+/* ============================================================ */
+/* =========  报价页整体优化  ========== */
+/* ============================================================ */
+
+/* 价格摘要卡片（顶部醒目）*/
+.quote-summary-card {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border-radius: 16px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.quote-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quote-summary-label {
+  font-size: 14px;
+  opacity: 0.9;
+  letter-spacing: 0.5px;
+}
+
+.quote-summary-final {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.quote-summary-formula {
+  font-size: 12px;
+  opacity: 0.85;
+  font-family: monospace;
+}
+
+.quote-summary-meta {
+  display: flex;
+  gap: 24px;
+}
+
+.quote-summary-meta > div {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 12px 20px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.quote-summary-meta span {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.quote-summary-meta strong {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* 暗色模式适配 */
+[data-theme="dark"] .quote-summary-card {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+}
+
+/* 人日突出显示 */
+.audit-days {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e40af;
+  font-family: monospace;
+}
+
+.audit-days-small {
+  font-size: 13px;
+  color: #6b7280;
+  font-family: monospace;
+}
+
+.audit-days-sep {
+  color: #cbd5e1;
+  margin: 0 4px;
+  font-weight: 300;
+}
+
+[data-theme="dark"] .audit-days {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .audit-days-small {
+  color: #94a3b8;
+}
+
+/* 报价表简化 - 卡片式 */
+.quote-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+.quote-table thead {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+[data-theme="dark"] .quote-table thead {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+}
+
+.quote-table th {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: #475569;
+  letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .quote-table th {
+  color: #cbd5e1;
+}
+
+.quote-table td {
+  padding: 14px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+[data-theme="dark"] .quote-table td {
+  border-top-color: #334155;
+  background: #1e293b;
+}
+
+.quote-table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+[data-theme="dark"] .quote-table tbody tr:hover td {
+  background: #334155;
+}
+
+.quote-table tfoot td {
+  background: #f8fafc;
+  font-size: 14px;
+}
+
+[data-theme="dark"] .quote-table tfoot td {
+  background: #0f172a;
+}
+
+.quote-table small {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+[data-theme="dark"] .quote-table small {
+  color: #94a3b8;
+}
+
+/* 移除旧的 quote-total 块 */
+.quote-total {
+  display: none;
+}

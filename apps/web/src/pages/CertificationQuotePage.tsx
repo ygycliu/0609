@@ -470,6 +470,27 @@ export function CertificationQuotePage() {
       {/* ============ 报价结果 ============ */}
       {quote && (
         <section className="quote-result" aria-live="polite">
+          {/* 🎯 价格摘要卡片（顶部醒目）*/}
+          <div className="quote-summary-card">
+            <div className="quote-summary-main">
+              <span className="quote-summary-label">最终客户报价</span>
+              <strong className="quote-summary-final">¥ {quote.finalPrice.toLocaleString()}</strong>
+              <span className="quote-summary-formula">
+                = 基础价 {quote.basePrice.toLocaleString()} + 税费 {quote.taxFee.toLocaleString()} + 经营管理 {quote.businessManagementFee.toLocaleString()}
+              </span>
+            </div>
+            <div className="quote-summary-meta">
+              <div>
+                <span>预估人日</span>
+                <strong>{quote.estimatedAuditDays} 天</strong>
+              </div>
+              <div>
+                <span>监督审核（次年）</span>
+                <strong>¥ {quote.supervisionPrice.toLocaleString()}</strong>
+              </div>
+            </div>
+          </div>
+
           <header className="quote-header">
             <div>
               <h2>📋 报价单</h2>
@@ -499,10 +520,7 @@ export function CertificationQuotePage() {
             <thead>
               <tr>
                 <th>证书</th>
-                <th>基价</th>
-                <th>行业系数</th>
-                <th>调整后</th>
-                <th>人日</th>
+                <th>人日（初/监/再）</th>
               </tr>
             </thead>
             <tbody>
@@ -511,15 +529,14 @@ export function CertificationQuotePage() {
                   <td>
                     <strong>{item.certName}</strong>
                     <br />
-                    <small>{item.certId}</small>
-                  </td>
-                  <td>¥ {item.basePrice.toLocaleString()}</td>
-                  <td>× {item.industryFactor}</td>
-                  <td>¥ {item.adjustedBase.toLocaleString()}</td>
-                  <td>
-                    {item.initialAuditDays}/{item.supervisionAuditDays}/{item.recertificationAuditDays}
-                    <br />
                     <small>{item.auditorLevel}审核员</small>
+                  </td>
+                  <td>
+                    <span className="audit-days">{item.initialAuditDays}</span>
+                    <span className="audit-days-sep">/</span>
+                    <span className="audit-days-small">{item.supervisionAuditDays}</span>
+                    <span className="audit-days-sep">/</span>
+                    <span className="audit-days-small">{item.recertificationAuditDays}</span>
                   </td>
                 </tr>
               ))}
@@ -558,23 +575,6 @@ export function CertificationQuotePage() {
               </tr>
             </tfoot>
           </table>
-
-          <div className="quote-total">
-            <div className="quote-total-main">
-              <span>最终客户报价（含税 + 经营管理）</span>
-              <strong>¥ {quote.finalPrice.toLocaleString()}</strong>
-            </div>
-            <div className="quote-total-sub">
-              <div>
-                <span>监督审核（次年）</span>
-                <strong>¥ {quote.supervisionPrice.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>预估审核人日</span>
-                <strong>{quote.estimatedAuditDays} 天</strong>
-              </div>
-            </div>
-          </div>
 
           <div className="quote-notes">
             <div>
