@@ -126,24 +126,42 @@ export function CertificationQuotePage() {
 
   // 估算当前选中总价（按后端规则）
   const estimatedSubtotal = useMemo(() => {
-    let total = 0;
+    // 新报价：人日 × 500 + 体系数 × 1100 + 280 (QES) + 差旅 + 补贴 + 住宿
+    // 这里做实时估算（不含差旅/补贴/住宿的精细计算）
+    const basePriceMap: Record<string, { stdCount: number; isQES: boolean }> = {
+      QES: { stdCount: 3, isQES: true },
+      Q: { stdCount: 1, isQES: false },
+      QE: { stdCount: 2, isQES: false },
+      ES: { stdCount: 2, isQES: false },
+      QJES: { stdCount: 2, isQES: false },
+      "27001": { stdCount: 1, isQES: false },
+      "20000": { stdCount: 1, isQES: false },
+      "双信息": { stdCount: 2, isQES: false },
+      HACCP: { stdCount: 1, isQES: false },
+      "食品安全管理": { stdCount: 1, isQES: false },
+      GAP: { stdCount: 1, isQES: false },
+      "商品售后服务": { stdCount: 1, isQES: false },
+      "餐饮服务": { stdCount: 1, isQES: false },
+      "社会责任": { stdCount: 1, isQES: false },
+      "能源": { stdCount: 1, isQES: false },
+      "碳管理": { stdCount: 1, isQES: false },
+      "绿色供应链": { stdCount: 1, isQES: false }
+    };
+    // 人日估算：默认 17 人日（中等企业 QES）
+    const estAuditDays = 17;
+    let reviewFee = estAuditDays * 500;
+    let stdCount = 0;
+    let isQES = false;
     for (const id of selected) {
-      const cert = options.find((c) => c.id === id);
-      if (!cert) continue;
-      // 简化估算：基价 × 行业系数
-      const basePriceMap: Record<string, number> = {
-        QES: 12000, Q: 5000, QE: 8000, ES: 9000, QJES: 17000,
-        "27001": 13000, "20000": 10000, "双信息": 21500,
-        HACCP: 8500, "食品安全管理": 8000, GAP: 10000,
-        "商品售后服务": 7000, "餐饮服务": 6000,
-        "社会责任": 13000, "能源": 12000, "碳管理": 10000,
-        "绿色供应链": 6500
-      };
-      const base = basePriceMap[id] ?? 0;
-      total += base;
+      const meta = basePriceMap[id];
+      if (!meta) continue;
+      stdCount += meta.stdCount;
+      if (meta.isQES) isQES = true;
     }
-    return total;
-  }, [selected, options]);
+    const managementFee = stdCount * 1100;
+    const groupLeader = isQES ? 280 : 0;
+    return reviewFee + managementFee + groupLeader;
+  }, [selected]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -507,29 +525,44 @@ export function CertificationQuotePage() {
               ))}
             </tbody>
             <tfoot>
-              <tr>
-                <td colSpan={3}>小计</td>
-                <td>¥ {quote.subtotal.toLocaleString()}</td>
+              <tr className="quote-row-divider">
+                <td colSpan={4}>📋 4 项费用明细</td>
               </tr>
               <tr>
-                <td colSpan={3}>人数系数（{quote.sizeTier}）</td>
-                <td>× {quote.sizeFactor}</td>
+                <td colSpan={3}>1. 专家评审费（{quote.totalAuditDays} 人日 × ¥500）</td>
+                <td>¥ {quote.expertReviewFee.toLocaleString()}</td>
               </tr>
               <tr>
-                <td colSpan={3}>小计 × 人数</td>
-                <td>¥ {quote.afterSizeFactor.toLocaleString()}</td>
+                <td colSpan={3}>2. 三体系组长费（{quote.groupLeaderFee > 0 ? "QES" : "—"}）</td>
+                <td>¥ {quote.groupLeaderFee.toLocaleString()}</td>
               </tr>
               <tr>
-                <td colSpan={3}>多证折扣（{quote.bundleTier}）</td>
-                <td>× {quote.bundleDiscount}</td>
+                <td colSpan={3}>3. 专业补贴（{quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）</td>
+                <td>¥ {quote.professionalSubsidy.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td colSpan={3}>4. 管理注册年金（{quote.standardCount} 体系 × ¥1,100）</td>
+                <td>¥ {quote.managementAnnualFee.toLocaleString()}</td>
+              </tr>
+              <tr className="quote-row-divider">
+                <td colSpan={3}>基础价（4 部分之和）</td>
+                <td><strong>¥ {quote.basePrice.toLocaleString()}</strong></td>
+              </tr>
+              <tr>
+                <td colSpan={3}>税费（基础价 / 0.92 × 8.7%）</td>
+                <td>¥ {quote.taxFee.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td colSpan={3}>企业经营管理费（基础价 × 18%）</td>
+                <td>¥ {quote.businessManagementFee.toLocaleString()}</td>
               </tr>
             </tfoot>
           </table>
 
           <div className="quote-total">
             <div className="quote-total-main">
-              <span>初审报价（包干）</span>
-              <strong>¥ {quote.initialPrice.toLocaleString()}</strong>
+              <span>最终客户报价（含税 + 经营管理）</span>
+              <strong>¥ {quote.finalPrice.toLocaleString()}</strong>
             </div>
             <div className="quote-total-sub">
               <div>

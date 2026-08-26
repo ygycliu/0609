@@ -50,10 +50,6 @@ export interface QuoteResult {
   groupLeaderFee: number;
   /** 专业补贴（高风险/特殊行业） */
   professionalSubsidy: number;
-  /** 专家差旅费（实报实销） */
-  travelFee: number;
-  /** 审核员住宿费（异地） */
-  accommodationFee: number;
   /** 管理注册年金（每体系 ¥1,100） */
   managementAnnualFee: number;
   /** 基础价（不含税/不含经营管理 = 6部分之和） */
@@ -254,24 +250,9 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     professionalSubsidy += 500;
   }
 
-  // 4) 专家差旅费：宁夏本地约 ¥2,000 / 异地约 ¥3,500 / 偏远 ¥5,000
-  let travelFee = 2000;
-  if (input.employeeCount > 100) {
-    travelFee = 3500;
-  }
-  // 高风险行业需要更多现场人员
-  if (input.riskLevel === "high") {
-    travelFee = 4000;
-  }
+  // 4) 专家差旅费 + 5) 审核员住宿费 → 不含在报价内（实报实销另行结算）
 
-  // 5) 证书工本费 → 已合并到税费和经营管理费中，不再单独计算
-
-  // 6) 审核员住宿费：异地 ¥300/天 × 人日（宁夏本地免）
-  const accommodationFee = input.employeeCount > 100
-    ? Math.round(totalAuditDays * 300)
-    : 0;
-
-  // 7) 管理注册年金：每体系 ¥1,100
+  // 6) 管理注册年金：每体系 ¥1,100
   //     QES 三体系 = 3 体系 = ¥3,300
   //     Q 单体系 = 1 体系 = ¥1,100
   //     双信息（27001+20000）= 2 体系 = ¥2,200
@@ -283,10 +264,10 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   }
   const managementAnnualFee = standardCount * 1100;
 
-  // 🎯 基础价（直接计算，无系数）
-  //   = 人日 × 500 + 体系数 × 1100 + 280 (QES时) + 差旅 + 补贴 + 住宿
+  // 🎯 基础价（不含差旅/住宿，实报实销）
+  //   = 人日 × 500 + 体系数 × 1100 + 280 (QES时) + 补贴
   const basePrice = expertReviewFee + managementAnnualFee + groupLeaderFee +
-                     professionalSubsidy + travelFee + accommodationFee;
+                     professionalSubsidy;
 
   // 🧮 税费：basePrice / 0.92 × 0.08 ≈ basePrice × 8.7%
   //     计算逻辑：含税 = basePrice / 0.92，所以税 = basePrice / 0.92 - basePrice
@@ -314,8 +295,6 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     expertReviewFee,
     groupLeaderFee,
     professionalSubsidy,
-    travelFee,
-    accommodationFee,
     managementAnnualFee,
     basePrice,
     taxFee,
@@ -327,15 +306,14 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
       "1. 专家评审费：人日 × ¥500/天",
       "2. 三体系组长费：QES 收取 ¥280",
       "3. 专业补贴：高风险/特殊行业 ¥500-1000",
-      "4. 专家差旅费：食宿交通（实报实销）",
-      "5. 审核员住宿：异地 ¥300/天",
-      "6. 管理注册年金：每体系 ¥1,100（首年）",
-      "7. 税费：基础价 × 8.7%（含税公式：基础价/0.92）",
-      "8. 企业经营管理费：基础价 × 18%",
-      "9. 最终客户报价 = 基础价 + 税费 + 经营管理费"
+      "4. 管理注册年金：每体系 ¥1,100（首年）",
+      "5. 税费：基础价 × 8.7%（含税公式：基础价/0.92）",
+      "6. 企业经营管理费：基础价 × 18%",
+      "7. 最终客户报价 = 基础价 + 税费 + 经营管理费"
     ],
     priceExcludes: [
-      "远距离企业差旅费（按实报销）",
+      "专家差旅费（实报实销，另行结算）",
+      "审核员住宿费（异地，实报实销）",
       "特殊行业附加审核（医疗/危化等）",
       "证书副本加印（¥100/套）",
       "加急审核（双倍审核费）",

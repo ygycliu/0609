@@ -86,6 +86,16 @@ export interface CertificationQuote {
   bundleTier: string;
   initialPrice: number;
   supervisionPrice: number;
+  expertReviewFee: number;
+  groupLeaderFee: number;
+  professionalSubsidy: number;
+  managementAnnualFee: number;
+  basePrice: number;
+  taxFee: number;
+  businessManagementFee: number;
+  finalPrice: number;
+  totalAuditDays: number;
+  standardCount: number;
   priceIncludes: string[];
   priceExcludes: string[];
   estimatedAuditDays: number;
