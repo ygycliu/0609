@@ -51,6 +51,18 @@ export interface DocxBranding {
   confidentiality: string;
   includeToc: boolean;
   includeReferences: boolean;
+  /** 认证机构办公地址 */
+  agencyAddress?: string;
+  /** 认证机构联系人电话 */
+  agencyContact?: string;
+  /** 发票税率（如 6%）*/
+  taxRate?: string;
+  /** 发票类型 */
+  invoiceType?: string;
+  /** 付款方式 */
+  paymentTerms?: string;
+  /** 出证周期 */
+  certificatePeriod?: string;
 }
 
 interface InlineStyle {
@@ -787,15 +799,21 @@ export function enterpriseTemplateRecord(): ConsultationRecord {
 
 export function enterpriseTemplateBranding(): DocxBranding {
   return {
-    companyName: "[编制单位名称]",
+    companyName: "华中国际认证检验集团有限公司",
     clientName: "[客户单位名称]",
-    projectName: "[项目名称]",
-    documentTitle: "企业数字化建设方案",
+    projectName: "管理体系认证报价",
+    documentTitle: "管理体系认证报价单",
     version: "V1.0",
-    preparedBy: "[编制人员/团队]",
+    preparedBy: "刘军",
     confidentiality: "内部资料",
-    includeToc: true,
-    includeReferences: true
+    includeToc: false,
+    includeReferences: false,
+    agencyAddress: "银川国智知识产权服务园201室",
+    agencyContact: "13195086656",
+    taxRate: "6%",
+    invoiceType: "增值税普通发票",
+    paymentTerms: "合同签订首付70%，收到证书付清尾款30%",
+    certificatePeriod: "30天左右"
   };
 }
 
@@ -853,18 +871,35 @@ export async function generateQuoteDocx(
 function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChild[] {
   const blocks: FileChild[] = [];
   const now = new Date();
+  const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+
+  // ========== 顶部机构信息 ==========
+  // 机构名称
+  blocks.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 100, after: 60 },
+      children: [
+        new TextRun({
+          text: "─传递信任 服务发展─",
+          size: 20,
+          color: COLORS.muted,
+          italics: true
+        })
+      ]
+    })
+  );
 
   // 标题
   blocks.push(
     new Paragraph({
-      heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
       spacing: { before: 200, after: 200 },
       children: [
         new TextRun({
-          text: "认证证书报价单",
+          text: "管理体系认证报价单",
           bold: true,
-          size: 36,
+          size: 40,
           color: COLORS.primary,
           font: FONTS.heading
         })
@@ -872,44 +907,120 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     })
   );
 
-  // 客户信息块
+  // 机构信息
   blocks.push(
     new Paragraph({
       spacing: { after: 80 },
       children: [
-        new TextRun({ text: "客户：", bold: true, size: 22, color: COLORS.ink }),
-        new TextRun({ text: quote.companyName, size: 22, color: COLORS.ink }),
-        new TextRun({ text: "    行业：", bold: true, size: 22, color: COLORS.ink }),
-        new TextRun({ text: quote.industry, size: 22, color: COLORS.ink }),
-        new TextRun({ text: "    人数：", bold: true, size: 22, color: COLORS.ink }),
-        new TextRun({ text: `${quote.employeeCount} 人（${quote.sizeTier}）`, size: 22, color: COLORS.ink })
+        new TextRun({ text: "机构名称：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({ text: branding.companyName, size: 22, color: COLORS.ink })
       ]
     })
   );
 
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [
+        new TextRun({ text: "办公地址：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({ text: branding.agencyAddress ?? "银川国智知识产权服务园201室", size: 22, color: COLORS.ink })
+      ]
+    })
+  );
+
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [
+        new TextRun({ text: "联 系 人：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({ text: branding.preparedBy ?? "刘军", size: 22, color: COLORS.ink }),
+        new TextRun({ text: "    电    话：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({ text: branding.agencyContact ?? "13195086656", size: 22, color: COLORS.ink })
+      ]
+    })
+  );
+
+  // 分隔线
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 100, after: 200 },
+      border: { bottom: { color: COLORS.primary, space: 4, style: BorderStyle.SINGLE, size: 12 } },
+      children: []
+    })
+  );
+
+  // ========== 客户信息 ==========
+  blocks.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 100, after: 200 },
+      children: [
+        new TextRun({
+          text: "管理体系认证报价单",
+          bold: true,
+          size: 32,
+          color: COLORS.primary,
+          font: FONTS.heading
+        })
+      ]
+    })
+  );
+
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 100 },
+      children: [
+        new TextRun({ text: "客户名称：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({ text: quote.companyName, size: 22, color: COLORS.ink })
+      ]
+    })
+  );
+
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 100 },
+      children: [
+        new TextRun({ text: "组织规模：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({ text: `${quote.employeeCount} 人（${quote.industry}）`, size: 22, color: COLORS.ink })
+      ]
+    })
+  );
+
+  // 拟申请认证范围（多行）
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 100 },
+      children: [
+        new TextRun({ text: "拟申请认证范围：", bold: true, size: 22, color: COLORS.ink })
+      ]
+    })
+  );
+  const scopeText = (quote as any).certificationScope || "（最终认证范围以合同评审为准）";
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      indent: { left: 400 },
+      children: [
+        new TextRun({ text: scopeText, size: 20, color: COLORS.ink })
+      ]
+    })
+  );
   blocks.push(
     new Paragraph({
       spacing: { after: 240 },
+      indent: { left: 400 },
       children: [
-        new TextRun({ text: "出具日期：", bold: true, size: 20, color: COLORS.muted }),
-        new TextRun({
-          text: now.toLocaleString("zh-CN"),
-          size: 20,
-          color: COLORS.muted
-        }),
-        new TextRun({ text: "    报价人：", bold: true, size: 20, color: COLORS.muted }),
-        new TextRun({ text: branding.preparedBy, size: 20, color: COLORS.muted })
+        new TextRun({ text: "（最终认证范围以合同评审为准）", size: 18, color: COLORS.muted, italics: true })
       ]
     })
   );
 
-  // 证书明细表
+  // ========== 一、报价明细表 ==========
   blocks.push(
     new Paragraph({
-      heading: HeadingLevel.HEADING_2,
       spacing: { before: 200, after: 120 },
       children: [
-        new TextRun({ text: "一、报价明细", bold: true, size: 26, color: COLORS.primary })
+        new TextRun({ text: "一、报价明细", bold: true, size: 26, color: COLORS.primary, font: FONTS.heading })
       ]
     })
   );
@@ -946,32 +1057,71 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     });
   }
 
+  // 报价明细表（简化版：只显示证书+价格+备注）
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
-      buildCell("证书名称", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 3000 }),
-      buildCell("基价", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1200, align: "right" }),
-      buildCell("行业系数", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1000, align: "center" }),
-      buildCell("调整后", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1300, align: "right" }),
-      buildCell("审核员", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1000, align: "center" }),
-      buildCell("人日（初/监/再）", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1800, align: "center" })
+      buildCell("认证类别", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1800 }),
+      buildCell("认证标准", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 2800 }),
+      buildCell("价格（元）", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 1500, align: "right" }),
+      buildCell("备注", { bold: true, color: COLORS.white, fill: COLORS.primary, width: 2700 })
     ]
   });
 
-  const itemRows = quote.certifications.map((c, i) => new TableRow({
-    children: [
-      buildCell(c.certName, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 3000 }),
-      buildCell(`¥ ${c.basePrice.toLocaleString()}`, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1200, align: "right" }),
-      buildCell(`× ${c.industryFactor}`, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1000, align: "center" }),
-      buildCell(`¥ ${c.adjustedBase.toLocaleString()}`, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1300, align: "right" }),
-      buildCell(c.auditorLevel, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1000, align: "center" }),
-      buildCell(`${c.initialAuditDays} / ${c.supervisionAuditDays} / ${c.recertificationAuditDays}`,
-        { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1800, align: "center" })
-    ]
-  }));
+  const certStandardMap: Record<string, string> = {
+    "Q": "GB/T19001-2016/ISO9001:2015",
+    "QE": "GB/T19001+24001",
+    "ES": "GB/T24001+45001",
+    "QES": "GB/T19001/24001/45001",
+    "27001": "GB/T22080-2016/ISO/IEC27001:2022",
+    "20000": "ISO/IEC 20000-1:2018",
+    "双信息": "ISO 27001+20000",
+    "HACCP": "GB/T27341-2009/ISO22000",
+    "食品安全管理": "ISO 22000:2018",
+    "GAP": "良好农业规范",
+    "商品售后服务": "商品售后服务认证",
+    "餐饮服务": "餐饮服务认证",
+    "社会责任": "SA 8000 社会责任",
+    "能源": "ISO 50001:2018",
+    "碳管理": "ISO 14068",
+    "绿色供应链": "绿色供应链"
+  };
+
+  const certTypeMap: Record<string, string> = {
+    "QES": "质量+环境+职业健康安全管理体系",
+    "Q": "质量管理体系认证",
+    "QE": "质量+环境管理体系",
+    "ES": "环境+职业健康安全管理体系",
+    "27001": "信息安全管理体系",
+    "20000": "信息技术服务管理体系",
+    "双信息": "信息+IT服务双体系",
+    "HACCP": "危害分析与关键控制点体系",
+    "食品安全管理": "食品安全管理体系",
+    "GAP": "良好农业规范",
+    "商品售后服务": "商品售后服务认证",
+    "餐饮服务": "餐饮服务认证",
+    "社会责任": "社会责任管理体系",
+    "能源": "能源管理体系",
+    "碳管理": "碳管理体系",
+    "绿色供应链": "绿色供应链管理体系"
+  };
+
+  const itemRows = quote.certifications.map((c, i) => {
+    const supervisionPrice = Math.round(quote.finalPrice * 0.8 / quote.certifications.length);
+    return new TableRow({
+      children: [
+        buildCell(certTypeMap[c.certId] ?? c.certName, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1800 }),
+        buildCell(certStandardMap[c.certId] ?? c.certName, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 2800 }),
+        buildCell(`初审 ¥${quote.basePrice.toLocaleString()}\n监督 ¥${supervisionPrice.toLocaleString()}`,
+          { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1500, align: "right", bold: true, color: COLORS.accent }),
+        buildCell(`差旅食宿费由企业实报实销\n（含 ${c.auditorLevel} 审核员）`,
+          { fill: i % 2 ? COLORS.surface : COLORS.white, width: 2700 })
+      ]
+    });
+  });
 
   blocks.push(new Table({
-    width: { size: 9300, type: WidthType.DXA },
+    width: { size: 8800, type: WidthType.DXA },
     borders: {
       top: border(COLORS.line, 4),
       bottom: border(COLORS.line, 4),
@@ -983,13 +1133,12 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     rows: [headerRow, ...itemRows]
   }));
 
-  // 计算明细
+  // ========== 二、计算明细 ==========
   blocks.push(
     new Paragraph({
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 280, after: 120 },
+      spacing: { before: 240, after: 120 },
       children: [
-        new TextRun({ text: "二、计算明细", bold: true, size: 26, color: COLORS.primary })
+        new TextRun({ text: "二、计算明细", bold: true, size: 26, color: COLORS.primary, font: FONTS.heading })
       ]
     })
   );
@@ -997,7 +1146,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   // 公式说明
   blocks.push(
     new Paragraph({
-      spacing: { before: 200, after: 120 },
+      spacing: { before: 80, after: 120 },
       children: [
         new TextRun({
           text: "💡 报价公式 = 人日×500 + 体系数×1,100 + 280（QES时）+ 专业补贴(人日/专家×200) + 税费 + 经营管理",
@@ -1020,7 +1169,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   ];
 
   const calcTable = new Table({
-    width: { size: 6000, type: WidthType.DXA },
+    width: { size: 8800, type: WidthType.DXA },
     borders: {
       top: border(COLORS.line, 4),
       bottom: border(COLORS.line, 4),
@@ -1031,8 +1180,8 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     },
     rows: calcRows.map((row, i) => new TableRow({
       children: [
-        tableCell(row[0], { heading: true, fill: i % 2 ? COLORS.surface : COLORS.white, width: 4000 }),
-        tableCell(row[1], { fill: i % 2 ? COLORS.surface : COLORS.white, width: 2000 })
+        tableCell(row[0], { heading: true, fill: i % 2 ? COLORS.surface : COLORS.white, width: 5500 }),
+        tableCell(row[1], { fill: i % 2 ? COLORS.surface : COLORS.white, width: 3300 })
       ]
     }))
   });
@@ -1056,7 +1205,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
         new TextRun({
           text: `¥ ${quote.finalPrice.toLocaleString()}`,
           bold: true,
-          size: 44,
+          size: 48,
           color: COLORS.accent,
           font: FONTS.heading
         })
@@ -1064,37 +1213,73 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     })
   );
 
-  // 监督 + 人日
+  // ========== 三、商务条款（参照云森模板）==========
   blocks.push(
     new Paragraph({
-      spacing: { after: 280 },
-      alignment: AlignmentType.CENTER,
+      spacing: { before: 200, after: 120 },
       children: [
-        new TextRun({ text: "监督审核（次年）：", size: 20, color: COLORS.muted }),
+        new TextRun({ text: "三、商务条款", bold: true, size: 26, color: COLORS.primary, font: FONTS.heading })
+      ]
+    })
+  );
+
+  // 发票类型及税率
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [
+        new TextRun({ text: "发票类型及税率：", bold: true, size: 22, color: COLORS.ink }),
         new TextRun({
-          text: `¥ ${quote.supervisionPrice.toLocaleString()}`,
-          bold: true,
-          size: 20,
+          text: branding.invoiceType ?? "增值税普通发票",
+          size: 22,
           color: COLORS.ink
         }),
-        new TextRun({ text: "    ｜    总审核人日：", size: 20, color: COLORS.muted }),
         new TextRun({
-          text: `${quote.estimatedAuditDays} 天`,
+          text: " 税率" + (branding.taxRate ?? "6%"),
           bold: true,
-          size: 20,
+          size: 22,
+          color: COLORS.accent
+        })
+      ]
+    })
+  );
+
+  // 付款方式
+  blocks.push(
+    new Paragraph({
+      spacing: { after: 80 },
+      children: [
+        new TextRun({ text: "付款方式：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({
+          text: branding.paymentTerms ?? "合同签订首付70%，收到证书付清尾款30%",
+          size: 22,
           color: COLORS.ink
         })
       ]
     })
   );
 
-  // 包含项
+  // 出证周期
   blocks.push(
     new Paragraph({
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 200, after: 100 },
+      spacing: { after: 240 },
       children: [
-        new TextRun({ text: "三、价格包含", bold: true, size: 24, color: COLORS.primary })
+        new TextRun({ text: "出证周期：", bold: true, size: 22, color: COLORS.ink }),
+        new TextRun({
+          text: branding.certificatePeriod ?? "30天左右",
+          size: 22,
+          color: COLORS.ink
+        })
+      ]
+    })
+  );
+
+  // ========== 四、价格包含/不包含 ==========
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 100, after: 100 },
+      children: [
+        new TextRun({ text: "四、价格包含", bold: true, size: 24, color: COLORS.primary })
       ]
     })
   );
@@ -1102,19 +1287,16 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     blocks.push(
       new Paragraph({
         spacing: { after: 60 },
-        bullet: { level: 0 },
-        children: [new TextRun({ text: item, size: 20 })]
+        children: [new TextRun({ text: "✓ " + item, size: 20 })]
       })
     );
   }
 
-  // 不包含
   blocks.push(
     new Paragraph({
-      heading: HeadingLevel.HEADING_2,
       spacing: { before: 200, after: 100 },
       children: [
-        new TextRun({ text: "四、价格不包含", bold: true, size: 24, color: COLORS.primary })
+        new TextRun({ text: "五、价格不包含", bold: true, size: 24, color: COLORS.primary })
       ]
     })
   );
@@ -1122,16 +1304,63 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     blocks.push(
       new Paragraph({
         spacing: { after: 60 },
-        bullet: { level: 0 },
-        children: [new TextRun({ text: item, size: 20 })]
+        children: [new TextRun({ text: "✗ " + item, size: 20 })]
       })
     );
   }
 
-  // 签章
+  // ========== 六、申请认证基本条件 ==========
   blocks.push(
     new Paragraph({
-      spacing: { before: 400, after: 100 },
+      spacing: { before: 200, after: 100 },
+      children: [
+        new TextRun({ text: "六、申请认证基本条件", bold: true, size: 24, color: COLORS.primary })
+      ]
+    })
+  );
+  const conditions = [
+    "①企业资质满三个月；体系运行满6个月；",
+    "②企业近一年无行政处罚（已消除影响的除外）；",
+    "③能提供营业执照、组织机构代码证等相关资质文件；",
+    "④建立完整的内部审核和管理评审记录。"
+  ];
+  for (const c of conditions) {
+    blocks.push(
+      new Paragraph({
+        spacing: { after: 60 },
+        children: [new TextRun({ text: c, size: 20 })]
+      })
+    );
+  }
+
+  // ========== 七、签章 ==========
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 200, after: 100 },
+      alignment: AlignmentType.RIGHT,
+      children: [
+        new TextRun({
+          text: branding.companyName + " · 宁夏分公司",
+          bold: true,
+          size: 22,
+          color: COLORS.ink
+        })
+      ]
+    })
+  );
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 60, after: 100 },
+      alignment: AlignmentType.RIGHT,
+      children: [
+        new TextRun({ text: dateStr, size: 22, color: COLORS.ink })
+      ]
+    })
+  );
+
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 100, after: 100 },
       children: [
         new TextRun({ text: "客户签字：", size: 20, color: COLORS.muted }),
         new TextRun({ text: "________________________", size: 20 }),
