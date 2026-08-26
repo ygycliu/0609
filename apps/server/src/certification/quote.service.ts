@@ -62,6 +62,8 @@ export interface QuoteResult {
   totalPrice: number;
   /** 估算总人日 */
   totalAuditDays: number;
+  /** 体系数（管理注册年金计算用） */
+  standardCount: number;
   priceIncludes: string[];
   priceExcludes: string[];
   estimatedAuditDays: number;
@@ -267,10 +269,16 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     : 0;
 
   // 7) 管理注册年金：每体系 ¥1,100
-  //     QES 三体系 = 3 套 = ¥3,300
-  //     单体系 = 1 套 = ¥1,100
-  //     多证书按选中的体系数计算（不按标准叠加）
-  const managementAnnualFee = items.length * 1100;
+  //     QES 三体系 = 3 体系 = ¥3,300
+  //     Q 单体系 = 1 体系 = ¥1,100
+  //     双信息（27001+20000）= 2 体系 = ¥2,200
+  //     按 CERT_TO_STANDARDS 展开后的总体系数计算
+  let standardCount = 0;
+  for (const item of items) {
+    const stds = CERT_TO_STANDARDS[item.certId] || [];
+    standardCount += stds.length;
+  }
+  const managementAnnualFee = standardCount * 1100;
 
   // 🎯 总报价
   const totalPrice = expertReviewFee + groupLeaderFee + professionalSubsidy +
@@ -299,6 +307,7 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
     managementAnnualFee,
     totalPrice,
     totalAuditDays,
+    standardCount,
     priceIncludes: [
       "1. 专家评审费：人日 × ¥500/天",
       "2. 三体系组长费：QES 收取 ¥280",

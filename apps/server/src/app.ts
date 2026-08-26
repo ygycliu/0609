@@ -121,6 +121,7 @@ export const quoteExportPayloadSchema = z.object({
     managementAnnualFee: z.number(),
     totalPrice: z.number(),
     totalAuditDays: z.number(),
+    standardCount: z.number(),
     priceIncludes: z.array(z.string()),
     priceExcludes: z.array(z.string()),
     estimatedAuditDays: z.number(),

@@ -1001,7 +1001,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     [`4. 专家差旅费（实报实销）`, `¥ ${quote.travelFee.toLocaleString()}`],
     [`5. 证书费（${quote.certifications.length} 套 × ¥200）`, `¥ ${quote.certificateFee.toLocaleString()}`],
     [`6. 审核员住宿${quote.accommodationFee > 0 ? "（异地 ¥300/天）" : "（本地免）"}`, `¥ ${quote.accommodationFee.toLocaleString()}`],
-    [`7. 管理注册年金（${quote.certifications.length} 套 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`]
+    [`7. 管理注册年金（${quote.certifications.length} 项证书 / ${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`]
   ];
 
   const calcTable = new Table({
