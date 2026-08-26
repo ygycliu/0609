@@ -41,6 +41,8 @@ export interface QuoteResult {
   employeeCount: number;
   sizeFactor: number;
   sizeTier: string;
+  /** 申请认证范围（用户填或从客户历史拉） */
+  certificationScope?: string;
   certifications: QuoteItem[];
   subtotal: number;
   afterSizeFactor: number;
@@ -226,9 +228,6 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   const bundle = bundleDiscount(items.length);
   const initialPrice = Math.round(afterSize * bundle.factor);
 
-  // 5) 监督审核 = 初审 × 80%
-  const supervisionPrice = Math.round(initialPrice * 0.8);
-
   // 6) 审核人日（按查表实际值求和）
   const totalAuditDays = items.reduce((sum, item) => sum + item.initialAuditDays, 0);
   const supervisionDays = items.reduce((sum, item) => sum + item.supervisionAuditDays, 0);
@@ -293,12 +292,16 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   // 🎯 最终客户报价 = 基础价 + 税费 + 经营管理费
   const finalPrice = Math.round((basePrice + taxFee + businessManagementFee) * 100) / 100;
 
+  // 5) 监督审核（次年）= 最终报价 × 80%
+  const supervisionPrice = Math.round(finalPrice * 0.8);
+
   return {
     companyName: input.companyName,
     industry: input.industry,
     employeeCount: input.employeeCount,
     sizeFactor: size.factor,
     sizeTier: size.tier,
+    certificationScope: input.certificationScope || "",
     certifications: items,
     subtotal,
     afterSizeFactor: afterSize,

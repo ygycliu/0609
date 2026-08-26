@@ -1206,10 +1206,9 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     }
   }
 
-  // 监督价格 = 初审的 80%
-  const supervisionPrice = Math.round(quote.basePrice * 0.8);
-  const initialPriceText = `初审 ¥${quote.basePrice.toLocaleString()}`;
-  const supervisionPriceText = `监督 ¥${supervisionPrice.toLocaleString()}`;
+  // 监督审核（次年）：从 quote.supervisionPrice 提取
+  const initialPriceText = `初审 ¥${quote.finalPrice.toLocaleString()}`;
+  const supervisionPriceText = `监督 ¥${quote.supervisionPrice.toLocaleString()}`;
 
   // 构建报价明细行（合并价格/备注单元格）
   const itemRows: TableRow[] = [];
