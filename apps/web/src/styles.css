@@ -7269,3 +7269,21 @@ textarea:focus {
   align-items: center;
   gap: 8px;
 }
+
+
+.selected-customer-info {
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: #e0f2fe;
+  border-radius: 6px;
+  border: 1px solid #7dd3fc;
+}
+[data-theme="dark"] .selected-customer-info {
+  background: #082f49;
+  border-color: #0c4a6e;
+}
+.selected-customer-info small {
+  color: #075985;
+  font-size: 12px;
+}
+[data-theme="dark"] .selected-customer-info small { color: #bae6fd; }

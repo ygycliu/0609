@@ -41,6 +41,14 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
   const [newPartnerContact, setNewPartnerContact] = useState("");
   const [newPartnerPhone, setNewPartnerPhone] = useState("");
 
+  // 新建客户
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerContact, setNewCustomerContact] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [newCustomerIndustry, setNewCustomerIndustry] = useState("");
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+
   useEffect(() => {
     Promise.all([
       api.listSignatories(),
@@ -110,6 +118,43 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
     }
   }
 
+  async function handleCreateCustomer() {
+    if (!newCustomerName.trim()) {
+      alert("请填写客户名称");
+      return;
+    }
+    setCreatingCustomer(true);
+    try {
+      // 自动生成 customerCode（基于名称拼音首字母 + 时间戳）
+      const code = "C" + Date.now().toString().slice(-8);
+      const r: any = await api.createCustomer({
+        customerCode: code,
+        name: newCustomerName.trim(),
+        contactPerson: newCustomerContact.trim() || undefined,
+        contactPhone: newCustomerPhone.trim() || undefined,
+        industry: newCustomerIndustry.trim() || undefined,
+        status: "active"
+      });
+      // 关闭弹窗 + 重置
+      setShowCustomerModal(false);
+      setNewCustomerName("");
+      setNewCustomerContact("");
+      setNewCustomerPhone("");
+      setNewCustomerIndustry("");
+      // 自动加到客户列表 + 自动选中
+      const created = r || r.data;
+      if (created && created.id) {
+        setCustomers((prev) => [created, ...prev]);
+        setCustomerId(created.id);
+        setCustomerSearch("");
+      }
+    } catch (e: any) {
+      alert(e?.message || "创建客户失败");
+    } finally {
+      setCreatingCustomer(false);
+    }
+  }
+
   const filteredCustomers = customerSearch
     ? customers.filter((c) => c.name.toLowerCase().includes(customerSearch.toLowerCase()))
     : customers.slice(0, 50);
@@ -139,13 +184,30 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
             />
-            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            <select
+              value={customerId}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  setShowCustomerModal(true);
+                  return;
+                }
+                setCustomerId(e.target.value);
+              }}
+            >
               <option value="">-- 选择客户 --</option>
               {filteredCustomers.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
+              <option value="__new__" style={{ color: "#0ea5e9", fontWeight: 600 }}>
+                ➕ 新建客户...
+              </option>
             </select>
           </div>
+          {customerId && (
+            <div className="selected-customer-info">
+              <small>已选客户：<strong>{customers.find((c) => c.id === customerId)?.name}</strong></small>
+            </div>
+          )}
         </div>
 
         {/* 服务类型 */}
@@ -279,6 +341,54 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
           </button>
         </div>
       </section>
+
+      {/* 新建客户弹窗 */}
+      {showCustomerModal && (
+        <div className="modal-overlay" onClick={() => setShowCustomerModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3><Plus size={18} /> 新建客户</h3>
+            <p className="muted small">客户会立即加入客户管理库，同时自动选中用于本项目</p>
+            <div className="form-row">
+              <label>客户名称 *</label>
+              <input
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                placeholder="例：宁夏某某新材料有限公司"
+              />
+            </div>
+            <div className="form-row-2">
+              <div>
+                <label>联系人</label>
+                <input
+                  value={newCustomerContact}
+                  onChange={(e) => setNewCustomerContact(e.target.value)}
+                />
+              </div>
+              <div>
+                <label>联系电话</label>
+                <input
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <label>行业</label>
+              <input
+                value={newCustomerIndustry}
+                onChange={(e) => setNewCustomerIndustry(e.target.value)}
+                placeholder="例：食品 / 化工 / 制造"
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="ghost-button" onClick={() => setShowCustomerModal(false)}><X size={14} /> 取消</button>
+              <button className="primary-button" onClick={handleCreateCustomer} disabled={creatingCustomer}>
+                <Save size={14} /> {creatingCustomer ? "保存中..." : "保存并选中"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 新建外协弹窗 */}
       {showPartnerModal && (
