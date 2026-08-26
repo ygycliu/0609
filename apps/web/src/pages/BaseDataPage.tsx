@@ -53,7 +53,7 @@ function SignatoryTab() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Signatory | null>(null);
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState<Partial<Signatory>>({});
+  const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -68,7 +68,7 @@ function SignatoryTab() {
   useEffect(() => { load(); }, []);
 
   const startNew = () => {
-    setForm({ entity_code: "", name: "", shortName: "", status: "active" });
+    setForm({ entity_code: "", name: "", short_name: "", status: "active" });
     setShowNew(true);
   };
 
@@ -77,9 +77,9 @@ function SignatoryTab() {
     setForm({
       entity_code: s.entity_code || s.code,
       name: s.name,
-      shortName: s.shortName,
-      contactPerson: s.contactPerson,
-      contactPhone: s.contactPhone,
+      short_name: (s as any).short_name || s.shortName,
+      contactPerson: (s as any).contact_person || s.contactPerson,
+      contactPhone: (s as any).contact_phone || s.contactPhone,
       address: s.address,
       status: s.status,
       notes: s.notes
@@ -145,9 +145,9 @@ function SignatoryTab() {
               <tr key={s.id}>
                 <td><strong>{s.entity_code || s.code}</strong></td>
                 <td>{s.name}</td>
-                <td>{s.shortName || "—"}</td>
-                <td>{s.contactPerson || "—"}</td>
-                <td>{s.contactPhone || "—"}</td>
+                <td>{(s as any).short_name || s.shortName || "—"}</td>
+                <td>{(s as any).contact_person || s.contactPerson || "—"}</td>
+                <td>{(s as any).contact_phone || s.contactPhone || "—"}</td>
                 <td>
                   <span className={`status-pill ${s.status === "active" ? "status-completed" : ""}`}>
                     {s.status === "active" ? "启用" : s.status === "inactive" ? "停用" : s.status}
@@ -185,8 +185,8 @@ function SignatoryTab() {
               <div>
                 <label>简称</label>
                 <input
-                  value={form.shortName || ""}
-                  onChange={(e) => setForm({ ...form, shortName: e.target.value })}
+                  value={form.short_name || ""}
+                  onChange={(e) => setForm({ ...form, short_name: e.target.value })}
                 />
               </div>
             </div>
@@ -409,14 +409,14 @@ function PartnerOrgTab() {
             {list.map((p) => (
               <tr key={p.id}>
                 <td><strong>{p.name}</strong></td>
-                <td>{p.contactName || p.contactPerson || "—"}</td>
-                <td>{p.contactPhone || "—"}</td>
+                <td>{p.contactName || (p as any).contact_name || p.contactPerson || "—"}</td>
+                <td>{p.contactPhone || (p as any).contact_phone || "—"}</td>
                 <td>{p.address || "—"}</td>
                 <td>
-                  <span className={`status-pill ${p.cooperationStatus === "active" || p.status === "active" ? "status-completed" : ""}`}>
-                    {p.cooperationStatus === "active" || p.status === "active" ? "合作中" :
-                     p.cooperationStatus === "paused" ? "暂停" :
-                     p.cooperationStatus || p.status}
+                  <span className={`status-pill ${p.cooperationStatus === "active" || (p as any).status === "active" ? "status-completed" : ""}`}>
+                    {p.cooperationStatus === "active" || (p as any).status === "active" ? "合作中" :
+                     p.cooperationStatus === "paused" || (p as any).status === "paused" ? "暂停" :
+                     p.cooperationStatus || (p as any).status}
                   </span>
                 </td>
                 <td>{p.notes || p.remark || "—"}</td>
