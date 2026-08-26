@@ -5,6 +5,7 @@ import {
   Footer,
   Header,
   HeadingLevel,
+  ImageRun,
   LevelFormat,
   PageBreak,
   PageNumber,
@@ -21,6 +22,9 @@ import {
   type FileChild
 } from "docx";
 import { marked, type Token, type Tokens } from "marked";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { config } from "../config.js";
 import type { ConsultationRecord } from "../shared/types.js";
 import type { QuoteResult } from "../certification/quote.service.js";
 
@@ -861,7 +865,7 @@ export async function generateQuoteDocx(
             ]
           })
         },
-        children: buildQuoteContent(quote, branding)
+        children: await buildQuoteContentWithImages(quote, branding)
       }
     ]
   });
@@ -1381,6 +1385,84 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       ]
     })
   );
+
+  return blocks;
+}
+
+/**
+ * 异步版本：构造包含证书图片附件的报价文档内容
+ * 使用 Promise 等待 buildQuoteContent 完成后追加证书图片
+ */
+async function buildQuoteContentWithImages(quote: QuoteResult, branding: DocxBranding): Promise<FileChild[]> {
+  // 调用同步函数获取基础 blocks
+  const blocks: FileChild[] = buildQuoteContent(quote, branding);
+
+  // 去掉原本同步函数末尾误加的"八、"标题（（异步函数里再加）
+  // 保留最后 2 个 paragraph（签章块）
+  const lastIdx = blocks.length - 1;
+  if (lastIdx >= 0) {
+    const lastBlock = blocks[lastIdx] as any;
+    const lastChildren = lastBlock?.root?.children || lastBlock?.options?.children || [];
+    const lastText = JSON.stringify(lastChildren);
+    if (lastText.includes('"八、证书样本附件')) {
+      blocks.pop();
+    }
+  }
+
+  const certDir = path.join(config.dataDir, "certificates");
+  const certs = [
+    { file: "qms_certificate_sample.jpg", title: "质量管理体系认证证书（样本）", standard: "GB/T 19001-2016/ISO 9001:2015" },
+    { file: "ems_certificate_sample.jpg", title: "环境管理体系认证证书（样本）", standard: "GB/T 24001-2016/ISO 14001:2015" },
+    { file: "ohsms_certificate_sample.jpg", title: "职业健康安全管理体系认证证书（样本）", standard: "GB/T 45001-2020/ISO 45001:2018" }
+  ];
+
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 400, after: 100 },
+      children: [
+        new TextRun({ text: "八、证书样本附件（华中国际认证检验集团）", bold: true, size: 26, color: COLORS.primary, font: FONTS.heading })
+      ]
+    })
+  );
+
+  for (const cert of certs) {
+    const imgPath = path.join(certDir, cert.file);
+    try {
+      const imgBuffer = await fs.readFile(imgPath);
+      blocks.push(
+        new Paragraph({
+          spacing: { before: 240, after: 100 },
+          children: [
+            new TextRun({ text: cert.title, bold: true, size: 22, color: COLORS.ink }),
+            new TextRun({ text: "  |  ", size: 22, color: COLORS.muted }),
+            new TextRun({ text: cert.standard, size: 20, color: COLORS.muted })
+          ]
+        })
+      );
+      blocks.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 80, after: 240 },
+          children: [
+            new ImageRun({
+              data: imgBuffer,
+              transformation: { width: 580, height: 410 },
+              type: "jpg"
+            })
+          ]
+        })
+      );
+    } catch (err) {
+      blocks.push(
+        new Paragraph({
+          spacing: { before: 100, after: 100 },
+          children: [
+            new TextRun({ text: `[证书样本未找到：${cert.file}]`, size: 18, color: COLORS.muted, italics: true })
+          ]
+        })
+      );
+    }
+  }
 
   return blocks;
 }
