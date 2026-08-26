@@ -3822,12 +3822,15 @@ export function createApp() {
         throw new ValidationError(parsed.error.issues[0]?.message ?? "导出参数无效");
       }
       const buffer = await generateQuoteDocx(parsed.data.quote, {
-        companyName: parsed.data.companyName,
+        // 首页显示认证机构信息（固定）
+        companyName: "华中国际认证检验集团有限公司",
         clientName: parsed.data.companyName,
         projectName: "认证证书报价",
         documentTitle: "认证证书报价单",
         version: "v1.0",
-        preparedBy: "认证专家",
+        preparedBy: "刘军",
+        agencyAddress: "银川国智知识产权服务园201室",
+        agencyContact: "13195086656",
         confidentiality: "内部",
         includeToc: false,
         includeReferences: false

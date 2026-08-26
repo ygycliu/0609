@@ -877,8 +877,8 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
   const now = new Date();
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
 
-  // ========== 顶部机构信息 ==========
-  // 机构名称
+  // ========== 首页：机构信息（封面）==========
+  // 机构名称（居中，大字号）
   blocks.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -911,7 +911,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     })
   );
 
-  // 机构信息
+  // 机构信息（3 行：机构名称 / 办公地址 / 联系人+电话）
   blocks.push(
     new Paragraph({
       spacing: { after: 80 },
@@ -953,7 +953,15 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     })
   );
 
-  // ========== 客户信息 ==========
+  // 分页符：机构信息页 → 客户报价页
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 0, after: 0 },
+      children: [new PageBreak()]
+    })
+  );
+
+  // ========== 客户信息（首页）==========
   blocks.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -999,7 +1007,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       ]
     })
   );
-  const scopeText = (quote as any).certificationScope || "（最终认证范围以合同评审为准）";
+  const scopeText = quote.certificationScope || "（最终认证范围以合同评审为准）";
   blocks.push(
     new Paragraph({
       spacing: { after: 80 },
@@ -1009,15 +1017,18 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       ]
     })
   );
-  blocks.push(
-    new Paragraph({
-      spacing: { after: 240 },
-      indent: { left: 400 },
-      children: [
-        new TextRun({ text: "（最终认证范围以合同评审为准）", size: 18, color: COLORS.muted, italics: true })
-      ]
-    })
-  );
+  // 只在没有填认证范围时才显示合同评审备注
+  if (!quote.certificationScope) {
+    blocks.push(
+      new Paragraph({
+        spacing: { after: 240 },
+        indent: { left: 400 },
+        children: [
+          new TextRun({ text: "（最终认证范围以合同评审为准）", size: 18, color: COLORS.muted, italics: true })
+        ]
+      })
+    );
+  }
 
   // ========== 一、报价明细表 ==========
   blocks.push(
@@ -1072,14 +1083,13 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     ]
   });
 
+  // 标准映射（按体系拆分）
   const certStandardMap: Record<string, string> = {
     "Q": "GB/T19001-2016/ISO9001:2015",
-    "QE": "GB/T19001+24001",
-    "ES": "GB/T24001+45001",
-    "QES": "GB/T19001/24001/45001",
+    "E": "GB/T 24001-2016 /ISO 14001:2015",
+    "S": "GB/T 45001-2020 /ISO 45001:2018",
     "27001": "GB/T22080-2016/ISO/IEC27001:2022",
     "20000": "ISO/IEC 20000-1:2018",
-    "双信息": "ISO 27001+20000",
     "HACCP": "GB/T27341-2009/ISO22000",
     "食品安全管理": "ISO 22000:2018",
     "GAP": "良好农业规范",
@@ -1091,14 +1101,33 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     "绿色供应链": "绿色供应链"
   };
 
-  const certTypeMap: Record<string, string> = {
-    "QES": "质量+环境+职业健康安全管理体系",
+  // 体系简称映射（用于拆分 QES 三体系）
+  const shortCertMap: Record<string, string> = {
+    "QES": "Q",
+    "QE": "Q",
+    "ES": "E",
+    "QJES": "Q",
+    "27001": "27001",
+    "20000": "20000",
+    "双信息": "27001",  // 显示 27001 行
+    "HACCP": "HACCP",
+    "食品安全管理": "食品安全管理",
+    "GAP": "GAP",
+    "商品售后服务": "商品售后服务",
+    "餐饮服务": "餐饮服务",
+    "社会责任": "社会责任",
+    "能源": "能源",
+    "碳管理": "碳管理",
+    "绿色供应链": "绿色供应链"
+  };
+
+  // 体系类型名称映射（拆分）
+  const shortTypeMap: Record<string, string> = {
     "Q": "质量管理体系认证",
-    "QE": "质量+环境管理体系",
-    "ES": "环境+职业健康安全管理体系",
+    "E": "环境管理体系",
+    "S": "职业健康安全管理体系",
     "27001": "信息安全管理体系",
     "20000": "信息技术服务管理体系",
-    "双信息": "信息+IT服务双体系",
     "HACCP": "危害分析与关键控制点体系",
     "食品安全管理": "食品安全管理体系",
     "GAP": "良好农业规范",
@@ -1110,18 +1139,166 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     "绿色供应链": "绿色供应链管理体系"
   };
 
-  const itemRows = quote.certifications.map((c, i) => {
-    const supervisionPrice = Math.round(quote.finalPrice * 0.8 / quote.certifications.length);
-    return new TableRow({
-      children: [
-        buildCell(certTypeMap[c.certId] ?? c.certName, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1800 }),
-        buildCell(certStandardMap[c.certId] ?? c.certName, { fill: i % 2 ? COLORS.surface : COLORS.white, width: 2800 }),
-        buildCell(`初审 ¥${quote.basePrice.toLocaleString()}\n监督 ¥${supervisionPrice.toLocaleString()}`,
-          { fill: i % 2 ? COLORS.surface : COLORS.white, width: 1500, align: "right", bold: true, color: COLORS.accent }),
-        buildCell(`差旅食宿费由企业实报实销\n（含 ${c.auditorLevel} 审核员）`,
-          { fill: i % 2 ? COLORS.surface : COLORS.white, width: 2700 })
-      ]
-    });
+  // 把每个选中的证书拆分成行（QES → 3 行）
+  const expandedRows: Array<{
+    certId: string;
+    certType: string;
+    certStandard: string;
+  }> = [];
+  for (const c of quote.certifications) {
+    if (c.certId === "QES") {
+      // QES = Q + E + S 三行
+      for (const std of ["Q", "E", "S"]) {
+        expandedRows.push({
+          certId: c.certId,
+          certType: shortTypeMap[std],
+          certStandard: certStandardMap[std]
+        });
+      }
+    } else if (c.certId === "QE") {
+      // QE = Q + E 两行
+      for (const std of ["Q", "E"]) {
+        expandedRows.push({
+          certId: c.certId,
+          certType: shortTypeMap[std],
+          certStandard: certStandardMap[std]
+        });
+      }
+    } else if (c.certId === "ES") {
+      // ES = E + S 两行
+      for (const std of ["E", "S"]) {
+        expandedRows.push({
+          certId: c.certId,
+          certType: shortTypeMap[std],
+          certStandard: certStandardMap[std]
+        });
+      }
+    } else if (c.certId === "QJES") {
+      // QJES = Q + E + 27001（Q+E 在 QES，27001 单独）
+      for (const std of ["Q", "E"]) {
+        expandedRows.push({
+          certId: c.certId,
+          certType: shortTypeMap[std],
+          certStandard: certStandardMap[std]
+        });
+      }
+      expandedRows.push({
+        certId: c.certId,
+        certType: shortTypeMap["27001"],
+        certStandard: certStandardMap["27001"]
+      });
+    } else if (c.certId === "双信息") {
+      // 双信息 = 27001 + 20000 两行
+      for (const std of ["27001", "20000"]) {
+        expandedRows.push({
+          certId: c.certId,
+          certType: shortTypeMap[std],
+          certStandard: certStandardMap[std]
+        });
+      }
+    } else {
+      // 其他证书单行
+      expandedRows.push({
+        certId: c.certId,
+        certType: shortTypeMap[c.certId] ?? c.certName,
+        certStandard: certStandardMap[c.certId] ?? c.certName
+      });
+    }
+  }
+
+  // 监督价格 = 初审的 80%
+  const supervisionPrice = Math.round(quote.basePrice * 0.8);
+  const initialPriceText = `初审 ¥${quote.basePrice.toLocaleString()}`;
+  const supervisionPriceText = `监督 ¥${supervisionPrice.toLocaleString()}`;
+
+  // 构建报价明细行（合并价格/备注单元格）
+  const itemRows: TableRow[] = [];
+  for (let i = 0; i < expandedRows.length; i++) {
+    const row = expandedRows[i];
+    const isFirst = i === 0;
+    const isLast = i === expandedRows.length - 1;
+
+    itemRows.push(
+      new TableRow({
+        children: [
+          buildCell(row.certType, { fill: COLORS.white, width: 2400 }),
+          buildCell(row.certStandard, { fill: COLORS.white, width: 3200 }),
+          // 价格/备注列只在第一行实际生成 cell（含 rowSpan）
+          // 后面的行不创建这些列的 cell（让 LibreOffice/Word 合并）
+          ...(isFirst
+            ? [
+                new TableCell({
+                  rowSpan: expandedRows.length,
+                  verticalAlign: VerticalAlign.CENTER,
+                  margins: { top: 110, bottom: 110, left: 130, right: 130 },
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      children: [
+                        new TextRun({
+                          text: initialPriceText,
+                          bold: true,
+                          color: COLORS.accent,
+                          size: 22,
+                          underline: {}
+                        })
+                      ]
+                    }),
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      children: [
+                        new TextRun({
+                          text: supervisionPriceText,
+                          bold: true,
+                          color: COLORS.accent,
+                          size: 22,
+                          underline: {}
+                        })
+                      ]
+                    })
+                  ]
+                }),
+                new TableCell({
+                  rowSpan: expandedRows.length,
+                  verticalAlign: VerticalAlign.CENTER,
+                  margins: { top: 110, bottom: 110, left: 130, right: 130 },
+                  children: [
+                    new Paragraph({
+                      children: [
+                        new TextRun({
+                          text: "差旅食宿费由企业实报实销（银川老师为主）",
+                          size: 20
+                        })
+                      ]
+                    })
+                  ]
+                })
+              ]
+            : [])  // 非首行：让 rowSpan 接管这两列
+        ]
+      })
+    );
+  }
+
+  // 商务条款（发票 + 付款方式）
+  const billingRow = new TableRow({
+    children: [
+      buildCell("发票类型及税率", { fill: COLORS.surface, width: 2400, bold: true }),
+      buildCell(`税率${branding.taxRate ?? "6%"}，${branding.invoiceType ?? "增值税普通发票"}`,
+        { fill: COLORS.white, width: 3200 }),
+      buildCell("—", { fill: COLORS.white, width: 1600, align: "center" }),
+      buildCell("—", { fill: COLORS.white, width: 1600, align: "center" })
+    ]
+  });
+
+  const paymentRow = new TableRow({
+    children: [
+      buildCell("付款方式", { fill: COLORS.surface, width: 2400, bold: true }),
+      buildCell(branding.paymentTerms ?? "合同签订首付70%，收到证书付清尾款30%",
+        { fill: COLORS.white, width: 3200 }),
+      buildCell("—", { fill: COLORS.white, width: 1600, align: "center" }),
+      buildCell("—", { fill: COLORS.white, width: 1600, align: "center" })
+    ]
   });
 
   blocks.push(new Table({
@@ -1134,7 +1311,7 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
       insideHorizontal: border(COLORS.line, 4),
       insideVertical: border(COLORS.line, 4)
     },
-    rows: [headerRow, ...itemRows]
+    rows: [headerRow, ...itemRows, billingRow, paymentRow]
   }));
 
   // ========== 二、计算明细 ==========
@@ -1429,13 +1606,52 @@ async function buildQuoteContentWithImages(quote: QuoteResult, branding: DocxBra
     const imgPath = path.join(certDir, cert.file);
     try {
       const imgBuffer = await fs.readFile(imgPath);
+
+      // 读取图片实际尺寸（PNG/JPG 头），按宽高比缩放
+      let origWidth = 600;
+      let origHeight = 800;
+      try {
+        const header = imgBuffer.subarray(0, 24);
+        if (header[0] === 0x89 && header[1] === 0x50) {
+          // PNG: IHDR @ offset 8: width(4) + height(4)
+          origWidth = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
+          origHeight = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
+        } else if (header[0] === 0xFF && header[1] === 0xD8) {
+          // JPG: 扫描 SOFn 标记（FF C0/C1/C2/C3）
+          let i = 2;
+          while (i < imgBuffer.length - 9) {
+            if (imgBuffer[i] !== 0xFF) {
+              i++;
+              continue;
+            }
+            const marker = imgBuffer[i + 1];
+            // SOFn markers: 0xC0-0xCF (except C4, C8, CC)
+            if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+              origHeight = (imgBuffer[i + 5] << 8) | imgBuffer[i + 6];
+              origWidth = (imgBuffer[i + 7] << 8) | imgBuffer[i + 8];
+              break;
+            }
+            const segLen = (imgBuffer[i + 2] << 8) | imgBuffer[i + 3];
+            i += 2 + segLen;
+          }
+        }
+      } catch {
+        // 解析失败使用默认值
+      }
+
+      // 按比例缩放到目标宽度 480 px
+      const targetWidth = 480;
+      const displayWidth = targetWidth;
+      const displayHeight = Math.round(targetWidth * origHeight / origWidth);
+
       blocks.push(
         new Paragraph({
           spacing: { before: 240, after: 100 },
           children: [
             new TextRun({ text: cert.title, bold: true, size: 22, color: COLORS.ink }),
             new TextRun({ text: "  |  ", size: 22, color: COLORS.muted }),
-            new TextRun({ text: cert.standard, size: 20, color: COLORS.muted })
+            new TextRun({ text: cert.standard, size: 20, color: COLORS.muted }),
+            new TextRun({ text: `  (${origWidth}×${origHeight})`, size: 16, color: COLORS.muted })
           ]
         })
       );
@@ -1446,7 +1662,7 @@ async function buildQuoteContentWithImages(quote: QuoteResult, branding: DocxBra
           children: [
             new ImageRun({
               data: imgBuffer,
-              transformation: { width: 580, height: 410 },
+              transformation: { width: displayWidth, height: displayHeight },
               type: "jpg"
             })
           ]
