@@ -17,6 +17,10 @@ export interface QuoteInput {
   certifications: string[];
   /** 风险级别：'medium' 用中级审核员，'high' 用高级 */
   riskLevel: "medium" | "high";
+  /** 申请认证范围（手动输入或从客户历史拉取） */
+  certificationScope?: string;
+  /** 专家人数（手动输入） */
+  expertCount?: number;
 }
 
 export interface QuoteItem {
@@ -253,6 +257,10 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   }
   if (input.riskLevel === "high" && expertCount < 3) {
     expertCount = 3;  // 高风险等级也至少 3 个专家
+  }
+  // 手动输入优先（用户自定义专家数）
+  if (input.expertCount && input.expertCount >= 1) {
+    expertCount = input.expertCount;
   }
   const professionalSubsidy = Math.round((totalAuditDays / expertCount) * 200);
 

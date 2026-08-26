@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Download,
   FileDown,
+  FileText,
   LoaderCircle,
   ShieldCheck,
   Sparkles,
@@ -69,6 +70,10 @@ export function CertificationQuotePage() {
   const [industry, setIndustry] = useState("");
   const [employeeCount, setEmployeeCount] = useState<number>(100);
   const [riskLevel, setRiskLevel] = useState<"medium" | "high">("medium");
+  const [certificationScope, setCertificationScope] = useState("");  // 申请认证范围
+  const [expertCount, setExpertCount] = useState<number>(1);  // 专家人数（手动输入）
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [customerList, setCustomerList] = useState<any[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -87,6 +92,12 @@ export function CertificationQuotePage() {
       })
       .catch((caught) => setError(caught.message))
       .finally(() => setLoading(false));
+
+    // 加载客户列表（用于"从客户管理获取历史范围"）
+    api
+      .searchCustomers("")
+      .then((list) => setCustomerList(Array.isArray(list) ? list : []))
+      .catch(() => setCustomerList([]));
   }, []);
 
   // 按 category 分组
@@ -181,7 +192,9 @@ export function CertificationQuotePage() {
         industry,
         employeeCount,
         certifications: Array.from(selected),
-        riskLevel
+        riskLevel,
+        certificationScope,  // 申请认证范围（手动输入）
+        expertCount  // 专家人数（手动输入）
       });
       setQuote(result);
       // 滚动到报价区域
@@ -439,6 +452,84 @@ export function CertificationQuotePage() {
                   ? "⚠️ 高风险行业（化工、重工、医疗器械等）建议选高级审核员，人日更多"
                   : "✓ 常规行业用中级审核员即可"}
               </small>
+            </label>
+
+            {/* 申请认证范围（手动 + 客户历史） */}
+            <label className="cert-field cert-field-wide">
+              <span>
+                <FileText size={13} /> 申请认证范围
+                <span className="cert-field-hint-inline">（产品/服务/活动描述）</span>
+              </span>
+              <textarea
+                value={certificationScope}
+                onChange={(e) => setCertificationScope(e.target.value)}
+                placeholder="例：本公司销售的手机配件、家用电器、电子产品；提供的产品售后服务包括：安装、维修、咨询"
+                rows={2}
+              />
+              <div className="cert-field-actions">
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => setShowCustomerPicker(!showCustomerPicker)}
+                >
+                  📋 从客户管理获取历史范围
+                </button>
+                {certificationScope && (
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => setCertificationScope("")}
+                  >
+                    清空
+                  </button>
+                )}
+              </div>
+
+              {/* 客户选择器（下拉） */}
+              {showCustomerPicker && (
+                <div className="cert-customer-picker">
+                  <select
+                    onChange={async (e) => {
+                      const custId = e.target.value;
+                      if (!custId) return;
+                      try {
+                        const hist = await api.getCustomerHistoryScope(custId);
+                        if (hist.data && hist.data.length > 0) {
+                          const desc = hist.data.map((s: any) => s.description).join("；");
+                          setCertificationScope(desc);
+                        } else {
+                          alert("该客户暂无历史认证范围，请手动填写");
+                        }
+                        setShowCustomerPicker(false);
+                      } catch (err) {
+                        alert("获取历史失败：" + (err instanceof Error ? err.message : String(err)));
+                      }
+                    }}
+                  >
+                    <option value="">-- 选择客户 --</option>
+                    {customerList.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}（{c.industry || "—"}）
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </label>
+
+            {/* 专家人数（手动输入） */}
+            <label className="cert-field">
+              <span>
+                <Users size={13} /> 专家人数
+                <span className="cert-field-hint-inline">（专业补贴 = 人日/专家 × 200）</span>
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={expertCount}
+                onChange={(e) => setExpertCount(Math.max(1, Number(e.target.value) || 1))}
+              />
             </label>
           </div>
           <div className="cert-size-hint">

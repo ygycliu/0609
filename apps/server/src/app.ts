@@ -1771,7 +1771,9 @@ export function createApp() {
           industry: z.string().trim().min(1, "请选择企业类型"),
           employeeCount: z.number().int().min(1, "人数必须 ≥ 1").max(100000),
           certifications: z.array(z.string().trim().min(1)).min(1, "至少选择一项认证"),
-          riskLevel: z.enum(["medium", "high"]).default("medium")
+          riskLevel: z.enum(["medium", "high"]).default("medium"),
+          certificationScope: z.string().trim().max(2000).optional().default(""),
+          expertCount: z.number().int().min(1).max(20).optional().default(1)
         })
         .safeParse(request.body);
       if (!parsed.success) {
@@ -2011,6 +2013,50 @@ export function createApp() {
     } catch (error) {
       next(error);
     }
+  });
+
+  // 获取客户历史认证范围（按 audit_session 历史）
+  app.get("/api/customers/:id/history-scope", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const id = request.params.id;
+      const customer = await customerRepository.getById(u.companyId, id);
+      if (!customer) throw new NotFoundError("客户不存在");
+
+      // 从 audit_session 拉历史（按客户名匹配）
+      const r = await query<{
+        id: string;
+        audit_type: string;
+        standards: string[];
+        industry: string | null;
+        employee_count: number | null;
+        scheduled_date: Date | null;
+        created_at: Date;
+      }>(
+        `SELECT id, audit_type, standards, industry, employee_count, scheduled_date, created_at
+         FROM audit_session
+         WHERE company_id = $1 AND customer_name = $2
+         ORDER BY created_at DESC
+         LIMIT 10`,
+        [u.companyId, customer.name]
+      );
+
+      // 构造认证范围描述
+      const scopes = r.rows.map(row => ({
+        sessionId: row.id,
+        auditType: row.audit_type,
+        standards: row.standards || [],
+        industry: row.industry,
+        employeeCount: row.employee_count,
+        scheduledDate: row.scheduled_date,
+        createdAt: row.created_at,
+        description: row.standards && row.standards.length > 0
+          ? `${row.standards.join(" + ")} (${row.audit_type})`
+          : `${row.audit_type} 审核`
+      }));
+
+      response.json({ data: scopes });
+    } catch (error) { next(error); }
   });
 
   // 创建客户

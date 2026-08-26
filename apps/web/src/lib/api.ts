@@ -325,6 +325,8 @@ export const api = {
     }),
   getCustomerCertTypes: (customerId: string) =>
     request<{ data: string[] }>(`/follow-up/customer-types/${customerId}`),
+  getCustomerHistoryScope: (customerId: string) =>
+    request<{ data: any[] }>(`/customers/${customerId}/history-scope`),
   getAuditPlanByFollowUp: (followUpId: string) =>
     request<{ data: any[] }>(`/follow-up/${followUpId}/audit-plan`),
   listAuditTemplates: () =>
