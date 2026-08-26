@@ -1313,86 +1313,6 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     rows: [headerRow, ...itemRows, billingRow, paymentRow]
   }));
 
-  // ========== 二、计算明细 ==========
-  blocks.push(
-    new Paragraph({
-      spacing: { before: 240, after: 120 },
-      children: [
-        new TextRun({ text: "二、计算明细", bold: true, size: 26, color: COLORS.primary, font: FONTS.heading })
-      ]
-    })
-  );
-
-  // 公式说明
-  blocks.push(
-    new Paragraph({
-      spacing: { before: 80, after: 120 },
-      children: [
-        new TextRun({
-          text: "💡 报价公式 = 人日×500 + 体系数×1,100 + 280（QES时）+ 专业补贴(人日/专家×200) + 税费 + 经营管理",
-          italics: true,
-          size: 18,
-          color: COLORS.muted
-        })
-      ]
-    })
-  );
-
-  const calcRows = [
-    [`1. 专家评审费（${quote.totalAuditDays} 人日 × ¥500）`, `¥ ${quote.expertReviewFee.toLocaleString()}`],
-    [`2. 三体系组长费（${quote.groupLeaderFee > 0 ? "QES" : "—"}）`, `¥ ${quote.groupLeaderFee.toLocaleString()}`],
-    [`3. 专业补贴（${quote.totalAuditDays} 人日 / ${quote.expertCount} 专家 × ¥200）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
-    [`4. 管理注册年金（${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`],
-    [`基础价（4 项直接相加）`, `¥ ${quote.basePrice.toLocaleString()}`],
-    [`税费（基础价 / 0.92 × 8.7%）`, `¥ ${quote.taxFee.toLocaleString()}`],
-    [`企业经营管理费（基础价 × 18%）`, `¥ ${quote.businessManagementFee.toLocaleString()}`]
-  ];
-
-  const calcTable = new Table({
-    width: { size: 8800, type: WidthType.DXA },
-    borders: {
-      top: border(COLORS.line, 4),
-      bottom: border(COLORS.line, 4),
-      left: border(COLORS.line, 4),
-      right: border(COLORS.line, 4),
-      insideHorizontal: border(COLORS.line, 4),
-      insideVertical: border(COLORS.line, 4)
-    },
-    rows: calcRows.map((row, i) => new TableRow({
-      children: [
-        tableCell(row[0], { heading: true, fill: i % 2 ? COLORS.surface : COLORS.white, width: 5500 }),
-        tableCell(row[1], { fill: i % 2 ? COLORS.surface : COLORS.white, width: 3300 })
-      ]
-    }))
-  });
-  blocks.push(calcTable);
-
-  // 最终客户报价
-  blocks.push(
-    new Paragraph({
-      spacing: { before: 320, after: 100 },
-      alignment: AlignmentType.CENTER,
-      children: [
-        new TextRun({ text: "最终客户报价（含税 + 经营管理）", size: 22, color: COLORS.muted })
-      ]
-    })
-  );
-  blocks.push(
-    new Paragraph({
-      spacing: { before: 60, after: 240 },
-      alignment: AlignmentType.CENTER,
-      children: [
-        new TextRun({
-          text: `¥ ${quote.finalPrice.toLocaleString()}`,
-          bold: true,
-          size: 48,
-          color: COLORS.accent,
-          font: FONTS.heading
-        })
-      ]
-    })
-  );
-
   // ========== 三、商务条款（参照云森模板）==========
   blocks.push(
     new Paragraph({
@@ -1513,7 +1433,32 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     );
   }
 
-  // ========== 七、签章 ==========
+  // ========== 七、签章（独立一页）==========
+  // 分页符：把签章推到新一页
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 0, after: 0 },
+      children: [new PageBreak()]
+    })
+  );
+
+  // 签章页标题
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 100, after: 200 },
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({
+          text: "七、签章",
+          bold: true,
+          size: 28,
+          color: COLORS.primary,
+          font: FONTS.heading
+        })
+      ]
+    })
+  );
+
   blocks.push(
     new Paragraph({
       spacing: { before: 200, after: 100 },
@@ -1592,11 +1537,20 @@ async function buildQuoteContentWithImages(quote: QuoteResult, branding: DocxBra
     { file: "ohsms_certificate_sample.jpg", title: "职业健康安全管理体系认证证书（样本）", standard: "GB/T 45001-2020/ISO 45001:2018" }
   ];
 
+  // 分页符：把证书样本附件推到新一页
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 0, after: 0 },
+      children: [new PageBreak()]
+    })
+  );
+
   blocks.push(
     new Paragraph({
       spacing: { before: 400, after: 100 },
+      alignment: AlignmentType.CENTER,
       children: [
-        new TextRun({ text: "八、证书样本附件（华中国际认证检验集团）", bold: true, size: 26, color: COLORS.primary, font: FONTS.heading })
+        new TextRun({ text: "八、证书样本附件（华中国际认证检验集团）", bold: true, size: 28, color: COLORS.primary, font: FONTS.heading })
       ]
     })
   );
