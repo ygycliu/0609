@@ -97,6 +97,9 @@ export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> 
   cancelled: [],
 };
 
+// 同步给前端使用
+export const PROJECT_STATUS_TRANSITIONS_FRONTEND = PROJECT_STATUS_TRANSITIONS;
+
 export interface CertificationProject {
   id: string;
   companyId: string;

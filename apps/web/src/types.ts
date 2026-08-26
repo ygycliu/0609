@@ -172,6 +172,33 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   suspended: "暂停", at_risk: "风险/待处理", cancelled: "取消",
 };
 
+// 项目状态流转（与后端保持一致）
+export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
+  lead: ["communicating", "quoted", "suspended", "cancelled"],
+  communicating: ["quoted", "lead", "suspended", "cancelled"],
+  quoted: ["contract_pending", "communicating", "lead", "cancelled"],
+  contract_pending: ["contract_signed", "quoted", "suspended", "cancelled"],
+  contract_signed: ["contract_archived", "suspended", "cancelled"],
+  contract_archived: ["first_pay_pending", "first_paid", "suspended", "cancelled"],
+  first_pay_pending: ["first_paid", "suspended", "cancelled"],
+  first_paid: ["delivery_prep", "first_pay_pending"],
+  delivery_prep: ["doc_collecting", "suspended"],
+  doc_collecting: ["contract_review", "expert_review_pending", "delivery_prep"],
+  contract_review: ["expert_review_pending", "doc_collecting", "at_risk"],
+  expert_review_pending: ["expert_reviewing", "doc_collecting", "at_risk"],
+  expert_reviewing: ["correcting", "cert_pending", "at_risk"],
+  correcting: ["cert_pending", "expert_reviewing", "at_risk"],
+  final_pay_pending: ["cert_pending", "invoice_pending", "correcting"],
+  invoice_pending: ["cert_pending", "final_pay_pending"],
+  cert_pending: ["certified", "correcting"],
+  certified: ["shipment_pending", "completed"],
+  shipment_pending: ["completed", "certified"],
+  completed: ["suspended", "at_risk"],
+  suspended: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
+  at_risk: ["correcting", "contract_review", "expert_reviewing", "cancelled"],
+  cancelled: [],
+};
+
 export interface Signatory {
   id: string;
   entity_code?: string;

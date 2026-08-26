@@ -2262,6 +2262,7 @@ export function createApp() {
       const u = getUserFromReq(request);
       const body = request.body as any;
       if (!body?.status) throw new ValidationError("状态必填");
+      if (!body?.reason?.trim()) throw new ValidationError("变更原因必填");
       const p = await projectRepo.changeProjectStatus(
         u.companyId,
         request.params.id,
@@ -4495,10 +4496,16 @@ export function createApp() {
       });
       return;
     }
-    request.log.error({ error }, "Unhandled request error");
+    const err = error as any;
+    request.log.error({
+      msg: err?.message,
+      stack: err?.stack?.slice(0, 800),
+      name: err?.name
+    }, "Unhandled request error");
+    console.error("[INTERNAL_ERROR]", err?.message, err?.stack?.slice(0, 800));
     response.status(500).json({
       code: "INTERNAL_ERROR",
-      message: "服务处理失败，请稍后重试",
+      message: err?.message || "服务处理失败，请稍后重试",
       requestId: request.id
     });
   });

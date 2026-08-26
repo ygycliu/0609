@@ -5,7 +5,8 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import {
-  PROJECT_STATUS_LABEL, type Project, type ProjectStatus,
+  PROJECT_STATUS_LABEL, PROJECT_STATUS_TRANSITIONS,
+  type Project, type ProjectStatus,
   type ProjectTimelineEvent
 } from "../types";
 
@@ -74,8 +75,9 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
 
   async function handleStatusChange() {
     if (!project || !newStatus) return;
+    if (!reason.trim()) { alert("请填写变更原因"); return; }
     try {
-      await api.changeCertificationProjectStatus(project.id, newStatus, reason || undefined);
+      await api.changeCertificationProjectStatus(project.id, newStatus, reason);
       setChangingStatus(false);
       setNewStatus("");
       setReason("");
@@ -508,8 +510,8 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
             <h3><MessageSquare size={18} /> 变更项目状态</h3>
             <p>当前状态：<strong>{PROJECT_STATUS_LABEL[project.status]}</strong></p>
             <select value={newStatus} onChange={(e) => setNewStatus(e.target.value as ProjectStatus)}>
-              <option value="">选择新状态...</option>
-              {(["communicating", "quoted", "contract_pending", "contracted", "first_pay_pending", "first_paid", "delivery_prep", "doc_collecting", "contract_review", "expert_review_pending", "expert_reviewing", "correcting", "final_pay_pending", "invoice_pending", "cert_pending", "certified", "shipment_pending", "completed", "suspended", "at_risk", "cancelled"] as ProjectStatus[]).filter(s => s !== project.status).map((s) => (
+              <option value="">选择新状态（仅显示允许的流转）...</option>
+              {(PROJECT_STATUS_TRANSITIONS[project.status] || []).map((s) => (
                 <option key={s} value={s}>{PROJECT_STATUS_LABEL[s]}</option>
               ))}
             </select>
