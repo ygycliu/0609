@@ -34,19 +34,35 @@ export function OverviewPage({
 }: OverviewPageProps) {
   return (
     <div className="page-stack">
-      <header className="page-header overview-header">
-        <div>
-          <span className="eyebrow">AI 数字化咨询中心 · MVP V1.0</span>
-          <h1>从业务问题到可实施方案</h1>
-          <p>
-            基于行业知识、大模型和标准工作流，完成数字化诊断、AI 应用咨询、方案输出与知识沉淀。
-          </p>
+      {/* 核心业务快速直达（最上面，醒目） */}
+      <section className="category-band category-band-top">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">业务入口</span>
+            <h2>核心业务快速直达</h2>
+          </div>
         </div>
-        <button className="primary-button" onClick={() => onNavigate("consult")}>
-          开始一次咨询
-          <ArrowRight size={17} />
-        </button>
-      </header>
+        <div className="category-grid">
+          {[
+            { key: "consult", label: "开始咨询", desc: "AI 多角色协同", color: "yellow", icon: "💬" },
+            { key: "certification-quote", label: "认证报价", desc: "QES 三体系", color: "purple", icon: "📋" },
+            { key: "auditor", label: "数字审核员", desc: "智能模拟外审", color: "pink", icon: "✓" },
+            { key: "customer-list", label: "客户管理", desc: "CRM 基础数据", color: "green", icon: "👥" },
+            { key: "files", label: "文件浏览", desc: "知识资产", color: "cyan", icon: "📁" },
+            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "blue", icon: "📚" }
+          ].map((item) => (
+            <button
+              key={item.key}
+              className={`category-card cat-${item.color}`}
+              onClick={() => onNavigate(item.key as Page)}
+            >
+              <span className="cat-icon">{item.icon}</span>
+              <strong>{item.label}</strong>
+              <small>{item.desc}</small>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="metric-grid" aria-label="运行概览">
         <div className="metric">
@@ -129,35 +145,6 @@ export function OverviewPage({
         </ol>
       </section>
 
-      {/* 业务入口：彩色分类卡片（参考认监委平台风格） */}
-      <section className="category-band">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">业务入口</span>
-            <h2>核心业务快速直达</h2>
-          </div>
-        </div>
-        <div className="category-grid">
-          {[
-            { key: "consult", label: "开始咨询", desc: "AI 多角色协同", color: "yellow", icon: "💬" },
-            { key: "certification-quote", label: "认证报价", desc: "QES 三体系", color: "purple", icon: "📋" },
-            { key: "auditor", label: "数字审核员", desc: "智能模拟外审", color: "pink", icon: "✓" },
-            { key: "customer-list", label: "客户管理", desc: "CRM 基础数据", color: "green", icon: "👥" },
-            { key: "files", label: "文件浏览", desc: "知识资产", color: "cyan", icon: "📁" },
-            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "blue", icon: "📚" }
-          ].map((item) => (
-            <button
-              key={item.key}
-              className={`category-card cat-${item.color}`}
-              onClick={() => onNavigate(item.key as Page)}
-            >
-              <span className="cat-icon">{item.icon}</span>
-              <strong>{item.label}</strong>
-              <small>{item.desc}</small>
-            </button>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

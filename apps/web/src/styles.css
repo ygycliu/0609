@@ -6515,3 +6515,48 @@ textarea:focus {
   border-color: #334155;
   color: #e2e8f0;
 }
+
+
+/* ============================================================ */
+/*=========  顶部核心业务快速直达  ========== */
+/* ============================================================ */
+
+.category-band-top {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  padding: 32px;
+  border-radius: 16px;
+  border: 1px solid #cbd5e1;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .category-band-top {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: #334155;
+}
+
+.category-band-top .section-heading h2 {
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.category-band-top .category-grid {
+  margin-top: 0;
+}
+
+.category-band-top .category-card {
+  padding: 24px 18px;
+  min-height: 110px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.category-band-top .category-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.category-band-top .category-card strong {
+  font-size: 18px;
+  font-weight: 700;
+}
