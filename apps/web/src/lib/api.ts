@@ -636,6 +636,53 @@ export const api = {
   createCertificationProject: (input: any) => request<{ data: Project }>("/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }),
   changeCertificationProjectStatus: (id: string, status: string, reason?: string) => request<{ data: Project }>(`/projects/${id}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status, reason }) }),
   getCertificationProjectTimeline: (id: string) => request<{ data: ProjectTimelineEvent[] }>(`/projects/${id}/timeline`),
+  listProjectPayments: (projectId: string) =>
+    request<{ data: any[] }>(`/projects/${projectId}/payments`),
+  createProjectPayment: (projectId: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/payments`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+  updateProjectPayment: (projectId: string, paymentId: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/payments/${paymentId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+  deleteProjectPayment: (projectId: string, paymentId: string) =>
+    request<{ data: any }>(`/projects/${projectId}/payments/${paymentId}`, { method: "DELETE" }),
+  listProjectInvoices: (projectId: string) =>
+    request<{ data: any[] }>(`/projects/${projectId}/invoices`),
+  createProjectInvoice: (projectId: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/invoices`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+  listProjectCorrections: (projectId: string) =>
+    request<{ data: any[] }>(`/projects/${projectId}/corrections`),
+  createProjectCorrection: (projectId: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/corrections`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+  updateProjectCorrection: (projectId: string, id: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/corrections/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+  listProjectDocuments: (projectId: string) =>
+    request<{ data: any[] }>(`/projects/${projectId}/documents`),
+  createProjectDocument: (projectId: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/documents`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+  listProjectReviews: (projectId: string) =>
+    request<{ data: any[] }>(`/projects/${projectId}/reviews`),
+  createProjectReview: (projectId: string, input: any) =>
+    request<{ data: any }>(`/projects/${projectId}/reviews`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
 };
 
 export { API_BASE_URL };

@@ -20,6 +20,7 @@ import { autoGenerateAuditPlan, listTemplates as listAuditTemplates } from "./fo
 import { QuoteRepository } from "./certification/quote.repository.js";
 import { CustomerRepository } from "./customers/customer.repository.js";
 import { FinanceRepository } from "./finance/finance.repository.js";
+import * as projectRepo from "./project/project.repository.js";
 import { ARRepository } from "./finance/ar.repository.js";
 import { FollowUpRepository, FOLLOW_UP_STAGES, ISSUING_BODIES } from "./follow_up/follow_up.repository.js";
 import { login, logout, createUser, listUsers, resetPassword, changeOwnPassword, setUserActive, authMiddleware, refresh as refreshToken, verifyMfa, enableMfa, disableMfa } from "./auth/auth.service.js";
@@ -2128,6 +2129,453 @@ export function createApp() {
       if (!ok) throw new NotFoundError("客户");
       response.json({ data: { id, deleted: true } });
     } catch (error) { next(error); }
+  });
+
+  // ============================================================
+  // 2.0-MVP 认证项目中心
+  // ============================================================
+  // 【签约主体/服务类型/外协单位】
+  app.get("/api/signatories", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.listSignatories(u.companyId) });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/service-types", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.listServiceTypes(u.companyId) });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/partner-orgs", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.listPartnerOrgs(u.companyId) });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/partner-orgs", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.name?.trim()) throw new ValidationError("外协单位名称必填");
+      const r = await projectRepo.createPartnerOrg(u.companyId, {
+        name: body.name.trim(),
+        contactPerson: body.contactPerson?.trim(),
+        contactPhone: body.contactPhone?.trim(),
+        address: body.address?.trim(),
+        notes: body.notes?.trim(),
+        createdBy: u.id,
+      });
+      response.json({ data: r });
+    } catch (e) { next(e); }
+  });
+
+  // 【认证项目】
+  app.get("/api/projects", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const result = await projectRepo.listProjects(u.companyId, {
+        status: (request.query.status as any) || "all",
+        customerId: request.query.customer_id as string | undefined,
+        ownerId: request.query.owner_id as string | undefined,
+        overdue: request.query.overdue === "true",
+        limit: request.query.limit ? parseInt(request.query.limit as string) : 50,
+        offset: request.query.offset ? parseInt(request.query.offset as string) : 0,
+      });
+      response.json(result);
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/projects/stats", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const stats = await projectRepo.getProjectStats(u.companyId);
+      response.json({ data: stats });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/projects/overdue", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.listOverdueProjects(u.companyId) });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/projects/pending-payment", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.listPendingPaymentProjects(u.companyId) });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/projects/pending-cert", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.listPendingCertProjects(u.companyId) });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/projects/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const p = await projectRepo.getProject(u.companyId, request.params.id);
+      if (!p) throw new NotFoundError("项目");
+      response.json({ data: p });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.customerId) throw new ValidationError("客户必选");
+      if (!body?.serviceTypeId) throw new ValidationError("服务类型必选");
+      if (!body?.signatoryId) throw new ValidationError("签约主体必选");
+
+      const project = await projectRepo.createProject({
+        companyId: u.companyId,
+        customerId: body.customerId,
+        serviceTypeId: body.serviceTypeId,
+        signatoryId: body.signatoryId,
+        partnerOrgId: body.partnerOrgId,
+        contactPerson: body.contactPerson,
+        contactPhone: body.contactPhone,
+        industry: body.industry,
+        certificationScope: body.certificationScope,
+        certificationStandards: body.certificationStandards,
+        riskLevel: body.riskLevel,
+        salesSource: body.salesSource,
+        contractAmount: body.contractAmount,
+        expectedCertDate: body.expectedCertDate,
+        notes: body.notes,
+        createdBy: u.id,
+      });
+      response.json({ data: project });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects/:id/status", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.status) throw new ValidationError("状态必填");
+      const p = await projectRepo.changeProjectStatus(
+        u.companyId,
+        request.params.id,
+        body.status,
+        body.reason ?? null,
+        u.id,
+        u.username ?? null
+      );
+      response.json({ data: p });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/projects/:id/timeline", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      response.json({ data: await projectRepo.getProjectTimeline(u.companyId, request.params.id) });
+    } catch (e) { next(e); }
+  });
+
+  // ============== 2.0-MVP 项目子模块路由 ==============
+
+  // ----- 收款记录（首付款/尾款） -----
+  app.get("/api/projects/:id/payments", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query(
+        `SELECT * FROM project_payment
+         WHERE project_id = $1 AND company_id = $2 AND deleted_at IS NULL
+         ORDER BY created_at DESC`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects/:id/payments", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.paymentType) throw new ValidationError("paymentType 必填");
+      const r = await query(
+        `INSERT INTO project_payment
+         (company_id, project_id, payment_type, receivable_amount, received_amount,
+          amount, due_date, received_date, payment_method, voucher_no, status, notes, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [
+          u.companyId, request.params.id, body.paymentType,
+          body.receivableAmount || body.amount, body.receivedAmount || 0,
+          body.amount, body.dueDate || null, body.receivedAt || body.receivedDate || null,
+          body.paymentMethod || null, body.voucherNo || null,
+          body.status || "pending", body.notes || null, u.id
+        ]
+      );
+      // 更新项目的 paid_amount
+      await query(
+        `UPDATE certification_project AS p
+         SET paid_amount = (
+           SELECT COALESCE(SUM(pp.received_amount), 0) FROM project_payment AS pp
+           WHERE pp.project_id = p.id AND pp.company_id = p.company_id AND pp.deleted_at IS NULL
+         ),
+         first_pay_date = (
+           SELECT MIN(pp.received_date) FROM project_payment AS pp
+           WHERE pp.project_id = p.id AND pp.company_id = p.company_id
+             AND pp.payment_type = 'deposit' AND pp.received_date IS NOT NULL AND pp.deleted_at IS NULL
+         ),
+         final_pay_date = (
+           SELECT MIN(pp.received_date) FROM project_payment AS pp
+           WHERE pp.project_id = p.id AND pp.company_id = p.company_id
+             AND pp.payment_type = 'balance' AND pp.received_date IS NOT NULL AND pp.deleted_at IS NULL
+         )
+         WHERE id = $1 AND company_id = $2`,
+        [request.params.id, u.companyId]
+      );
+      response.status(201).json({ data: r.rows[0] });
+    } catch (e) { next(e); }
+  });
+
+  app.patch("/api/projects/:id/payments/:paymentId", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      const r = await query(
+        `UPDATE project_payment
+         SET received_amount = COALESCE($1, received_amount),
+             received_date = COALESCE($2, received_date),
+             status = COALESCE($3, status),
+             notes = COALESCE($4, notes),
+             updated_at = NOW()
+         WHERE id = $5 AND project_id = $6 AND company_id = $7
+         RETURNING *`,
+        [body.receivedAmount, body.receivedAt || body.receivedDate, body.status, body.notes,
+         request.params.paymentId, request.params.id, u.companyId]
+      );
+      if (r.rows.length === 0) throw new NotFoundError("收款记录");
+      // 重新汇总 paid_amount
+      await query(
+        `UPDATE certification_project AS p
+         SET paid_amount = (
+           SELECT COALESCE(SUM(pp.received_amount), 0) FROM project_payment AS pp
+           WHERE pp.project_id = p.id AND pp.company_id = p.company_id AND pp.deleted_at IS NULL
+         ),
+         first_pay_date = (
+           SELECT MIN(pp.received_date) FROM project_payment AS pp
+           WHERE pp.project_id = p.id AND pp.company_id = p.company_id
+             AND pp.payment_type = 'deposit' AND pp.received_date IS NOT NULL AND pp.deleted_at IS NULL
+         ),
+         final_pay_date = (
+           SELECT MIN(pp.received_date) FROM project_payment AS pp
+           WHERE pp.project_id = p.id AND pp.company_id = p.company_id
+             AND pp.payment_type = 'balance' AND pp.received_date IS NOT NULL AND pp.deleted_at IS NULL
+         )
+         WHERE id = $1 AND company_id = $2`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows[0] });
+    } catch (e) { next(e); }
+  });
+
+  app.delete("/api/projects/:id/payments/:paymentId", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      await query(
+        `UPDATE project_payment SET deleted_at = NOW()
+         WHERE id = $1 AND project_id = $2 AND company_id = $3`,
+        [request.params.paymentId, request.params.id, u.companyId]
+      );
+      response.json({ data: { id: request.params.paymentId, deleted: true } });
+    } catch (e) { next(e); }
+  });
+
+  // ----- 发票 -----
+  app.get("/api/projects/:id/invoices", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query(
+        `SELECT * FROM project_invoice
+         WHERE project_id = $1 AND company_id = $2 AND deleted_at IS NULL
+         ORDER BY created_at DESC`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects/:id/invoices", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.amount) throw new ValidationError("amount 必填");
+      const r = await query(
+        `INSERT INTO project_invoice
+         (company_id, project_id, invoice_type, invoice_no, amount, tax_rate, tax_amount,
+          issue_date, status, notes, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [
+          u.companyId, request.params.id, body.invoiceType || "vat_general",
+          body.invoiceNo || null, body.amount, body.taxRate || 6, body.taxAmount || 0,
+          body.issueDate || null, body.status || "pending", body.notes || null, u.id
+        ]
+      );
+      // 更新 invoice_amount
+      await query(
+        `UPDATE certification_project AS p
+         SET invoice_amount = (
+           SELECT COALESCE(SUM(inv.amount), 0) FROM project_invoice AS inv
+           WHERE inv.project_id = p.id AND inv.company_id = p.company_id AND inv.deleted_at IS NULL
+         ) WHERE id = $1 AND company_id = $2`,
+        [request.params.id, u.companyId]
+      );
+      response.status(201).json({ data: r.rows[0] });
+    } catch (e) { next(e); }
+  });
+
+  // ----- 整改项 -----
+  app.get("/api/projects/:id/corrections", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query(
+        `SELECT * FROM project_correction
+         WHERE project_id = $1 AND company_id = $2 AND deleted_at IS NULL
+         ORDER BY created_at DESC`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects/:id/corrections", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.title) throw new ValidationError("title 必填");
+      const r = await query(
+        `INSERT INTO project_correction
+         (company_id, project_id, item_no, title, description, requirement,
+          owner_name, responsible_name, due_date, status, review_id, source_document_id,
+          created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [
+          u.companyId, request.params.id, body.itemNo || `CA-${Date.now().toString().slice(-6)}`,
+          body.title, body.description || null, body.requirement || null,
+          body.ownerName || body.responsibleName || null,
+          body.responsibleName || body.ownerName || null,
+          body.dueDate || null, body.status || "open", body.reviewId || null,
+          body.sourceDocumentId || null, u.id
+        ]
+      );
+      response.status(201).json({ data: r.rows[0] });
+    } catch (e) { next(e); }
+  });
+
+  app.patch("/api/projects/:id/corrections/:correctionId", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      const r = await query(
+        `UPDATE project_correction
+         SET title = COALESCE($1, title),
+             description = COALESCE($2, description),
+             requirement = COALESCE($3, requirement),
+             status = COALESCE($4, status),
+             due_date = COALESCE($5, due_date),
+             responsible_name = COALESCE($6, responsible_name),
+             verified_at = COALESCE($7::timestamptz, verified_at),
+             verified_by = COALESCE($8::uuid, verified_by),
+             updated_at = NOW()
+         WHERE id = $9 AND project_id = $10 AND company_id = $11
+         RETURNING *`,
+        [
+          body.title, body.description, body.requirement, body.status,
+          body.dueDate, body.responsibleName,
+          body.verifiedAt, body.verifiedBy,
+          request.params.correctionId, request.params.id, u.companyId
+        ]
+      );
+      if (r.rows.length === 0) throw new NotFoundError("整改项");
+      response.json({ data: r.rows[0] });
+    } catch (e) { next(e); }
+  });
+
+  // ----- 资料 -----
+  app.get("/api/projects/:id/documents", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query(
+        `SELECT * FROM project_document
+         WHERE project_id = $1 AND company_id = $2 AND deleted_at IS NULL
+         ORDER BY created_at DESC`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects/:id/documents", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.title && !body?.name) throw new ValidationError("title/name 必填");
+      const docTitle = body.title || body.name;
+      const docFileName = body.file_name || body.fileName || body.name || docTitle;
+      const r = await query(
+        `INSERT INTO project_document
+         (company_id, project_id, title, file_name, document_type, category, version,
+          storage_key, mime_type, size_bytes, uploaded_by, uploaded_by_name, uploaded_at, status, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14) RETURNING *`,
+        [
+          u.companyId, request.params.id, docTitle, docFileName,
+          body.documentType || "other",
+          body.category || body.documentType || "other",
+          body.version || body.versionNo || 1,
+          body.storageKey || null, body.mimeType || null,
+          body.sizeBytes || null, u.id, u.username,
+          body.status || "active", body.notes || null
+        ]
+      );
+      response.status(201).json({ data: r.rows[0] });
+    } catch (e) { next(e); }
+  });
+
+  // ----- 评审 -----
+  app.get("/api/projects/:id/reviews", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const r = await query(
+        `SELECT * FROM project_review
+         WHERE project_id = $1 AND company_id = $2 AND deleted_at IS NULL
+         ORDER BY scheduled_date DESC NULLS LAST`,
+        [request.params.id, u.companyId]
+      );
+      response.json({ data: r.rows });
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/projects/:id/reviews", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.reviewType) throw new ValidationError("reviewType 必填");
+      const r = await query(
+        `INSERT INTO project_review
+         (company_id, project_id, review_type, review_method, scheduled_date,
+          scheduled_time, location, reviewer_id, reviewer_name, external_reviewer,
+          status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+        [
+          u.companyId, request.params.id, body.reviewType, body.reviewMethod || "remote",
+          body.scheduledDate || null, body.scheduledTime || null, body.location || null,
+          body.reviewerId || null, body.reviewerName || null, body.externalReviewer || null,
+          body.status || "scheduled", u.id
+        ]
+      );
+      response.status(201).json({ data: r.rows[0] });
+    } catch (e) { next(e); }
   });
 
   // ============== 财务管理 ==============
