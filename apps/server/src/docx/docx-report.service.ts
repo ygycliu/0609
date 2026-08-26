@@ -994,14 +994,29 @@ function buildQuoteContent(quote: QuoteResult, branding: DocxBranding): FileChil
     })
   );
 
+  // 公式说明
+  blocks.push(
+    new Paragraph({
+      spacing: { before: 200, after: 120 },
+      children: [
+        new TextRun({
+          text: "💡 报价公式：基础价 = 人日×500 + 体系数×1,100 + 280（QES时） + 差旅 + 补贴 + 住宿",
+          italics: true,
+          size: 18,
+          color: COLORS.muted
+        })
+      ]
+    })
+  );
+
   const calcRows = [
     [`1. 专家评审费（${quote.totalAuditDays} 人日 × ¥500）`, `¥ ${quote.expertReviewFee.toLocaleString()}`],
-    [`2. 三体系组长费（${quote.groupLeaderFee > 0 ? "QES" : "—"}）`, `¥ ${quote.groupLeaderFee.toLocaleString()}`],
-    [`3. 专业补贴（${quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
-    [`4. 专家差旅费（实报实销）`, `¥ ${quote.travelFee.toLocaleString()}`],
-    [`5. 审核员住宿${quote.accommodationFee > 0 ? "（异地 ¥300/天）" : "（本地免）"}`, `¥ ${quote.accommodationFee.toLocaleString()}`],
-    [`6. 管理注册年金（${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`],
-    [`基础价（6 部分之和）`, `¥ ${quote.basePrice.toLocaleString()}`],
+    [`2. 管理注册年金（${quote.standardCount} 体系 × ¥1,100）`, `¥ ${quote.managementAnnualFee.toLocaleString()}`],
+    [`3. 三体系组长费（${quote.groupLeaderFee > 0 ? "QES" : "—"}）`, `¥ ${quote.groupLeaderFee.toLocaleString()}`],
+    [`4. 专业补贴（${quote.professionalSubsidy > 0 ? "特殊行业/高风险" : "—"}）`, `¥ ${quote.professionalSubsidy.toLocaleString()}`],
+    [`5. 专家差旅费（实报实销）`, `¥ ${quote.travelFee.toLocaleString()}`],
+    [`6. 审核员住宿${quote.accommodationFee > 0 ? "（异地 ¥300/天）" : "（本地免）"}`, `¥ ${quote.accommodationFee.toLocaleString()}`],
+    [`基础价（6 项直接相加）`, `¥ ${quote.basePrice.toLocaleString()}`],
     [`税费（基础价 / 0.92 × 8.7%）`, `¥ ${quote.taxFee.toLocaleString()}`],
     [`企业经营管理费（基础价 × 18%）`, `¥ ${quote.businessManagementFee.toLocaleString()}`]
   ];

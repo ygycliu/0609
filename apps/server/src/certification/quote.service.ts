@@ -283,9 +283,10 @@ export async function generateQuote(input: QuoteInput): Promise<QuoteResult> {
   }
   const managementAnnualFee = standardCount * 1100;
 
-  // 🎯 基础价 = 6 部分之和（评审 + 组长 + 补贴 + 差旅 + 住宿 + 注册金）
-  const basePrice = expertReviewFee + groupLeaderFee + professionalSubsidy +
-                     travelFee + accommodationFee + managementAnnualFee;
+  // 🎯 基础价（直接计算，无系数）
+  //   = 人日 × 500 + 体系数 × 1100 + 280 (QES时) + 差旅 + 补贴 + 住宿
+  const basePrice = expertReviewFee + managementAnnualFee + groupLeaderFee +
+                     professionalSubsidy + travelFee + accommodationFee;
 
   // 🧮 税费：basePrice / 0.92 × 0.08 ≈ basePrice × 8.7%
   //     计算逻辑：含税 = basePrice / 0.92，所以税 = basePrice / 0.92 - basePrice
