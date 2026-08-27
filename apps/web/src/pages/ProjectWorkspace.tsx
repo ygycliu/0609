@@ -157,7 +157,7 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
         <div>
           <span className="eyebrow">工作台</span>
           <h1>认证项目中心</h1>
-          <p>所有工作都围绕"认证项目"完成。从线索 → 报价 → 合同 → 交付 → 出证。</p>
+          <p>所有工作都围绕"认证项目"完成。从线索 → 沟通 → 报价 → 合同签订 → 合同评审 → 现场审核 → 整改中 → 出证 → 邮寄证书 → 项目完成。</p>
         </div>
         <div className="header-actions">
           <button className="ghost-button" onClick={load}><RefreshCw size={16} /> 刷新</button>
@@ -306,16 +306,16 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
         </div>
         <div className="funnel">
           {[
-            { label: "线索", status: "lead", color: "#f59e0b" },
-            { label: "沟通中", status: "communicating", color: "#3b82f6" },
-            { label: "已报价", status: "quoted", color: "#6366f1" },
-            { label: "合同签订", status: ["contract_pending", "contract_signed", "contract_archived"], color: "#10b981" },
-            { label: "首付款", status: ["first_pay_pending", "first_paid"], color: "#0ea5e9" },
-            { label: "评审中", status: ["contract_review", "expert_review_pending", "expert_reviewing", "delivery_prep", "doc_collecting"], color: "#8b5cf6" },
-            { label: "整改中", status: "correcting", color: "#ec4899" },
-            { label: "待出证", status: ["final_pay_pending", "invoice_pending", "cert_pending"], color: "#f97316" },
-            { label: "已出证", status: ["certified", "shipment_pending"], color: "#22c55e" },
-            { label: "已完成", status: "completed", color: "#16a34a" },
+            { label: "线索", status: ["lead"], color: "#f59e0b" },
+            { label: "沟通", status: ["communicating"], color: "#3b82f6" },
+            { label: "报价", status: ["quoted"], color: "#6366f1" },
+            { label: "合同签订", status: ["contract_pending", "contract_signed", "contract_archived", "first_pay_pending", "first_paid"], color: "#10b981" },
+            { label: "合同评审", status: ["contract_review"], color: "#06b6d4" },
+            { label: "现场审核", status: ["expert_review_pending", "expert_reviewing", "delivery_prep", "doc_collecting"], color: "#8b5cf6" },
+            { label: "整改中", status: ["correcting"], color: "#ec4899" },
+            { label: "出证", status: ["final_pay_pending", "invoice_pending", "cert_pending", "certified"], color: "#f97316" },
+            { label: "邮寄证书", status: ["shipment_pending"], color: "#22c55e" },
+            { label: "项目完成", status: ["completed"], color: "#16a34a" },
           ].map((stage, i) => {
             const stageList = Array.isArray(stage.status) ? stage.status : [stage.status];
             const stageCount = stageList.reduce((sum, s) => sum + (stats[s] || 0), 0);
