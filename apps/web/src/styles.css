@@ -8203,3 +8203,51 @@ textarea:focus {
   color: #059669;
   font-weight: 500;
 }
+
+
+/* ============================================================ */
+/*=========  外协勾选框  ========== */
+/* ============================================================ */
+
+.partner-checkbox-row {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+[data-theme="dark"] .partner-checkbox-row {
+  background: #0f172a;
+  border-color: #334155;
+}
+.partner-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+  font-weight: 500;
+}
+.partner-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #0ea5e9;
+}
+.partner-checkbox-label span {
+  font-weight: 500;
+  color: #1e293b;
+}
+[data-theme="dark"] .partner-checkbox-label span {
+  color: #e2e8f0;
+}
+.partner-checkbox-label small {
+  color: #64748b;
+  font-size: 11px;
+  margin-left: 4px;
+  font-weight: normal;
+}
+[data-theme="dark"] .partner-checkbox-label small {
+  color: #94a3b8;
+}

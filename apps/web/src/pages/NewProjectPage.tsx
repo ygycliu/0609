@@ -25,6 +25,7 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
   const [customerId, setCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [serviceTypeId, setServiceTypeId] = useState("");
+  const [needPartner, setNeedPartner] = useState(false);  // 独立勾选：是否需要外协
   const [signatoryId, setSignatoryId] = useState("");
   const [partnerOrgId, setPartnerOrgId] = useState("");
   const [contactPerson, setContactPerson] = useState("");
@@ -80,7 +81,7 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
   }, [customerSearch]);
 
   const selectedServiceType = serviceTypes.find((s) => s.id === serviceTypeId);
-  const needPartner = selectedServiceType?.config?.need_partner;
+  // needPartner 现在是独立 state（用户在勾选框里自己勾选）
 
   async function handleSubmit() {
     if (!customerId) { setError("请选择客户"); return; }
@@ -268,11 +269,11 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
           )}
         </div>
 
-        {/* 服务类型 */}
+        {/* 服务类型（去掉咨询服务：纯咨询服务不签合同/不出证）*/}
         <div className="form-row">
           <label>服务类型 *</label>
           <div className="service-type-grid">
-            {serviceTypes.map((st) => (
+            {serviceTypes.filter((st) => st.code !== "consulting").map((st) => (
               <button
                 key={st.id}
                 className={`service-type-card ${serviceTypeId === st.id ? "active" : ""}`}
@@ -281,9 +282,21 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
               >
                 <strong>{st.name}</strong>
                 <small>{st.description}</small>
-                {st.config?.need_partner && <span className="badge">需外协</span>}
               </button>
             ))}
+          </div>
+
+          {/* 独立勾选：是否需要外协 */}
+          <div className="partner-checkbox-row">
+            <label className="partner-checkbox-label">
+              <input
+                type="checkbox"
+                checked={needPartner}
+                onChange={(e) => setNeedPartner(e.target.checked)}
+              />
+              <span>需要外协认证单位</span>
+              <small>（如需外协出证机构认证，请勾选）</small>
+            </label>
           </div>
         </div>
 
