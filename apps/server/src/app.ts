@@ -24,6 +24,7 @@ import * as projectRepo from "./project/project.repository.js";
 import { ARRepository } from "./finance/ar.repository.js";
 import { FollowUpRepository, FOLLOW_UP_STAGES, ISSUING_BODIES } from "./follow_up/follow_up.repository.js";
 import { processRecordingEndToEnd } from "./services/yoooclaw-extract.service.js";
+import { handleChat, handleToolConfirmation, ASSISTANT_TOOLS } from "./services/assistant.service.js";
 import { login, logout, createUser, listUsers, resetPassword, changeOwnPassword, setUserActive, authMiddleware, refresh as refreshToken, verifyMfa, enableMfa, disableMfa } from "./auth/auth.service.js";
 import type { UserRecord } from "./auth/auth.service.js";
 import { ACCESS_COOKIE, MFA_COOKIE, REFRESH_COOKIE, clearAuthCookies, readCookie, setMfaCookie, setSessionCookies } from "./auth/session.js";
@@ -4662,6 +4663,44 @@ export function createApp() {
       message: err?.message || "服务处理失败，请稍后重试",
       requestId: request.id
     });
+  });
+
+  // ===== 页面助手（Agent + Tools）=====
+  app.post("/api/assistant/chat", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.message?.trim()) throw new ValidationError("message 必填");
+      const result = await handleChat(
+        {
+          message: body.message.trim(),
+          history: body.history || [],
+          context: body.context || {}
+        },
+        { companyId: u.companyId, userId: u.id, userName: u.username ?? undefined }
+      );
+      response.json({ data: result });
+    } catch (e) { next(e); }
+  });
+
+  // 确认执行工具（用户说"确认"后调用）
+  app.post("/api/assistant/confirm", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      if (!body?.toolName) throw new ValidationError("toolName 必填");
+      const result = await handleToolConfirmation(
+        body.toolName,
+        body.args || {},
+        { companyId: u.companyId, userId: u.id, userName: u.username ?? undefined }
+      );
+      response.json({ data: result });
+    } catch (e) { next(e); }
+  });
+
+  // 获取可用工具列表
+  app.get("/api/assistant/tools", async (_request, response) => {
+    response.json({ data: ASSISTANT_TOOLS });
   });
 
   return app;

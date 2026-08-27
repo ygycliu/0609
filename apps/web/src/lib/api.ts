@@ -732,7 +732,7 @@ export function listImportedRecordings(limit = 50) {
   return request<{ data: any[] }>(`/yoooclaw/imported-recordings?limit=${limit}`);
 }
 
-// ⭐ 自动从录音转写文本提取 todo / follow_up / knowledge
+// 智能提取：自动从转写文本提取 todo / follow_up / knowledge
 export function autoExtractYoooclawRecording(payload: {
   recordingId: string;
   recordingName?: string;
@@ -741,5 +741,49 @@ export function autoExtractYoooclawRecording(payload: {
 }) {
   return request<any>("/yoooclaw/auto-extract", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+  });
+}
+
+// ===== 页面助手 =====
+export interface AssistantMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export function assistantChat(payload: {
+  message: string;
+  history?: AssistantMessage[];
+  context?: { currentPage?: string };
+}) {
+  // 助手返回 {data: {reply, toolCalls, ...}}，需要保留 data 层
+  // /ai/ 前缀是 Apache 反代到 :3001
+  const base = ((import.meta as any).env?.BASE_URL || "/ai/") as string;
+  const url = base + "api/assistant/chat";
+  return fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).then(async (res) => {
+    const body = await res.text();
+    const json = body ? JSON.parse(body) : { data: { reply: "(空响应)" } };
+    if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+    return json;
+  });
+}
+
+export function assistantConfirm(payload: { toolName: string; args: any }) {
+  const base = ((import.meta as any).env?.BASE_URL || "/ai/") as string;
+  const url = base + "api/assistant/confirm";
+  return fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).then(async (res) => {
+    const body = await res.text();
+    const json = body ? JSON.parse(body) : { data: { reply: "(空响应)", success: false } };
+    if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+    return json;
   });
 }

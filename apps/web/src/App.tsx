@@ -1,6 +1,7 @@
 import { AlertCircle, LoaderCircle, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
+import { PageAssistant } from "./components/PageAssistant";
 import { api } from "./lib/api";
 import { LoginPage } from "./pages/LoginPage";
 import { PasswordChangePage } from "./pages/PasswordChangePage";
@@ -219,7 +220,10 @@ export default function App() {
           版权所有上海缘起卢卡智能科技有限公司
         </footer>
       </main>
+
+      {/* 页面助手：悬浮右下角 */}
+      <PageAssistant currentPage={page} />
     </div>
   );
-        
+
 }
