@@ -8251,3 +8251,23 @@ textarea:focus {
 [data-theme="dark"] .partner-checkbox-label small {
   color: #94a3b8;
 }
+
+
+/* ============================================================ */
+/*=========  自动填充标签  ========== */
+/* ============================================================ */
+
+.auto-fill-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+}
+[data-theme="dark"] .auto-fill-tag {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}

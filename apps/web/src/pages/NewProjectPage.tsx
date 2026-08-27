@@ -14,8 +14,8 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
   const [signatories, setSignatories] = useState<Signatory[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [partnerOrgs, setPartnerOrgs] = useState<PartnerOrg[]>([]);
-  const [customers, setCustomers] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
-  const [searchedCustomers, setSearchedCustomers] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string; industry?: string; contact_person?: string; contact_phone?: string }>>([]);
+  const [searchedCustomers, setSearchedCustomers] = useState<Array<{ id: string; name: string; industry?: string; contact_person?: string; contact_phone?: string }>>([]);
   const [searching, setSearching] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -228,6 +228,11 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
                         onClick={() => {
                           setCustomerId(c.id);
                           setCustomerDropdownOpen(false);
+                          // 自动填充联系人/电话/行业（来自客户基础数据）
+                          const c2 = c as any;
+                          if (c2.contactPerson || c2.contact_person) setContactPerson(c2.contactPerson || c2.contact_person);
+                          if (c2.contactPhone || c2.contact_phone) setContactPhone(c2.contactPhone || c2.contact_phone);
+                          if (c2.industry) setIndustry(c2.industry);
                         }}
                       >
                         <span className="customer-name">{c.name}</span>
@@ -331,22 +336,41 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
           </div>
         )}
 
-        {/* 联系人 */}
+        {/* 联系人 + 电话（选中客户后自动从客户库填充，可手动修改）*/}
         <div className="form-row-2">
           <div>
-            <label>联系人</label>
-            <input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} />
+            <label>
+              联系人
+          {customerId && (() => {
+            const sel = searchedCustomers.find((c) => c.id === customerId);
+            const person = (sel as any)?.contactPerson || (sel as any)?.contact_person;
+            return person && (
+              <span className="auto-fill-tag">📋 自动填充</span>
+            );
+          })()}
+            </label>
+            <input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="从客户基础数据自动带入，可修改" />
           </div>
           <div>
-            <label>联系电话</label>
-            <input type="text" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+            <label>
+              联系电话
+              {customerId && searchedCustomers.find((c) => c.id === customerId)?.contact_phone && (
+                <span className="auto-fill-tag">📋 自动填充</span>
+              )}
+            </label>
+            <input type="text" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="从客户基础数据自动带入，可修改" />
           </div>
         </div>
 
-        {/* 行业/标准/范围 */}
+        {/* 行业（选中客户后自动填充）*/}
         <div className="form-row-3">
           <div>
-            <label>行业</label>
+            <label>
+              行业
+              {customerId && searchedCustomers.find((c) => c.id === customerId)?.industry && (
+                <span className="auto-fill-tag">📋 自动填充</span>
+              )}
+            </label>
             <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="如：食品" />
           </div>
           <div>
