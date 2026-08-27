@@ -23,6 +23,7 @@ import { FinanceRepository } from "./finance/finance.repository.js";
 import * as projectRepo from "./project/project.repository.js";
 import { ARRepository } from "./finance/ar.repository.js";
 import { FollowUpRepository, FOLLOW_UP_STAGES, ISSUING_BODIES } from "./follow_up/follow_up.repository.js";
+import { processRecordingEndToEnd } from "./services/yoooclaw-extract.service.js";
 import { login, logout, createUser, listUsers, resetPassword, changeOwnPassword, setUserActive, authMiddleware, refresh as refreshToken, verifyMfa, enableMfa, disableMfa } from "./auth/auth.service.js";
 import type { UserRecord } from "./auth/auth.service.js";
 import { ACCESS_COOKIE, MFA_COOKIE, REFRESH_COOKIE, clearAuthCookies, readCookie, setMfaCookie, setSessionCookies } from "./auth/session.js";
@@ -3746,6 +3747,50 @@ export function createApp() {
         [u.companyId, limit]
       );
       response.json({ data: r.rows });
+    } catch (error) { next(error); }
+  });
+
+  // ⭐ 智能提取：从转写文本自动提取 todo / follow_up / knowledge（一次调用LLM）
+  app.post("/api/yoooclaw/auto-extract", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const body = request.body as any;
+      const recordingId = (body.recordingId || "").trim();
+      const recordingName = (body.recordingName || "").trim();
+      const transcript = (body.transcript || "").trim();
+      const durationSec = body.durationSec ? Number(body.durationSec) : null;
+
+      if (!recordingId) throw new ValidationError("recordingId 必填");
+      if (!transcript) throw new ValidationError("transcript 必填");
+
+      console.log(`[yoooclaw] auto-extract recording=${recordingId} name=${recordingName} len=${transcript.length}`);
+
+      const result = await processRecordingEndToEnd({
+        companyId: u.companyId,
+        userId: u.id,
+        recordingId,
+        recordingName,
+        transcript,
+        durationSec
+      });
+
+      response.json({
+        data: {
+          recordingId,
+          routes: {
+            todos: result.todos,
+            follow_ups: result.followUps,
+            knowledge: result.knowledge ? "saved" : "empty"
+          },
+          summary: {
+            todosCount: result.todos.length,
+            followUpsCount: result.followUps.length,
+            knowledgeExtracted: !!result.knowledge
+          },
+          knowledge: result.knowledge,
+          extractionFailed: result.extractionFailed
+        }
+      });
     } catch (error) { next(error); }
   });
 

@@ -731,3 +731,15 @@ export function importYoooclawRecording(payload: {
 export function listImportedRecordings(limit = 50) {
   return request<{ data: any[] }>(`/yoooclaw/imported-recordings?limit=${limit}`);
 }
+
+// ⭐ 自动从录音转写文本提取 todo / follow_up / knowledge
+export function autoExtractYoooclawRecording(payload: {
+  recordingId: string;
+  recordingName?: string;
+  transcript: string;
+  durationSec?: number;
+}) {
+  return request<any>("/yoooclaw/auto-extract", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+  });
+}

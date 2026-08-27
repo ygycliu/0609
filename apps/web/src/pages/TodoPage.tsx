@@ -17,6 +17,7 @@ import {
   updateTodo,
   deleteTodo,
   importYoooclawRecording,
+  autoExtractYoooclawRecording,
   listImportedRecordings
 } from "../lib/api";
 
@@ -70,6 +71,19 @@ export function TodoPage() {
     knowledge: number;
     todo: number;
     follow_up: number;
+  } | null>(null);
+  // 智能提取模式（自动从转写提取 todos/follow_ups/knowledge）
+  const [extractRecId, setExtractRecId] = useState("");
+  const [extractRecName, setExtractRecName] = useState("");
+  const [extractTranscript, setExtractTranscript] = useState("");
+  const [extractMode, setExtractMode] = useState<"closed" | "open">("closed");
+  const [extracting, setExtracting] = useState(false);
+  const [extractResult, setExtractResult] = useState<{
+    todosCount: number;
+    followUpsCount: number;
+    knowledgeExtracted: boolean;
+    todos: any[];
+    followUps: any[];
   } | null>(null);
 
   const load = () => {
@@ -133,6 +147,36 @@ export function TodoPage() {
     }
   };
 
+  // ⭐ 智能提取：粘贴转写 → 自动生成 todos / follow_ups / knowledge
+  const handleAutoExtract = async () => {
+    if (!extractRecId.trim()) { alert("请填写录音 ID"); return; }
+    if (!extractTranscript.trim()) { alert("请粘贴转写文本"); return; }
+    setExtracting(true);
+    try {
+      const r = await autoExtractYoooclawRecording({
+        recordingId: extractRecId.trim(),
+        recordingName: extractRecName.trim() || undefined,
+        transcript: extractTranscript.trim()
+      });
+      setExtractResult({
+        todosCount: r.data.summary.todosCount,
+        followUpsCount: r.data.summary.followUpsCount,
+        knowledgeExtracted: r.data.summary.knowledgeExtracted,
+        todos: r.data.routes.todos,
+        followUps: r.data.routes.follow_ups
+      });
+      load();
+      setExtractMode("closed");
+      setExtractRecId("");
+      setExtractRecName("");
+      setExtractTranscript("");
+    } catch (e) {
+      alert("提取失败：" + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   return (
     <div className="page-stack">
       <header className="page-header">
@@ -144,6 +188,9 @@ export function TodoPage() {
         <div className="page-header-actions">
           <button className="ghost-button" onClick={() => setShowImport(true)}>
             <Upload size={16} /> 录音导入
+          </button>
+          <button className="ghost-button" onClick={() => setExtractMode("open")}>
+            <Sparkles size={16} /> 智能提取
           </button>
           <button className="primary-button" onClick={() => setShowCreate(true)}>
             <Plus size={18} /> 新建待办
@@ -243,6 +290,103 @@ export function TodoPage() {
       </section>
 
       {/* 新建待办 Modal */}
+      {/* 智能提取弹窗 */}
+      {extractMode === "open" && (
+        <div className="modal-overlay" onClick={() => setExtractMode("closed")}>
+          <div className="modal-content extract-modal" onClick={(e) => e.stopPropagation()}>
+            <h3><Sparkles size={18} /> 智能提取待办</h3>
+            <p className="muted small">
+              粘贴 YoooClaw 录音的转写文本，AI 自动识别<strong> 待办事项 / 客户跟进 / 知识要点</strong>，自动写入对应模块。
+            </p>
+            <div className="form-row">
+              <label>录音 ID</label>
+              <input
+                value={extractRecId}
+                onChange={(e) => setExtractRecId(e.target.value)}
+                placeholder="如：REC-2026-0826-001"
+                autoFocus
+              />
+            </div>
+            <div className="form-row">
+              <label>录音标题（可选）</label>
+              <input
+                value={extractRecName}
+                onChange={(e) => setExtractRecName(e.target.value)}
+                placeholder="如：2026-08-26 与宁夏云森材料沟通"
+              />
+            </div>
+            <div className="form-row">
+              <label>录音转写文本 *</label>
+              <textarea
+                value={extractTranscript}
+                onChange={(e) => setExtractTranscript(e.target.value)}
+                placeholder={`粘贴 ASR 转写文本，AI 会自动提取：
+- 待办事项（如"周三前发合同给客户"）
+- 客户跟进（如客户名、金额、认证类型、预计签约日）
+- 知识要点（如新法规、行业标准）
+
+例如：
+"今天和宁夏云森材料公司的张经理沟通了 ISO9001 认证，他们下周三会确认签字。
+合同金额 14000 块，首付 70% 下周打款。
+另外现在新版 GB/T 19001-2026 标准要求 6.1 条风险识别更明确..."`}
+                rows={10}
+                style={{ fontSize: 13 }}
+              />
+            </div>
+
+            {extractResult && (
+              <div className="extract-result-banner">
+                <div className="extract-result-row">
+                  <span className="extract-stat">
+                    <strong>{extractResult.todosCount}</strong> 待办
+                  </span>
+                  <span className="extract-stat">
+                    <strong>{extractResult.followUpsCount}</strong> 跟进
+                  </span>
+                  <span className="extract-stat">
+                    <strong>{extractResult.knowledgeExtracted ? "✓" : "—"}</strong> 知识
+                  </span>
+                </div>
+                {extractResult.todos.length > 0 && (
+                  <div className="extract-detail">
+                    <strong>已生成的待办：</strong>
+                    <ul>
+                      {extractResult.todos.slice(0, 5).map((t, i) => (
+                        <li key={i}>{t.title}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {extractResult.followUps.length > 0 && (
+                  <div className="extract-detail">
+                    <strong>已建立的跟进：</strong>
+                    <ul>
+                      {extractResult.followUps.slice(0, 3).map((f, i) => (
+                        <li key={i}>{f.customer}（{f.action || "新建"}）</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="ghost-button" onClick={() => setExtractMode("closed")}>
+                <X size={14} /> 关闭
+              </button>
+              <button
+                className="primary-button"
+                onClick={handleAutoExtract}
+                disabled={extracting || !extractRecId || !extractTranscript}
+              >
+                {extracting ? <LoaderCircle size={14} className="spin" /> : <Sparkles size={14} />}
+                {extracting ? "提取中..." : "开始提取"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCreate && (
         <CreateTodoModal
           onClose={() => setShowCreate(false)}
