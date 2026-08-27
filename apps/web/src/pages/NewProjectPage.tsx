@@ -15,6 +15,9 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [partnerOrgs, setPartnerOrgs] = useState<PartnerOrg[]>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
+  const [searchedCustomers, setSearchedCustomers] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,15 +58,26 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
       api.listSignatories(),
       api.listServiceTypes(),
       api.listPartnerOrgs(),
-      api.searchCustomers("", 100),
-    ]).then(([sigs, svcs, parts, custs]: any) => {
-      console.log("APIs loaded", { sigs, svcs, parts, custs });
+    ]).then(([sigs, svcs, parts]: any) => {
       setSignatories(sigs || []);
       setServiceTypes(svcs || []);
       setPartnerOrgs(parts || []);
-      setCustomers((custs && custs.data) || custs || []);
     }).catch((e) => console.error("load error", e));
   }, []);
+
+  // 实时搜索客户（防抖）
+  useEffect(() => {
+    const q = customerSearch.trim();
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.searchCustomers(q, 30);
+        setSearchedCustomers((r as any).data || r || []);
+      } catch { setSearchedCustomers([]); }
+      finally { setSearching(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [customerSearch]);
 
   const selectedServiceType = serviceTypes.find((s) => s.id === serviceTypeId);
   const needPartner = selectedServiceType?.config?.need_partner;
@@ -158,9 +172,7 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
     }
   }
 
-  const filteredCustomers = customerSearch
-    ? customers.filter((c) => c.name.toLowerCase().includes(customerSearch.toLowerCase()))
-    : customers.slice(0, 50);
+  const filteredCustomers = searchedCustomers;
 
   return (
     <div className="page-stack">
@@ -183,32 +195,75 @@ export function NewProjectPage({ onBack, onCreated }: NewProjectPageProps) {
           <div className="customer-search">
             <input
               type="text"
-              placeholder="搜索客户名称..."
+              placeholder="🔍 输入客户名称模糊搜索（按客户名 / 简称 / 行业）..."
               value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-            />
-            <select
-              value={customerId}
               onChange={(e) => {
-                if (e.target.value === "__new__") {
-                  setShowCustomerModal(true);
-                  return;
-                }
-                setCustomerId(e.target.value);
+                setCustomerSearch(e.target.value);
+                setCustomerDropdownOpen(true);
               }}
-            >
-              <option value="">-- 选择客户 --</option>
-              {filteredCustomers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-              <option value="__new__" style={{ color: "#0ea5e9", fontWeight: 600 }}>
-                ➕ 新建客户...
-              </option>
-            </select>
+              onFocus={() => setCustomerDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setCustomerDropdownOpen(false), 200)}
+              autoComplete="off"
+            />
+            {customerDropdownOpen && (
+              <div className="customer-dropdown">
+                {searching && <div className="customer-dropdown-empty">搜索中...</div>}
+                {!searching && filteredCustomers.length === 0 && (
+                  <div className="customer-dropdown-empty">
+                    {customerSearch.trim()
+                      ? <>未找到" {customerSearch} "的客户。<br/>点下面"➕ 新建客户"创建。</>
+                      : "暂无客户，请新建。"}
+                  </div>
+                )}
+                {!searching && filteredCustomers.length > 0 && (
+                  <>
+                    <div className="customer-dropdown-hint">
+                      找到 {filteredCustomers.length} 个客户（{customerSearch ? `关键词："${customerSearch}"` : "全部"}）
+                    </div>
+                    {filteredCustomers.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`customer-dropdown-item ${customerId === c.id ? "selected" : ""}`}
+                        onClick={() => {
+                          setCustomerId(c.id);
+                          setCustomerDropdownOpen(false);
+                        }}
+                      >
+                        <span className="customer-name">{c.name}</span>
+                        {c.industry && <span className="customer-industry">· {c.industry}</span>}
+                      </div>
+                    ))}
+                  </>
+                )}
+                <div
+                  className="customer-dropdown-item customer-dropdown-new"
+                  onClick={() => {
+                    setShowCustomerModal(true);
+                    setCustomerDropdownOpen(false);
+                  }}
+                >
+                  ➕ 新建客户...
+                </div>
+              </div>
+            )}
           </div>
           {customerId && (
             <div className="selected-customer-info">
-              <small>已选客户：<strong>{customers.find((c) => c.id === customerId)?.name}</strong></small>
+              <small>
+                已选客户：<strong>{searchedCustomers.find((c) => c.id === customerId)?.name || "(已选，需重新搜索显示)"}</strong>
+              </small>
+              <button
+                type="button"
+                className="ghost-button small"
+                onClick={() => {
+                  setCustomerId("");
+                  setCustomerSearch("");
+                  setCustomerDropdownOpen(true);
+                }}
+                style={{ marginLeft: 8, padding: "2px 8px" }}
+              >
+                重新选择
+              </button>
             </div>
           )}
         </div>
