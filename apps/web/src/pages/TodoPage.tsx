@@ -91,8 +91,11 @@ export function TodoPage() {
     setError("");
     listTodos({ status: statusFilter || undefined, limit: 200 })
       .then((r) => {
-        setItems(r.data || []);
-        setTotal(r.total);
+        // request 已自动解包 body.data，所以 r 直接是数组或 {data, total}
+        const arr = Array.isArray(r) ? r : ((r as any).data || []);
+        const total = Array.isArray(r) ? r.length : ((r as any).total || arr.length);
+        setItems(arr);
+        setTotal(total);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
       .finally(() => setLoading(false));

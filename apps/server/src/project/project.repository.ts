@@ -454,12 +454,14 @@ export async function changeProjectStatus(
 
     // 自动生成待办：基于状态变更到关键节点
     const autoTodos: Record<string, { title: string; days: number; priority: string; description: string }> = {
+      contract_signed: { title: "催收合同首付款", days: 3, priority: "high", description: "合同已签订，3 个工作日内催收首付款（70%）" },
       contract_archived: { title: "准备首次评审", days: 14, priority: "medium", description: "合同已归档，开始安排首次评审" },
       expert_review_pending: { title: "安排专家评审", days: 7, priority: "high", description: "待专家评审，安排评审时间和评审员" },
       expert_reviewing: { title: "跟进评审进度", days: 5, priority: "medium", description: "评审进行中，每日跟进" },
       correcting: { title: "跟进整改进度", days: 7, priority: "high", description: "整改中，请确保 7 天内完成整改" },
       cert_pending: { title: "准备证书文件", days: 3, priority: "high", description: "待出证，准备证书文件" },
       certified: { title: "安排证书邮寄", days: 3, priority: "high", description: "证书已出，安排邮寄给客户" },
+      shipment_pending: { title: "跟进证书寄达", days: 7, priority: "medium", description: "证书已寄出，跟踪客户签收" },
     };
     if (autoTodos[newStatus]) {
       const todo = autoTodos[newStatus];
