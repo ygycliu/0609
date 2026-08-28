@@ -8316,3 +8316,103 @@ textarea:focus {
   flex: 1;
   height: 32px !important;
 }
+
+
+/* ============================================================ */
+/*=========  项目详情进度条  ========== */
+/* ============================================================ */
+
+.stage-progress {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 10px 0;
+  overflow-x: auto;
+}
+.stage-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 64px;
+  position: relative;
+}
+.stage-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: calc(50% + 16px);
+  right: calc(-50% + 16px);
+  height: 2px;
+  background: #cbd5e1;
+  z-index: 0;
+}
+.stage-step.completed:not(:last-child)::after {
+  background: #10b981;
+}
+.stage-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  z-index: 1;
+  position: relative;
+  box-shadow: 0 0 0 3px white;
+}
+.stage-step.current .stage-dot {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px white, 0 0 0 6px rgba(37, 99, 235, 0.2);
+}
+.stage-step.completed .stage-dot {
+  background: #10b981 !important;
+}
+.stage-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.stage-step.current .stage-label {
+  font-weight: 700;
+  font-size: 12px;
+}
+.stage-step.completed .stage-label {
+  font-weight: 600;
+  color: #059669;
+}
+
+.next-stage-hint {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #eff6ff;
+  border-left: 3px solid #2563eb;
+  border-radius: 4px;
+  font-size: 13px;
+}
+[data-theme="dark"] .next-stage-hint {
+  background: #1e3a8a;
+  border-left-color: #3b82f6;
+}
+.next-stage-label {
+  color: #64748b;
+  font-size: 11px;
+}
+.next-stage-name {
+  font-weight: 700;
+  color: #2563eb;
+}
+.next-stage-hint-tip {
+  color: #94a3b8;
+  font-size: 11px;
+  margin-left: 4px;
+}

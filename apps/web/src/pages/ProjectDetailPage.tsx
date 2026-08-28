@@ -213,7 +213,43 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
             </span>
           </h1>
           <p>{project.customerName} · {project.serviceTypeName} · {project.signatoryName}</p>
+
+          {/* 10 阶段进度条 */}
+          {(() => {
+            const stages = BUSINESS_STAGES.filter((bs) => !["cancelled", "suspended", "at_risk"].includes(bs.stage));
+            const currentIdx = stages.findIndex((b) => b.states.includes(project.status));
+            const nextStage = currentIdx >= 0 && currentIdx < stages.length - 1 ? stages[currentIdx + 1] : null;
+            return (
+              <>
+                <div className="stage-progress">
+                  {stages.map((bs, idx) => {
+                    const isCompleted = currentIdx > idx && currentIdx >= 0;
+                    const isCurrent = currentIdx === idx;
+                    const stateColor = isCurrent ? "#2563eb" : isCompleted ? "#10b981" : "#cbd5e1";
+                    return (
+                      <div key={bs.stage} className={`stage-step ${isCompleted ? "completed" : ""} ${isCurrent ? "current" : ""}`}>
+                        <div className="stage-dot" style={{ background: stateColor }}>
+                          {isCompleted ? "✓" : idx + 1}
+                        </div>
+                        <div className="stage-label" style={{ color: isCurrent || isCompleted ? stateColor : "#94a3b8" }}>
+                          {bs.stage}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {nextStage && (
+                  <div className="next-stage-hint">
+                    <span className="next-stage-label">下一步：</span>
+                    <span className="next-stage-name">{nextStage.stage}</span>
+                    <span className="next-stage-hint-tip">（点击右上角"变更状态"推进）</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
+
         <div className="header-actions">
           <button className="ghost-button" onClick={load}><RefreshCw size={16} /> 刷新</button>
           <button className="primary-button" onClick={() => setChangingStatus(true)}>

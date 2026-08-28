@@ -19,6 +19,12 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [stageFilter, setStageFilter] = useState<string[] | null>(null);
+
+  // 根据 stageFilter 过滤项目
+  const filteredProjects = stageFilter
+    ? projects.filter((p) => stageFilter.includes((p as any).status))
+    : projects;
 
   interface Reminder {
     id: string;
@@ -257,10 +263,29 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
       <section className="project-list-section">
         <div className="section-heading">
           <h3>最近项目</h3>
-          <span className="muted">共 {projects.length} 个</span>
+          <div className="project-list-meta">
+            <span className="muted">
+              {stageFilter
+                ? `已筛选 ${filteredProjects.length} / ${projects.length} 个（按漏斗阶段）`
+                : `共 ${projects.length} 个`}
+            </span>
+            {stageFilter && (
+              <button className="ghost-button small" onClick={() => setStageFilter(null)}>
+                清除筛选
+              </button>
+            )}
+          </div>
         </div>
-        {projects.length === 0 ? (
-          <p className="muted">暂无项目，点击右上角"新建项目"开始第一个</p>
+        {stageFilter && (
+          <div className="stage-filter-banner">
+            🔍 当前筛选：<strong>漏斗阶段</strong>
+            <span className="muted">（点击漏斗可切换 / 点击右上角"清除筛选"恢复全部）</span>
+          </div>
+        )}
+        {filteredProjects.length === 0 ? (
+          <p className="muted">
+            {stageFilter ? "此阶段暂无项目" : '暂无项目，点击右上角"新建项目"开始第一个'}
+          </p>
         ) : (
           <table className="data-table">
             <thead>
@@ -270,7 +295,7 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
               </tr>
             </thead>
             <tbody>
-              {projects.map((p) => (
+              {filteredProjects.map((p) => (
                 <tr key={p.id}>
                   <td><strong>{p.projectCode}</strong></td>
                   <td>{p.customerName}</td>
@@ -321,12 +346,27 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
             const stageCount = stageList.reduce((sum, s) => sum + (stats[s] || 0), 0);
             const total = sum.total || 1;
             const pct = (stageCount / total) * 100;
-            const prevTotal = i === 0 ? total : null;
-            const conversionFromPrev = prevTotal && stageCount > 0 && prevTotal > 0
-              ? null
-              : null;
+            const isActive = stageFilter && stage.status.some(s => stageFilter.includes(s));
             return (
-              <div key={stage.label} className="funnel-stage">
+              <div
+                key={stage.label}
+                className={`funnel-stage ${isActive ? "filter-active" : ""}`}
+                onClick={() => {
+                  // 第一次点击设过滤；再次点击取消
+                  if (stageFilter && stage.status.some(s => stageFilter.includes(s))) {
+                    setStageFilter(null);
+                  } else {
+                    setStageFilter(stage.status);
+                    // 滚动到项目列表
+                    setTimeout(() => {
+                      const el = document.querySelector('.project-list-section');
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+                title={`点击筛选 ${stage.label} 阶段的项目`}
+              >
                 <div className="funnel-stage-label" style={{ color: stage.color }}>
                   <strong>{stage.label}</strong>
                   <span className="funnel-stage-count">{stageCount}</span>
