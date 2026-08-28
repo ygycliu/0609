@@ -10,6 +10,38 @@ import {
   type ProjectTimelineEvent
 } from "../types";
 
+// 业务阶段 → 状态机状态映射（漏斗的 10 个阶段）
+const BUSINESS_STAGES: Array<{ stage: string; states: string[] }> = [
+  { stage: "线索", states: ["lead"] },
+  { stage: "沟通", states: ["communicating"] },
+  { stage: "报价", states: ["quoted"] },
+  { stage: "合同签订", states: ["contract_pending", "contract_signed", "contract_archived", "first_pay_pending", "first_paid"] },
+  { stage: "合同评审", states: ["contract_review"] },
+  { stage: "现场审核", states: ["expert_review_pending", "expert_reviewing", "delivery_prep", "doc_collecting"] },
+  { stage: "整改中", states: ["correcting"] },
+  { stage: "出证", states: ["final_pay_pending", "invoice_pending", "cert_pending", "certified"] },
+  { stage: "邮寄证书", states: ["shipment_pending"] },
+  { stage: "项目完成", states: ["completed"] },
+  { stage: "取消", states: ["cancelled"] },
+  { stage: "暂停", states: ["suspended"] },
+  { stage: "风险", states: ["at_risk"] },
+];
+
+// 根据当前状态，找出允许的业务阶段选项
+function getAllowedBusinessStages(currentStatus: string): Array<{ stage: string; states: string[] }> {
+  const allowedStates = new Set<string>((PROJECT_STATUS_TRANSITIONS as any)[currentStatus] || []);
+  // 找出当前状态对应的业务阶段
+  const currentStageIdx = BUSINESS_STAGES.findIndex((bs) => bs.states.includes(currentStatus));
+  return BUSINESS_STAGES
+    .filter((bs) => {
+      // 排除当前阶段自身
+      const currentStage = BUSINESS_STAGES[currentStageIdx];
+      if (currentStage && bs.stage === currentStage.stage) return false;
+      // 该业务阶段下是否有任何状态在 allowed 列表中
+      return bs.states.some((s) => allowedStates.has(s));
+    });
+}
+
 interface ProjectDetailPageProps {
   projectId: string;
   onBack: () => void;
@@ -510,10 +542,13 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
             <h3><MessageSquare size={18} /> 变更项目状态</h3>
             <p>当前状态：<strong>{PROJECT_STATUS_LABEL[project.status]}</strong></p>
             <select value={newStatus} onChange={(e) => setNewStatus(e.target.value as ProjectStatus)}>
-              <option value="">选择新状态（仅显示允许的流转）...</option>
-              {(PROJECT_STATUS_TRANSITIONS[project.status] || []).map((s) => (
-                <option key={s} value={s}>{PROJECT_STATUS_LABEL[s]}</option>
-              ))}
+              <option value="">选择新阶段（按业务漏斗顺序）...</option>
+              {(() => {
+                const stages = getAllowedBusinessStages(project.status);
+                return stages.map((bs) => (
+                  <option key={bs.stage} value={bs.states[0]}>{bs.stage}</option>
+                ));
+              })()}
             </select>
             <textarea placeholder="变更原因（必填）" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
             <div className="modal-actions">
