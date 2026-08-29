@@ -371,8 +371,11 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
                   <strong>{stage.label}</strong>
                   <span className="funnel-stage-count">{stageCount}</span>
                 </div>
-                <div className="funnel-bar" style={{ background: stage.color }}>
-                  <div className="funnel-fill" style={{ width: `${Math.max(pct, 2)}%` }}>
+                <div className="funnel-bar">
+                  <div className="funnel-fill" style={{ width: `${Math.max(pct, 5)}%`, background: stage.color }}>
+                    {stageCount > 0 && (
+                      <span className="funnel-fill-count">{stageCount}</span>
+                    )}
                   </div>
                 </div>
                 {i > 0 && (
