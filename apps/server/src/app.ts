@@ -17,6 +17,7 @@ import { extractDocumentText } from "./documents/document.service.js";
 import { ConsultationRepository } from "./consultations/consultation.repository.js";
 import { generateAuditPlan, generateChecklist, detectNonConformances, generateAuditReport } from "./auditor/auditor.service.js";
 import { autoGenerateAuditPlan, listTemplates as listAuditTemplates } from "./follow_up/autoAuditPlan.js";
+import { syncFollowUpToProject } from "./follow_up/syncFollowUpToProject.js";
 import { QuoteRepository } from "./certification/quote.repository.js";
 import { CustomerRepository } from "./customers/customer.repository.js";
 import { FinanceRepository } from "./finance/finance.repository.js";
@@ -3048,6 +3049,37 @@ export function createApp() {
       );
       if (!updated) throw new NotFoundError("跟进记录");
 
+      // 🎯 联动：跟进到关键阶段时自动创建/同步 certification_project
+      // 映射：quoted→lead, contract_review→contract_pending, implementing→contract_signed, certified→certified
+      let syncedProject = null;
+      const STAGE_TO_PROJECT_STATUS: Record<string, string> = {
+        quoted: "lead",
+        contract_review: "contract_pending",
+        implementing: "contract_signed",
+        certified: "certified",
+        completed: "completed"
+      };
+      if (STAGE_TO_PROJECT_STATUS[body.stage as string] && updated.customerId) {
+        try {
+          syncedProject = await syncFollowUpToProject({
+            companyId: u.companyId,
+            customerId: updated.customerId,
+            customerName: updated.customerName || "(未知客户)",
+            serviceTypeCode: updated.certificationType === "QES" || updated.certificationType === "QEs" ? "bundle"
+                            : updated.certificationType === "Q" ? "certification"
+                            : "certification",
+            targetStatus: STAGE_TO_PROJECT_STATUS[body.stage as string],
+            expectedAmount: updated.expectedAmount ? Number(updated.expectedAmount) : undefined,
+            contractAmount: updated.contractAmount ? Number(updated.contractAmount) : undefined,
+            notes: `从客户跟进自动创建（跟进 ID: ${request.params.id}, 阶段: ${body.stage}）`,
+            operatorId: u.id,
+            year: updated.year
+          });
+        } catch (e) {
+          console.warn("[sync-followup-project] failed (non-fatal):", e instanceof Error ? e.message : e);
+        }
+      }
+
       // 🎯 自动生成审核计划：当推进到"项目实施"阶段时
       let auditPlan = null;
       if ((body.stage as string) === "implementing") {
@@ -3084,7 +3116,7 @@ export function createApp() {
         }
       }
 
-      response.json({ data: updated, auditPlan });
+      response.json({ data: updated, auditPlan, syncedProject });
     } catch (error) { next(error); }
   });
 
