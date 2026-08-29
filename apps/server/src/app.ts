@@ -2266,6 +2266,23 @@ export function createApp() {
       const body = request.body as any;
       if (!body?.status) throw new ValidationError("状态必填");
       if (!body?.reason?.trim()) throw new ValidationError("变更原因必填");
+
+      // P0-B §9：取消时强制要求 cancel_reason（区别于普通 reason）
+      if (body.status === "cancelled" && !body?.cancelReason?.trim()) {
+        throw new ValidationError("取消项目必须填写取消原因（cancelReason）");
+      }
+
+      // P0-B §9：归档要求 archive_reason（区别于普通 reason）
+      if (body.status === "project_archived" && !body?.archiveReason?.trim()) {
+        throw new ValidationError("归档项目必须填写归档原因（archiveReason）");
+      }
+
+      // P0-B §9：拒绝 cancelled → 其他状态（防止"重新启动"）
+      const curProj = await projectRepo.getProject(u.companyId, request.params.id);
+      if (curProj && curProj.status === "cancelled" && body.status !== "cancelled") {
+        throw new ValidationError("已取消的项目不能重新启动");
+      }
+
       const p = await projectRepo.changeProjectStatus(
         u.companyId,
         request.params.id,
