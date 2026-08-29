@@ -467,6 +467,21 @@ export async function changeProjectStatus(
        JSON.stringify({ clientRequestId: clientRequestId || null })]
     );
 
+    // P0-B §11：每次状态变更写 audit_log（P0-D 权限系统接入前的基础审计）
+    await client.query(
+      `INSERT INTO audit_log
+        (company_id, user_id, action, resource_type, resource_id, method, path, request_body, response_status, created_at)
+       VALUES ($1, $2, $3, 'certification_project', $4, 'POST', $5, $6, 200, NOW())`,
+      [
+        companyId,
+        operatorId,
+        `status_change:${oldStatus}->${newStatus}`,
+        projectId,
+        `/api/projects/${projectId}/status`,
+        JSON.stringify({ from: oldStatus, to: newStatus, reason, clientRequestId })
+      ]
+    );
+
     const updated = await client.query(
       `SELECT * FROM certification_project WHERE id = $1`,
       [projectId]
