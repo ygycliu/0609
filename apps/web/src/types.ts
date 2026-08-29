@@ -157,7 +157,8 @@ export type ProjectStatus =
   | "delivery_prep" | "doc_collecting" | "contract_review" | "expert_review_pending"
   | "expert_reviewing" | "correcting" | "final_pay_pending" | "invoice_pending"
   | "cert_pending" | "certified" | "shipment_pending" | "completed"
-  | "suspended" | "at_risk" | "cancelled";
+  | "project_archived"  // P0-B 新增
+  | "paused" | "at_risk" | "cancelled";
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   lead: "线索", communicating: "沟通中", quoted: "已报价",
@@ -169,20 +170,21 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   correcting: "整改中", final_pay_pending: "待尾款",
   invoice_pending: "待开票", cert_pending: "待出证",
   certified: "已出证", shipment_pending: "待邮寄", completed: "已完成",
-  suspended: "暂停", at_risk: "风险/待处理", cancelled: "取消",
+  project_archived: "项目已归档",
+  paused: "暂停", at_risk: "风险/待处理", cancelled: "取消",
 };
 
 // 项目状态流转（与后端保持一致）
 export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
-  lead: ["communicating", "quoted", "contract_pending", "suspended", "cancelled"],
-  communicating: ["quoted", "lead", "suspended", "cancelled"],
+  lead: ["communicating", "quoted", "contract_pending", "paused", "cancelled"],
+  communicating: ["quoted", "lead", "paused", "cancelled"],
   quoted: ["contract_pending", "communicating", "lead", "cancelled"],
-  contract_pending: ["contract_signed", "quoted", "suspended", "cancelled"],
-  contract_signed: ["contract_archived", "suspended", "cancelled"],
-  contract_archived: ["first_pay_pending", "first_paid", "suspended", "cancelled"],
-  first_pay_pending: ["first_paid", "suspended", "cancelled"],
+  contract_pending: ["contract_signed", "quoted", "paused", "cancelled"],
+  contract_signed: ["contract_archived", "paused", "cancelled"],
+  contract_archived: ["first_pay_pending", "first_paid", "paused", "cancelled"],
+  first_pay_pending: ["first_paid", "paused", "cancelled"],
   first_paid: ["delivery_prep", "first_pay_pending", "doc_collecting", "contract_review", "expert_review_pending", "expert_reviewing"],
-  delivery_prep: ["doc_collecting", "suspended"],
+  delivery_prep: ["doc_collecting", "paused"],
   doc_collecting: ["contract_review", "expert_review_pending", "delivery_prep"],
   contract_review: ["expert_review_pending", "doc_collecting", "at_risk"],
   expert_review_pending: ["expert_reviewing", "doc_collecting", "at_risk"],
@@ -193,8 +195,9 @@ export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> 
   cert_pending: ["certified", "correcting"],
   certified: ["shipment_pending", "completed"],
   shipment_pending: ["completed", "certified"],
-  completed: ["suspended", "at_risk"],
-  suspended: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
+  completed: ["project_archived", "paused", "at_risk"],
+  project_archived: ["paused"],
+  paused: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
   at_risk: ["correcting", "contract_review", "expert_reviewing", "cancelled"],
   cancelled: [],
 };

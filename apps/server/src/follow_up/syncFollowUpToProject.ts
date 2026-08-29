@@ -40,15 +40,15 @@ export interface SyncedProject {
 
 // 状态机允许流转（与 project.repository.ts 同步）
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  lead: ["communicating", "quoted", "suspended", "cancelled"],
-  communicating: ["quoted", "lead", "suspended", "cancelled"],
+  lead: ["communicating", "quoted", "paused", "cancelled"],
+  communicating: ["quoted", "lead", "paused", "cancelled"],
   quoted: ["contract_pending", "communicating", "lead", "cancelled"],
-  contract_pending: ["contract_signed", "quoted", "suspended", "cancelled"],
-  contract_signed: ["contract_archived", "suspended", "cancelled"],
-  contract_archived: ["first_pay_pending", "first_paid", "suspended", "cancelled"],
-  first_pay_pending: ["first_paid", "suspended", "cancelled"],
+  contract_pending: ["contract_signed", "quoted", "paused", "cancelled"],
+  contract_signed: ["contract_archived", "paused", "cancelled"],
+  contract_archived: ["first_pay_pending", "first_paid", "paused", "cancelled"],
+  first_pay_pending: ["first_paid", "paused", "cancelled"],
   first_paid: ["delivery_prep", "first_pay_pending", "doc_collecting", "contract_review", "expert_review_pending", "expert_reviewing"],
-  delivery_prep: ["doc_collecting", "suspended"],
+  delivery_prep: ["doc_collecting", "paused"],
   doc_collecting: ["contract_review", "expert_review_pending", "delivery_prep"],
   contract_review: ["expert_review_pending", "doc_collecting", "at_risk"],
   expert_review_pending: ["expert_reviewing", "doc_collecting", "at_risk"],
@@ -59,8 +59,8 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   cert_pending: ["certified", "correcting"],
   certified: ["shipment_pending", "completed"],
   shipment_pending: ["completed", "certified"],
-  completed: ["suspended", "at_risk"],
-  suspended: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
+  completed: ["paused", "at_risk"],
+  paused: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
   at_risk: ["correcting", "contract_review", "expert_reviewing", "cancelled"],
   cancelled: []
 };

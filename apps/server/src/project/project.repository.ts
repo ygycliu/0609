@@ -25,7 +25,7 @@ export type ProjectStatus =
   | "quoted"            // 已报价
   | "contract_pending"  // 待签合同
   | "contract_signed"   // 合同已签
-  | "contract_archived" // 合同已归档
+  | "contract_archived" // 合同已归档（P0-B: 与 project_archived 区分）
   | "first_pay_pending" // 待首付款
   | "first_paid"        // 已收首付款
   | "delivery_prep"     // 交付准备
@@ -40,7 +40,8 @@ export type ProjectStatus =
   | "certified"         // 已出证
   | "shipment_pending"  // 待邮寄
   | "completed"         // 已完成
-  | "suspended"         // 暂停
+  | "project_archived"  // P0-B 新增：项目最终归档（与 contract_archived 区分）
+  | "paused"            // P0-B：替代 paused
   | "at_risk"           // 风险/待处理
   | "cancelled";        // 取消
 
@@ -65,22 +66,23 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   certified: "已出证",
   shipment_pending: "待邮寄",
   completed: "已完成",
-  suspended: "暂停",
+  project_archived: "项目已归档（P0-B 新增）",
+  paused: "暂停",
   at_risk: "风险/待处理",
   cancelled: "取消",
 };
 
 /** 状态流转定义：每个状态允许切换到的下一个状态 */
 export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
-  lead: ["communicating", "quoted", "contract_pending", "suspended", "cancelled"],
-  communicating: ["quoted", "lead", "suspended", "cancelled"],
+  lead: ["communicating", "quoted", "contract_pending", "paused", "cancelled"],
+  communicating: ["quoted", "lead", "paused", "cancelled"],
   quoted: ["contract_pending", "communicating", "lead", "cancelled"],
-  contract_pending: ["contract_signed", "quoted", "suspended", "cancelled"],
-  contract_signed: ["contract_archived", "suspended", "cancelled"],
-  contract_archived: ["first_pay_pending", "first_paid", "suspended", "cancelled"],
-  first_pay_pending: ["first_paid", "suspended", "cancelled"],
+  contract_pending: ["contract_signed", "quoted", "paused", "cancelled"],
+  contract_signed: ["contract_archived", "paused", "cancelled"],
+  contract_archived: ["first_pay_pending", "first_paid", "paused", "cancelled"],
+  first_pay_pending: ["first_paid", "paused", "cancelled"],
   first_paid: ["delivery_prep", "first_pay_pending", "doc_collecting", "contract_review", "expert_review_pending", "expert_reviewing"],
-  delivery_prep: ["doc_collecting", "suspended"],
+  delivery_prep: ["doc_collecting", "paused"],
   doc_collecting: ["contract_review", "expert_review_pending", "delivery_prep"],
   contract_review: ["expert_review_pending", "doc_collecting", "at_risk"],
   expert_review_pending: ["expert_reviewing", "doc_collecting", "at_risk"],
@@ -91,8 +93,9 @@ export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> 
   cert_pending: ["certified", "correcting"],
   certified: ["shipment_pending", "completed"],
   shipment_pending: ["completed", "certified"],
-  completed: ["suspended", "at_risk"],
-  suspended: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
+  completed: ["project_archived", "paused", "at_risk"],
+  project_archived: ["paused"],   // P0-B：项目最终归档后只能"暂停"（极少见）
+  paused: ["lead", "communicating", "quoted", "contract_pending", "cancelled"],
   at_risk: ["correcting", "contract_review", "expert_reviewing", "cancelled"],
   cancelled: [],
 };
@@ -432,7 +435,7 @@ export async function changeProjectStatus(
     await client.query(
       `UPDATE certification_project
        SET status = $3::varchar, prev_status = $4::varchar,
-           is_suspended = ($3 = 'suspended'),
+           is_suspended = ($3 = 'paused'),
            is_cancelled = ($3 = 'cancelled'),
            updated_at = NOW()
        WHERE id = $1 AND company_id = $2`,
