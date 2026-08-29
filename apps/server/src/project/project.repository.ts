@@ -72,7 +72,7 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
 
 /** 状态流转定义：每个状态允许切换到的下一个状态 */
 export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
-  lead: ["communicating", "quoted", "suspended", "cancelled"],
+  lead: ["communicating", "quoted", "contract_pending", "suspended", "cancelled"],
   communicating: ["quoted", "lead", "suspended", "cancelled"],
   quoted: ["contract_pending", "communicating", "lead", "cancelled"],
   contract_pending: ["contract_signed", "quoted", "suspended", "cancelled"],

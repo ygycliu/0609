@@ -46,6 +46,7 @@ interface FollowUpItem {
   id: string;
   customerId: string;
   customerName?: string;
+  projectId?: string;
   projectCode?: string;
   certificationType?: string;
   issuingBody?: string;
@@ -63,9 +64,10 @@ interface FollowUpItem {
 
 interface FollowUpPageProps {
   onOpenCustomer: (id: string) => void;
+  onOpenFinanceProject?: (id: string) => void;
 }
 
-export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
+export function FollowUpPage({ onOpenCustomer, onOpenFinanceProject }: FollowUpPageProps) {
   const [items, setItems] = useState<FollowUpItem[]>([]);
   const [total, setTotal] = useState(0);
   const [totalAll, setTotalAll] = useState(0);
@@ -347,6 +349,7 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                 <th>客户</th>
                 <th>认证类型</th>
                 <th>阶段</th>
+                <th>项目</th>
                 <th>预计完成</th>
                 <th>金额</th>
                 <th>更新</th>
@@ -387,6 +390,24 @@ export function FollowUpPage({ onOpenCustomer }: FollowUpPageProps) {
                       <span className={`status-pill ${STATUS_COLORS[stageInfo.color] || "status-default"}`}>
                         {stageInfo.label}
                       </span>
+                    </td>
+                    <td>
+                      {f.projectCode ? (
+                        <button
+                          className="project-link-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (f.customerId) onOpenCustomer(f.customerId);
+                          }}
+                          title="点击查看客户详情（含项目记录）"
+                        >
+                          📁 {f.projectCode}
+                        </button>
+                      ) : (
+                        <span className="project-pending-tag" title="推进到 contract_review 后自动创建">
+                          推进后自动创建
+                        </span>
+                      )}
                     </td>
                     <td className="mono">
                       {f.expectedDate

@@ -3050,12 +3050,15 @@ export function createApp() {
       if (!updated) throw new NotFoundError("跟进记录");
 
       // 🎯 联动：跟进到关键阶段时自动创建/同步 certification_project
-      // 映射：quoted→lead, contract_review→contract_pending, implementing→contract_signed, certified→certified
+      // 映射：quoted→lead, contract_review→contract_pending, implementing→contract_signed,
+      //      correcting→correcting, cert_pending→cert_pending, certified→certified, completed→completed
       let syncedProject = null;
       const STAGE_TO_PROJECT_STATUS: Record<string, string> = {
         quoted: "lead",
         contract_review: "contract_pending",
         implementing: "contract_signed",
+        correcting: "correcting",
+        cert_pending: "cert_pending",
         certified: "certified",
         completed: "completed"
       };

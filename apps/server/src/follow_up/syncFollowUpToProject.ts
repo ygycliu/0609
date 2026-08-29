@@ -120,6 +120,19 @@ export async function syncFollowUpToProject(
       let projectId: string;
       let projectCode: string;
       let action: "created" | "updated";
+      let followUpId: string | null = null;
+
+      // 查找该客户所有当年的 follow_up（可能有多个）
+      const followUpsRes = await client.query<{ id: string }>(
+        `SELECT id FROM customer_follow_up
+         WHERE company_id = $1 AND customer_id = $2
+           AND year = $3 AND deleted_at IS NULL`,
+        [companyId, customerId, yearPrefix]
+      );
+      const followUpIds = followUpsRes.rows.map((r) => r.id);
+      if (followUpIds.length > 0) {
+        followUpId = followUpIds[0];
+      }
 
       if (existingRes.rows.length === 0) {
         // 2a. 没有项目 → 创建
@@ -144,6 +157,35 @@ export async function syncFollowUpToProject(
             operatorId
           ]
         );
+
+        // 🔗 反向写回：把项目 ID 关联到该客户所有当年未关联的 follow_up
+        // 注意：customer_follow_up.project_id FK 指向 finance_project，不是 certification_project
+        // 所以这里只能更新到 finance_project（如果存在）
+        if (followUpIds.length > 0) {
+          try {
+            // 找该客户当年在 finance_project 的项目
+            const fpRes = await client.query<{ id: string }>(
+              `SELECT id FROM finance_project
+               WHERE company_id = $1 AND customer_id = $2
+                 AND EXTRACT(YEAR FROM created_at) = $3
+                 AND deleted_at IS NULL
+               ORDER BY created_at DESC LIMIT 1`,
+              [companyId, customerId, yearPrefix]
+            );
+            const financeProjectId = fpRes.rows[0]?.id;
+            if (financeProjectId) {
+              await client.query(
+                `UPDATE customer_follow_up
+                 SET project_id = $1, updated_at = NOW()
+                 WHERE id = ANY($2::uuid[]) AND project_id IS NULL`,
+                [financeProjectId, followUpIds]
+              );
+              logger.info(`[sync-followup-project] 关联 ${followUpIds.length} 条 follow_up 到 finance_project ${financeProjectId}`);
+            }
+          } catch (fkErr: any) {
+            logger.warn(`[sync-followup-project] follow_up 反向写回失败（非致命）: ${fkErr.message}`);
+          }
+        }
 
         // 写 project_event
         await client.query(
@@ -176,6 +218,31 @@ export async function syncFollowUpToProject(
              WHERE id = $1`,
             [projectId, targetStatus, currentStatus]
           );
+
+          // 🔗 反向写回：把项目 ID 关联到未关联的 follow_up（FK 指向 finance_project）
+          if (followUpIds.length > 0) {
+            try {
+              const fpRes = await client.query<{ id: string }>(
+                `SELECT id FROM finance_project
+                 WHERE company_id = $1 AND customer_id = $2
+                   AND EXTRACT(YEAR FROM created_at) = $3
+                   AND deleted_at IS NULL
+                 ORDER BY created_at DESC LIMIT 1`,
+                [companyId, customerId, yearPrefix]
+              );
+              const financeProjectId = fpRes.rows[0]?.id;
+              if (financeProjectId) {
+                await client.query(
+                  `UPDATE customer_follow_up
+                   SET project_id = $1, updated_at = NOW()
+                   WHERE id = ANY($2::uuid[]) AND project_id IS NULL`,
+                  [financeProjectId, followUpIds]
+                );
+              }
+            } catch (fkErr: any) {
+              logger.warn(`[sync-followup-project] follow_up 反向写回失败（非致命）: ${fkErr.message}`);
+            }
+          }
 
           // 写 project_event
           await client.query(
