@@ -2289,7 +2289,8 @@ export function createApp() {
         body.status,
         body.reason ?? null,
         u.id,
-        u.username ?? null
+        u.username ?? null,
+        body.clientRequestId  // P0-B §10：幂等键
       );
       response.json({ data: p });
     } catch (e) { next(e); }

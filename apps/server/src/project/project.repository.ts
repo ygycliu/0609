@@ -415,9 +415,26 @@ export async function changeProjectStatus(
   newStatus: ProjectStatus,
   reason: string | null,
   operatorId: string,
-  operatorName: string | null
+  operatorName: string | null,
+  clientRequestId?: string  // P0-B §10：幂等键（防止重复提交）
 ): Promise<CertificationProject> {
   return withTransaction(async (client) => {
+    // P0-B §10：重复提交保护（30 秒内同 request_id 直接拒绝）
+    // 注：content 列是 text，需要 LIKE 匹配（JSON.stringify 无空格）
+    if (clientRequestId) {
+      const dup = await client.query(
+        `SELECT id, created_at FROM project_event
+         WHERE company_id = $1 AND project_id = $2
+           AND content LIKE $3
+           AND created_at > NOW() - INTERVAL '30 seconds'
+         LIMIT 1`,
+        [companyId, projectId, `%"clientRequestId":"${clientRequestId}"%`]
+      );
+      if (dup.rows.length > 0) {
+        throw new Error(`重复请求：clientRequestId=${clientRequestId} 在 30 秒内已处理`);
+      }
+    }
+
     const cur = await client.query(
       `SELECT status FROM certification_project
        WHERE company_id = $1 AND id = $2 AND deleted_at IS NULL FOR UPDATE`,
@@ -444,9 +461,10 @@ export async function changeProjectStatus(
 
     await client.query(
       `INSERT INTO project_event
-       (company_id, project_id, from_status, to_status, reason, operator_id, operator_name)
-       VALUES ($1, $2, $3::varchar, $4::varchar, $5::text, $6, $7::varchar)`,
-      [companyId, projectId, oldStatus, newStatus, reason, operatorId, operatorName]
+       (company_id, project_id, from_status, to_status, reason, operator_id, operator_name, content)
+       VALUES ($1, $2, $3::varchar, $4::varchar, $5::text, $6, $7::varchar, $8)`,
+      [companyId, projectId, oldStatus, newStatus, reason, operatorId, operatorName,
+       JSON.stringify({ clientRequestId: clientRequestId || null })]
     );
 
     const updated = await client.query(
