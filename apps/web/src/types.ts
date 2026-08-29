@@ -181,7 +181,7 @@ export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> 
   contract_signed: ["contract_archived", "suspended", "cancelled"],
   contract_archived: ["first_pay_pending", "first_paid", "suspended", "cancelled"],
   first_pay_pending: ["first_paid", "suspended", "cancelled"],
-  first_paid: ["delivery_prep", "first_pay_pending"],
+  first_paid: ["delivery_prep", "first_pay_pending", "doc_collecting", "contract_review", "expert_review_pending", "expert_reviewing"],
   delivery_prep: ["doc_collecting", "suspended"],
   doc_collecting: ["contract_review", "expert_review_pending", "delivery_prep"],
   contract_review: ["expert_review_pending", "doc_collecting", "at_risk"],
