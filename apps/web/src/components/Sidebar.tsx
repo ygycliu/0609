@@ -31,6 +31,7 @@ type NavItem = {
   id: Page;
   label: string;
   icon: IconType;
+  color?: string; // V2.0 业务联动色（与员工卡片同色）
 };
 
 type NavGroup = {
@@ -62,13 +63,13 @@ const navigation: NavGroup[] = [
     label: "认证业务中心",
     icon: Award,
     items: [
-      { id: "project-workspace", label: "项目工作台", icon: Briefcase },
-      { id: "consult", label: "开始咨询", icon: MessageSquareText },
-      { id: "certification-quote", label: "认证报价", icon: Calculator },
-      { id: "auditor", label: "数字审核员", icon: ClipboardList },
-      { id: "follow-up", label: "客户跟进", icon: Activity },
-      { id: "todo", label: "待办事项", icon: CheckSquare },
-      { id: "finance-dashboard", label: "财务管理", icon: Banknote }
+      { id: "project-workspace", label: "项目工作台", icon: Briefcase, color: "#64748b" },
+      { id: "consult", label: "开始咨询", icon: MessageSquareText, color: "#3b82f6" },          // 培训讲师 蓝
+      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#f59e0b" },    // 报价员 橙
+      { id: "auditor", label: "数字审核员", icon: ClipboardList, color: "#10b981" },          // 数字审核员 绿
+      { id: "follow-up", label: "客户跟进", icon: Activity, color: "#ec4899" },                // 跟进（用认证专家粉）
+      { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" },                 // 跟进联动绿
+      { id: "finance-dashboard", label: "财务管理", icon: Banknote, color: "#64748b" }
     ]
   },
   {
@@ -239,16 +240,27 @@ export function Sidebar({
                     {group.items.map((item) => {
                       const ItemIcon = item.icon;
                       const isActive = page === item.id;
+                      const itemColor = item.color || "var(--green)";
                       return (
                         <button
                           key={item.id}
                           className={isActive ? "nav-item nav-subitem active" : "nav-item nav-subitem"}
+                          style={isActive ? {
+                            background: itemColor + '15',
+                            color: itemColor,
+                            borderLeftColor: itemColor,
+                          } : undefined}
                           onClick={() => {
                             onNavigate(item.id);
                             onClose();
                           }}
+                          title={item.label}
                         >
-                          <ItemIcon size={16} strokeWidth={1.8} />
+                          <ItemIcon
+                            size={16}
+                            strokeWidth={1.8}
+                            style={{ color: isActive ? itemColor : 'inherit' }}
+                          />
                           {item.label}
                         </button>
                       );
