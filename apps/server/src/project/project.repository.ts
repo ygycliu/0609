@@ -653,7 +653,24 @@ export async function getProjectTimeline(
     });
   }
 
-  // 操作日志
+  // 操作日志（翻译 action 为中文）
+  const ACTION_CN: Record<string, string> = {
+    create: '创建',
+    update: '更新',
+    delete: '删除',
+    archive: '归档',
+    restore: '恢复',
+    assign: '分配',
+    export: '导出',
+    import: '导入',
+    login: '登录',
+    logout: '登出',
+    send: '发送',
+    approve: '审批通过',
+    reject: '审批拒绝',
+    review: '审核',
+    audit: '审计'
+  };
   const logR = await query<any>(
     `SELECT * FROM project_log
      WHERE company_id = $1 AND project_id = $2 ORDER BY created_at DESC`,
@@ -663,7 +680,7 @@ export async function getProjectTimeline(
     events.push({
       at: r.created_at.toISOString(),
       type: "log",
-      action: r.action,
+      action: ACTION_CN[r.action] || r.action,  // P0-C 中文化：翻译操作动作
       note: r.detail,
       operatorName: r.operator_name,
     });
