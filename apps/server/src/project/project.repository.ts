@@ -9,6 +9,7 @@
  *         project_status_log
  */
 import { query, withTransaction } from "../db/pool.js";
+import { randomUUID } from "node:crypto";
 
 export async function queryOne<T = any>(
   sql: string,
@@ -459,12 +460,43 @@ export async function changeProjectStatus(
       [projectId, companyId, newStatus, oldStatus]
     );
 
+    // P0-C §3：aggregate_version 自增（每个项目的版本号）
+    const versionRes = await client.query(
+      `SELECT COALESCE(MAX(aggregate_version), 0) + 1 AS next_version
+       FROM project_event
+       WHERE company_id = $1 AND project_id = $2`,
+      [companyId, projectId]
+    );
+    const aggregateVersion = versionRes.rows[0].next_version;
+
+    // P0-C §3：事件信封（event_id, aggregate_version, trace_id, idempotency_key）
+    const eventId = randomUUID();
+    // trace_id 必须是 UUID，如果 clientRequestId 不是 UUID 则用新 UUID
+    let traceId: string;
+    try {
+      // 检查 clientRequestId 格式（36 字符 + 4 个 -）
+      if (clientRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientRequestId)) {
+        traceId = clientRequestId;
+      } else {
+        traceId = randomUUID();
+      }
+    } catch {
+      traceId = randomUUID();
+    }
+
     await client.query(
       `INSERT INTO project_event
-       (company_id, project_id, from_status, to_status, reason, operator_id, operator_name, content)
-       VALUES ($1, $2, $3::varchar, $4::varchar, $5::text, $6, $7::varchar, $8)`,
-      [companyId, projectId, oldStatus, newStatus, reason, operatorId, operatorName,
-       JSON.stringify({ clientRequestId: clientRequestId || null })]
+       (id, event_id, company_id, project_id, from_status, to_status,
+        reason, operator_id, operator_name, content,
+        aggregate_version, trace_id, idempotency_key)
+       VALUES ($1, $2, $3, $4, $5::varchar, $6::varchar, $7::text, $8, $9::varchar, $10,
+               $11, $12, $13)`,
+      [eventId, eventId, companyId, projectId, oldStatus, newStatus,
+       reason, operatorId, operatorName,
+       JSON.stringify({ clientRequestId: clientRequestId || null }),
+       aggregateVersion,
+       traceId,  // UUID 格式
+       clientRequestId ? `status_change:${oldStatus}->${newStatus}:${clientRequestId}` : null]
     );
 
     // P0-B §11：每次状态变更写 audit_log（P0-D 权限系统接入前的基础审计）
