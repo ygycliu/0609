@@ -2,8 +2,10 @@ import {
   ArrowRight,
   BookOpenText,
   Bot,
+  Calculator,
   CheckCircle2,
   Database,
+  Receipt,
   Route,
   ShieldCheck
 } from "lucide-react";
@@ -23,7 +25,24 @@ interface OverviewPageProps {
   onNavigate: (page: Page) => void;
 }
 
-const roleIcons = [Route, Bot, BookOpenText, Database];
+// 按员工 ID 映射专属图标
+const ROLE_ICONS: Record<string, any> = {
+  'auditor-digital': ShieldCheck,         // 数字审核员 - 盾牌 ✓
+  'quote-specialist': Calculator,         // 报价员 - 计算器 ✓
+  'trainer': BookOpenText,                // 培训讲师 - 书本 ✓
+  'knowledge-assistant': Database,         // 知识助手 - 数据库 ✓
+  'certification-expert': CheckCircle2,    // 认证专家 - 勾 ✓
+};
+
+// 按员工 ID 映射主题色
+const ROLE_COLORS: Record<string, string> = {
+  'auditor-digital': '#10b981',           // 绿（审核通过感）
+  'quote-specialist': '#f59e0b',          // 橙（价格感）
+  'trainer': '#3b82f6',                   // 蓝（学习感）
+  'knowledge-assistant': '#8b5cf6',       // 紫（智能感）
+  'certification-expert': '#ec4899',      // 粉（认证感）
+};
+const roleIcons = [Route, Bot, BookOpenText, Database, CheckCircle2];
 
 export function OverviewPage({
   employees,
@@ -91,13 +110,15 @@ export function OverviewPage({
         <div className="section-heading">
           <div>
             <span className="eyebrow">专业分工</span>
-            <h2>四名 AI 员工协同交付</h2>
+            <h2>AI 数字员工协同交付</h2>
           </div>
           <span className="section-note">选择角色后，系统自动匹配工作方法与输出结构</span>
         </div>
         <div className="employee-grid">
           {employees.map((employee, index) => {
-            const Icon = roleIcons[index] ?? Bot;
+            // 按 ID 取专属图标/颜色（fallback 到默认）
+            const Icon = ROLE_ICONS[employee.id] ?? roleIcons[index] ?? Bot;
+            const color = ROLE_COLORS[employee.id] ?? 'var(--green)';
             // 优先用 employee.navigateTo，否则跳咨询页
             const target = employee.navigateTo || "consult";
             return (
@@ -105,9 +126,10 @@ export function OverviewPage({
                 className="employee-item"
                 key={employee.id}
                 onClick={() => onNavigate(target as Page)}
+                style={{ '--employee-color': color } as any}
                 title={employee.title}
               >
-                <div className="employee-icon">
+                <div className="employee-icon" style={{ color, background: color + '20' }}>
                   <Icon size={20} />
                 </div>
                 <div>
