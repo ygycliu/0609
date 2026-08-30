@@ -1,6 +1,4 @@
 export type EmployeeRole =
-  | "auditor-digital"
-  | "quote-specialist"
   | "trainer"
   | "knowledge-assistant"
   | "certification-expert";

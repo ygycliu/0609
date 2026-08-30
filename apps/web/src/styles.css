@@ -8578,3 +8578,170 @@ textarea:focus {
   margin-left: auto;
   margin-right: auto;
 }
+
+
+/* V2.0 Dashboard 业务概览卡片 */
+.dashboard-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.dashboard-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.08);
+}
+
+.card-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.card-heading h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  flex: 1;
+}
+
+.card-link {
+  background: transparent;
+  border: 0;
+  color: #3b82f6;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 160ms ease;
+}
+.card-link:hover { background: rgba(59, 130, 246, 0.08); }
+
+.text-blue-500 { color: #3b82f6; }
+.text-orange-500 { color: #f59e0b; }
+.text-green-500 { color: #10b981; }
+.text-purple-500 { color: #8b5cf6; }
+.text-red-500 { color: #ef4444; }
+
+/* 项目进度 */
+.project-progress-list { display: grid; gap: 8px; }
+.progress-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 36px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+}
+.progress-label { color: #475569; text-transform: capitalize; }
+.progress-bar {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 360ms ease;
+  min-width: 5px;
+}
+.progress-count {
+  text-align: right;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* 待办 mini */
+.todo-mini-list { display: grid; gap: 8px; }
+.todo-mini-row {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 12px;
+  border-left: 3px solid #94a3b8;
+}
+.todo-priority { font-weight: 700; }
+.todo-priority.priority-urgent { color: #ef4444; }
+.todo-priority.priority-high { color: #f59e0b; }
+.todo-priority.priority-normal { color: #94a3b8; }
+.todo-title { color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 趋势柱状图 */
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 110px;
+  margin-bottom: 8px;
+}
+.trend-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+}
+.trend-bar {
+  width: 100%;
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 360ms ease;
+  min-height: 8px;
+}
+.trend-label { font-size: 11px; color: #94a3b8; }
+.trend-summary {
+  margin: 8px 0 0;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 最近项目 */
+.recent-projects { margin-top: 20px; }
+.recent-projects-list {
+  display: grid;
+  gap: 8px;
+}
+.recent-project-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 120px 100px;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 160ms ease;
+  font-size: 13px;
+}
+.recent-project-row:hover { background: rgba(59, 130, 246, 0.04); }
+.project-code {
+  font-family: 'SF Mono', monospace;
+  font-weight: 600;
+  color: #1e293b;
+}
+.project-name { color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-amount { color: #1e293b; font-weight: 600; text-align: right; }
+
+.muted { color: #94a3b8; }
+.muted.small { font-size: 12px; }

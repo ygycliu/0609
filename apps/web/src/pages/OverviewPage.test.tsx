@@ -34,6 +34,6 @@ describe("OverviewPage", () => {
 
     expect(screen.getByRole("heading", { name: "从业务问题到可实施方案" })).toBeInTheDocument();
     expect(screen.getByText("培训讲师")).toBeInTheDocument();
-    expect(screen.getByText("AI 专业角色")).toBeInTheDocument();
+    expect(screen.getByText("AI 咨询角色")).toBeInTheDocument();
   });
 });

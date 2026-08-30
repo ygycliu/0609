@@ -59,7 +59,7 @@ const upload = multer({
 });
 
 const consultationSchema = z.object({
-  role: z.enum(["auditor-digital", "quote-specialist", "trainer", "knowledge-assistant", "certification-expert"]),
+  role: z.enum(["trainer", "knowledge-assistant", "certification-expert"]),
   industry: z.string().trim().min(1, "请选择或填写行业"),
   companyContext: z.string().trim().max(5000).default(""),
   request: z.string().trim().min(10, "请至少输入 10 个字的需求描述").max(10000),

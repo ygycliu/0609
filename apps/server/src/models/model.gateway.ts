@@ -37,18 +37,6 @@ function demoResponse({ input, knowledge }: ModelRequest) {
     ? knowledge.map((item) => `《${item.title}》`).join("、")
     : "暂无直接匹配资料";
   const roleFocus: Record<typeof input.role, string[]> = {
-    "auditor-digital": [
-      "ISO 9001/14001/45001 条款级符合性判定",
-      "QES 资料审核与三角验证",
-      "不符合项识别（严重/一般/观察项）",
-      "审核材料生成（7 类）"
-    ],
-    "quote-specialist": [
-      "QES 三体系报价",
-      "1/2/3 体系组合报价",
-      "基础价 + 税费 + 经营管理费分解",
-      "外协/外审场景识别"
-    ],
     trainer: ["学习目标与对象分层", "课程结构与案例", "实训及效果评估"],
     "knowledge-assistant": ["问题拆解与结论", "知识依据与适用范围", "待核实事项"],
     "certification-expert": ["认证体系选型与适配", "多体系套报与组合优化", "审核准备与续约规划"]

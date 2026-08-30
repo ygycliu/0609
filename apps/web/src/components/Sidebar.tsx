@@ -70,8 +70,7 @@ const navigation: NavGroup[] = [
     icon: Award,
     items: [
       { id: "consult", label: "AI 咨询", icon: MessageSquareText, color: "#3b82f6" },           // 培训讲师 蓝
-      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#f59e0b" },     // 报价员 橙
-      { id: "auditor", label: "数字审核员", icon: ClipboardList, color: "#10b981" },            // 数字审核员 绿
+      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#ec4899" },     // 认证专家 粉
       { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" }                  // 跟进联动绿
     ]
   },

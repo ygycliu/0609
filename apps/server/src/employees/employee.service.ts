@@ -14,8 +14,6 @@
  */
 
 export type EmployeeRole =
-  | "auditor-digital"
-  | "quote-specialist"
   | "trainer"
   | "knowledge-assistant"
   | "certification-expert";
@@ -50,69 +48,7 @@ export interface EmployeeDefinition {
 }
 
 export const employees: EmployeeDefinition[] = [
-  {
-    id: "auditor-digital",
-    name: "数字审核员",
-    title: "QES 三体系现场审核 + 资料审核 + 材料生成",
-    description: "中认认证宁夏分公司数字审核员。基于 ISO 9001:2015/14001:2015/45001:2018 全文 + ISO 19011 审核指南 + 中认内部审核作业指导书 + 20+ 客户 QES 监督完整案例。具备 QMS 主任审核员资质。能力：资料审核 → 三角验证 → 不符合项识别 → 出具 7 类认证材料（合同/计划/检查表/不符合项报告/审核报告/整改跟踪/会议议程）。",
-    capabilities: [
-      "QES 现场审核",
-      "资料审核与三角验证",
-      "不符合项识别（严重/一般/观察项）",
-      "审核计划生成",
-      "现场检查表生成",
-      "不符合项报告生成",
-      "审核报告生成",
-      "首次/末次会议议程生成",
-      "整改跟踪与验证",
-      "ISO 9001/14001/45001 条款级判定",
-      "法律法规合规性评价"
-    ],
-    deliverables: [
-      "审核计划",
-      "首次会议议程",
-      "末次会议议程",
-      "现场检查表（覆盖 4-10 章）",
-      "不符合项报告",
-      "审核报告",
-      "整改跟踪表",
-      "认证合同"
-    ],
-    knowledgeCategories: [
-      "ISO标准审核要点",
-      "中认内部审核资料",
-      "QES案例研究"
-    ],
-    navigateTo: "auditor"
-  },
-  {
-    id: "quote-specialist",
-    name: "报价员",
-    title: "QES 三体系认证报价 + 客户需求匹配",
-    description: "基于 V2.0-MVP 公式（人日×500 + 体系×1100 + QES 280 + 补贴；税费/0.92；经营费×18%）自动计算 QES 三体系认证报价，输出含税最终客户报价。匹配认证标准、行业、规模，识别需求差异。",
-    capabilities: [
-      "QES 三体系报价",
-      "1/2/3 体系组合报价",
-      "基础价 + 税费 + 经营管理费分解",
-      "人日估算（基于员工数/行业）",
-      "外协/外审场景识别",
-      "客户需求匹配",
-      "认证体系选型建议"
-    ],
-    deliverables: [
-      "认证报价单",
-      "报价明细表",
-      "认证方案推荐",
-      "客户需求匹配报告",
-      "外协场景说明"
-    ],
-    knowledgeCategories: [
-      "认证报价规则",
-      "认证体系知识",
-      "客户档案"
-    ],
-    navigateTo: "certification-quote"
-  },
+  // V2.0 简化：只保留 3 个 AI 咨询角色
   {
     id: "trainer",
     name: "培训讲师",
@@ -164,7 +100,7 @@ export const employees: EmployeeDefinition[] = [
       "02-客户合同",
       "04-认证标准"
     ],
-    navigateTo: "certification-quote"  // V2.0：认证专家直达认证报价（认证方案 + 报价建议）
+    navigateTo: "certification-quote"  // 认证专家直达认证报价（认证方案 + 报价建议）
   }
 ];
 

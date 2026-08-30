@@ -193,9 +193,7 @@ function metadataTable(record: ConsultationRecord, branding: DocxBranding) {
 
 function roleName(role: ConsultationRecord["role"]) {
   return {
-    "auditor-digital": "数字审核员",
-    "quote-specialist": "报价员",
-    trainer: "培训讲师",
+    "trainer": "培训讲师",
     "knowledge-assistant": "知识助手",
     "certification-expert": "认证专家"
   }[role];
@@ -712,7 +710,7 @@ export async function generateConsultationDocx(
 export function enterpriseTemplateRecord(): ConsultationRecord {
   return {
     id: "enterprise-solution-template",
-    role: "quote-specialist",
+    role: "certification-expert",
     industry: "[所属行业]",
     companyContext: "[填写企业现状、已有系统、数据基础、组织能力及主要约束]",
     request: "[填写本项目需要解决的核心问题和建设目标]",

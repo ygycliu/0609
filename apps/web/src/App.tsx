@@ -64,21 +64,19 @@ export default function App() {
 
   useEffect(() => {
     if (!auth) return;  // 未登录不加载
-    Promise.all([
-      api.employees(),
-      api.models(),
-      api.knowledge(),
-      api.consultations()
-    ])
-      .then(([employeeData, modelData, knowledgeData, consultationData]) => {
-        setEmployees(employeeData);
-        setModels(modelData);
-        setKnowledge(knowledgeData);
-        setConsultations(consultationData);
-      })
-      .catch((caught) => {
-        setError(caught instanceof Error ? caught.message : "初始化失败");
-      });
+    // V2.0：每个调用独立处理（避免一个失败导致全部失败）
+    api.employees()
+      .then((employeeData) => setEmployees(employeeData))
+      .catch(() => setEmployees([]));
+    api.models()
+      .then((modelData) => setModels(modelData))
+      .catch(() => setModels([]));
+    api.knowledge()
+      .then((knowledgeData) => setKnowledge(knowledgeData))
+      .catch(() => setKnowledge([]));
+    api.consultations()
+      .then((consultationData) => setConsultations(consultationData))
+      .catch(() => setConsultations([]));
   }, [auth]);
 
   if (loading) {
