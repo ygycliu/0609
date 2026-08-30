@@ -204,6 +204,90 @@ export function createApp() {
     response.json({ status: "ok", service: "ai-digital-consulting-center" });
   });
 
+  // P0-C §9：全局一致性校验（每日）
+  // 扫描所有项目，检查事件一致性
+  // 可被 cron 调用（也可人工 GET 触发）
+  app.get("/api/admin/consistency/global", async (_request, response, next) => {
+    try {
+      const startTime = Date.now();
+      const issues: {
+        versionGaps: Array<{projectId: string; projectCode: string; expected: number; actual: number}>;
+        statusMismatches: Array<{projectId: string; projectCode: string; projectStatus: string; lastEventStatus: string}>;
+        auditLogMissing: any[];
+        totalProjects: number;
+        healthyProjects: number;
+      } = {
+        versionGaps: [],
+        statusMismatches: [],
+        auditLogMissing: [],
+        totalProjects: 0,
+        healthyProjects: 0
+      };
+
+      // 找出所有项目 + 最后事件
+      const projectsRes = await query(
+        `SELECT p.id, p.project_code, p.status, p.company_id
+         FROM certification_project p
+         WHERE p.deleted_at IS NULL`
+      );
+
+      for (const proj of projectsRes.rows) {
+        issues.totalProjects++;
+
+        // 检查事件连续性
+        const eventsRes = await query(
+          `SELECT aggregate_version, from_status, to_status
+           FROM project_event
+           WHERE project_id = $1 AND company_id = $2
+           ORDER BY aggregate_version ASC`,
+          [proj.id, proj.company_id]
+        );
+
+        let expectedVersion = 1;
+        let projectHealthy = true;
+        for (const evt of eventsRes.rows) {
+          if (evt.aggregate_version !== expectedVersion) {
+            issues.versionGaps.push({
+              projectId: proj.id,
+              projectCode: proj.project_code,
+              expected: expectedVersion,
+              actual: evt.aggregate_version
+            });
+            projectHealthy = false;
+          }
+          expectedVersion = evt.aggregate_version + 1;
+        }
+
+        // 检查状态一致性
+        if (eventsRes.rows.length > 0) {
+          const lastEvt = eventsRes.rows[eventsRes.rows.length - 1];
+          if (lastEvt.to_status !== proj.status) {
+            issues.statusMismatches.push({
+              projectId: proj.id,
+              projectCode: proj.project_code,
+              projectStatus: proj.status,
+              lastEventStatus: lastEvt.to_status
+            });
+            projectHealthy = false;
+          }
+        }
+
+        if (projectHealthy) issues.healthyProjects++;
+      }
+
+      const duration = Date.now() - startTime;
+
+      response.json({
+        data: {
+          ...issues,
+          durationMs: duration,
+          timestamp: new Date().toISOString(),
+          healthy: issues.versionGaps.length === 0 && issues.statusMismatches.length === 0
+        }
+      });
+    } catch (e) { next(e); }
+  });
+
   // 版本信息端点：只读查询，无需认证
   app.get("/api/version", (_request, response) => {
     response.json(getVersionInfo());
