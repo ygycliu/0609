@@ -8528,3 +8528,34 @@ textarea:focus {
 
 /* 项目最终归档（最深色）*/
 .stage-archived { background: #475569; color: #f8fafc; border-color: #334155; font-weight: 700; }
+
+
+/* V2.0 空状态卡片（友好提示） */
+.empty-state-card {
+  text-align: center;
+  padding: 60px 24px;
+  background: var(--surface, #fff);
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  margin: 24px 0;
+}
+.empty-state-card .empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+.empty-state-card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #334155;
+}
+.empty-state-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}

@@ -70,7 +70,15 @@ export function KnowledgeReviewPage({ currentUser }: KnowledgeReviewPageProps) {
       {loading && <p>加载中...</p>}
 
       {!loading && items.length === 0 && (
-        <p className="empty">暂无{filter === "pending" ? "待审核" : ""}内容</p>
+        <div className="empty-state-card">
+          <div className="empty-icon">📋</div>
+          <h3>暂无{filter === "pending" ? "待审核" : filter === "applied" ? "已应用" : filter === "rejected" ? "已拒绝" : ""}内容</h3>
+          <p>
+            {filter === "pending"
+              ? "目前没有用户提交纠正建议。可以去「知识中心」文档页选择「建议纠正」来提交审核。"
+              : "切换其他标签查看更多审核记录。"}
+          </p>
+        </div>
       )}
 
       <div className="review-list">
