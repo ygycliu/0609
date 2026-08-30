@@ -34,7 +34,7 @@ export function verifyTotp(secret: string, code: string): boolean {
 }
 
 /** 生成 otpauth:// URL（用于 QR 码） */
-export function generateOtpAuthUrl(email: string, secret: string, issuer = "AI 数字化咨询中心"): string {
+export function generateOtpAuthUrl(email: string, secret: string, issuer = "AI 数字化中心"): string {
   // 手写 otpauth URL（避免 otplib v13 generateURI 参数变化）
   const params = new URLSearchParams({
     secret,

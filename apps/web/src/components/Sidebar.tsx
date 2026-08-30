@@ -189,7 +189,7 @@ export function Sidebar({
           </div>
           <div>
             <strong>AI数字化</strong>
-            <span>咨询中心</span>
+            <span>中心</span>
           </div>
           <button className="sidebar-close" onClick={onClose} aria-label="关闭导航">
             <X size={18} />

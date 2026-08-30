@@ -7,7 +7,7 @@ await assertCurrentProductionRuntimeOwnership();
 await fs.mkdir(config.dataDir, { recursive: true });
 
 const server = createApp().listen(config.port, config.host, () => {
-  console.log(`AI 数字化咨询中心 API: http://${config.host}:${config.port}`);
+  console.log(`AI 数字化中心 API: http://${config.host}:${config.port}`);
 });
 
 function shutdown() {

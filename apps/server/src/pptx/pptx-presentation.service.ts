@@ -291,7 +291,7 @@ function addCover(
     fill: { color: theme.accent },
     line: { color: theme.accent }
   });
-  slide.addText("AI数字化咨询中心", {
+  slide.addText("AI数字化中心", {
     x: 0.62,
     y: 0.52,
     w: 4.8,

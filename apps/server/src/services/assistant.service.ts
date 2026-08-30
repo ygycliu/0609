@@ -306,7 +306,7 @@ API: POST /api/yoooclaw/auto-extract`,
 
 筛选：待办/进行中/已完成/全部`,
 
-          general: `**AI 数字化咨询中心** 是华中国际认证的数字化业务平台，主要功能：
+          general: `**AI 数字化中心** 是华中国际认证的数字化业务平台，主要功能：
 - 客户管理（518 客户库）
 - 项目工作台（从线索到出证 12 步闭环）
 - 财务收款/发票管理
@@ -354,7 +354,7 @@ export async function handleChat(
   req: ChatRequest,
   context: { companyId: string; userId: string; userName?: string }
 ): Promise<ChatResponse> {
-  const SYSTEM_PROMPT = `你是 AI 数字化咨询中心（华中认证宁夏分公司）的页面助手。
+  const SYSTEM_PROMPT = `你是 AI 数字化中心（华中认证宁夏分公司）的页面助手。
 
 **你的能力**：
 1. 讲解系统功能（任何问题 → 自然语言回答，简洁）

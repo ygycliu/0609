@@ -52,7 +52,7 @@ export function DocxExportDialog({ consultation }: DocxExportDialogProps) {
   const [form, setForm] = useState<ExportForm>(() => {
     const stored = storedOrganization();
     return {
-      companyName: stored.companyName ?? "本企业数字化咨询中心",
+      companyName: stored.companyName ?? "本企业AI数字化中心",
       clientName: stored.clientName ?? "客户单位",
       projectName: `${consultation.industry}数字化建设项目`,
       documentTitle: consultation.deliverable,
