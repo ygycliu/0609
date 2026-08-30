@@ -201,6 +201,30 @@ export function TodoPage() {
         </div>
       </header>
 
+      {/* 指标卡：V2.0 业务可视化 */}
+      <section className="metric-grid">
+        <div className="metric">
+          <span>待办总数</span>
+          <strong>{items.length}</strong>
+          <small>本次查询返回</small>
+        </div>
+        <div className="metric" style={{ borderLeft: '3px solid #f59e0b' }}>
+          <span>🔥 紧急</span>
+          <strong>{items.filter((t) => t.priority === "urgent").length}</strong>
+          <small>需立即处理</small>
+        </div>
+        <div className="metric" style={{ borderLeft: '3px solid #ef4444' }}>
+          <span>高优先级</span>
+          <strong>{items.filter((t) => t.priority === "high").length}</strong>
+          <small>今日处理</small>
+        </div>
+        <div className="metric" style={{ borderLeft: '3px solid #10b981' }}>
+          <span>已完成</span>
+          <strong>{items.filter((t) => t.status === "done").length}</strong>
+          <small>当前筛选</small>
+        </div>
+      </section>
+
       {/* 状态筛选 */}
       <section className="finance-toolbar">
         {[
