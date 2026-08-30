@@ -98,11 +98,14 @@ export function OverviewPage({
         <div className="employee-grid">
           {employees.map((employee, index) => {
             const Icon = roleIcons[index] ?? Bot;
+            // 优先用 employee.navigateTo，否则跳咨询页
+            const target = employee.navigateTo || "consult";
             return (
               <button
                 className="employee-item"
                 key={employee.id}
-                onClick={() => onNavigate("consult")}
+                onClick={() => onNavigate(target as Page)}
+                title={employee.title}
               >
                 <div className="employee-icon">
                   <Icon size={20} />

@@ -17,7 +17,7 @@ interface ConsultPageProps {
 }
 
 export function ConsultPage({ employees, models, onCreated }: ConsultPageProps) {
-  const [role, setRole] = useState<EmployeeRole>("consultant");
+  const [role, setRole] = useState<EmployeeRole>("trainer");
   const [industry, setIndustry] = useState("企业数字化");
   const [companyContext, setCompanyContext] = useState("");
   const [request, setRequest] = useState("");

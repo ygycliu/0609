@@ -7,12 +7,12 @@ import { sendMessage } from "./client.js";
 
 const EMPLOYEE_KEYWORDS: Record<string, string> = {
   // 飞书关键词 → AI 中心员工 ID
-  "咨询": "consultant",
-  "诊断": "consultant",
-  "规划": "consultant",
-  "方案": "solution-engineer",
-  "架构": "solution-engineer",
-  "实施": "solution-engineer",
+  "咨询": "trainer",         // V2.0：原 consultant 已合并到数字审核员
+  "诊断": "auditor-digital", // V2.0：审计 + 诊断
+  "规划": "certification-expert",
+  "方案": "quote-specialist",
+  "架构": "quote-specialist",
+  "实施": "quote-specialist",
   "培训": "trainer",
   "课程": "trainer",
   "学习": "trainer",

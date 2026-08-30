@@ -1078,7 +1078,7 @@ export async function generateConsultationPptx(
 export function presentationTemplateRecord(): ConsultationRecord {
   return {
     id: "digital-transformation-presentation-template",
-    role: "solution-engineer",
+    role: "quote-specialist",
     industry: "所属行业",
     companyContext:
       "请在此处替换为客户企业现状、已有系统、数据基础、组织能力和主要约束。",

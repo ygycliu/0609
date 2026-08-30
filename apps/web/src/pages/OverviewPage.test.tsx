@@ -9,12 +9,13 @@ describe("OverviewPage", () => {
       <OverviewPage
         employees={[
           {
-            id: "consultant",
-            name: "数字化咨询顾问",
-            title: "规划建设路径",
-            description: "诊断企业现状",
-            capabilities: ["数字化诊断"],
-            deliverables: ["咨询报告"]
+            id: "trainer",
+            name: "培训讲师",
+            title: "课程与案例生成",
+            description: "生成课程结构",
+            capabilities: ["课堂设计"],
+            deliverables: ["培训大纲"],
+            navigateTo: "consult"
           }
         ]}
         knowledge={[]}
@@ -32,7 +33,7 @@ describe("OverviewPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "从业务问题到可实施方案" })).toBeInTheDocument();
-    expect(screen.getByText("数字化咨询顾问")).toBeInTheDocument();
+    expect(screen.getByText("培训讲师")).toBeInTheDocument();
     expect(screen.getByText("AI 专业角色")).toBeInTheDocument();
   });
 });

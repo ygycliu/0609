@@ -37,8 +37,8 @@ export interface ReviewItem {
 }
 
 export type EmployeeRole =
-  | "consultant"
-  | "solution-engineer"
+  | "auditor-digital"
+  | "quote-specialist"
   | "trainer"
   | "knowledge-assistant"
   | "certification-expert";
@@ -52,6 +52,13 @@ export interface Employee {
   description: string;
   capabilities: string[];
   deliverables: string[];
+  /** 点击员工卡片跳转的页面 */
+  navigateTo?:
+    | "auditor"
+    | "certification-quote"
+    | "consult"
+    | "knowledge"
+    | "files";
 }
 
 export interface CertificationOption {

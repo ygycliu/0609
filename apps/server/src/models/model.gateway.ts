@@ -37,20 +37,24 @@ function demoResponse({ input, knowledge }: ModelRequest) {
     ? knowledge.map((item) => `《${item.title}》`).join("、")
     : "暂无直接匹配资料";
   const roleFocus: Record<typeof input.role, string[]> = {
-    consultant: ["业务与管理现状诊断", "高价值场景优先级", "三阶段建设路线"],
-    "solution-engineer": ["总体技术架构", "模块与接口边界", "实施计划与验收"],
-    trainer: ["学习目标与对象分层", "课程结构与案例", "实训及效果评估"],
-    "knowledge-assistant": ["问题拆解与结论", "知识依据与适用范围", "待核实事项"],
-    "certification-expert": ["认证体系选型与适配", "多体系套报与组合优化", "审核准备与续约规划"],
-    "certification-auditor": [
+    "auditor-digital": [
       "ISO 9001/14001/45001 条款级符合性判定",
       "QES 资料审核与三角验证",
       "不符合项识别（严重/一般/观察项）",
       "审核材料生成（7 类）"
-    ]
+    ],
+    "quote-specialist": [
+      "QES 三体系报价",
+      "1/2/3 体系组合报价",
+      "基础价 + 税费 + 经营管理费分解",
+      "外协/外审场景识别"
+    ],
+    trainer: ["学习目标与对象分层", "课程结构与案例", "实训及效果评估"],
+    "knowledge-assistant": ["问题拆解与结论", "知识依据与适用范围", "待核实事项"],
+    "certification-expert": ["认证体系选型与适配", "多体系套报与组合优化", "审核准备与续约规划"]
   };
 
-  return `# ${input.deliverable || employee.deliverables[0]}
+  return `# ${input.deliverable || (employee.deliverables?.[0] ?? "咨询建议")}
 
 ## 核心判断
 针对${input.industry || "当前行业"}场景，建议从可验证的业务问题出发建设能力闭环，而不是先堆叠平台功能。当前需求“${input.request}”应拆分为业务目标、数据条件、流程责任和技术支撑四部分。
