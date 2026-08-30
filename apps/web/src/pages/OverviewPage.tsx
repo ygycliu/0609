@@ -91,12 +91,14 @@ export function OverviewPage({
         <div className="category-grid">
           {[
             // 6 个核心入口，与员工卡片配色统一（V2.0 业务联动）
+            // 第一行：项目主链路（工作台 → 客户 → 认证）
+            { key: "project-workspace", label: "项目工作台", desc: "漏斗 + 待办", color: "#64748b", icon: "💼" },
             { key: "consult", label: "AI 咨询", desc: "三角色协同", color: "#3b82f6", icon: "💬", role: "trainer" },
             { key: "certification-quote", label: "认证报价", desc: "QES 三体系", color: "#ec4899", icon: "📋", role: "certification-expert" },
+            // 第二行：客户与知识
             { key: "customer-list", label: "客户管理", desc: "CRM 基础数据", color: "#ec4899", icon: "👥", role: "certification-expert" },
             { key: "files", label: "文件浏览", desc: "知识资产", color: "#8b5cf6", icon: "📁", role: "knowledge-assistant" },
-            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "#8b5cf6", icon: "📚", role: "knowledge-assistant" },
-            { key: "project-workspace", label: "项目工作台", desc: "漏斗 + 待办", color: "#64748b", icon: "💼" }
+            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "#8b5cf6", icon: "📚", role: "knowledge-assistant" }
           ].map((item) => (
             <button
               key={item.key}
