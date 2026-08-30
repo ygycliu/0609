@@ -6714,10 +6714,14 @@ textarea:focus {
 .status-certified { background: #d8b4fe; color: #6b21a8; }
 .status-completed { background: #86efac; color: #14532d; font-weight: 700; }
 .status-suspended { background: #fecaca; color: #991b1b; }
+.status-paused { background: #fecaca; color: #991b1b; }  /* V2.0：替代 suspended */
 .status-at_risk { background: #fed7aa; color: #9a3412; }
 .status-cancelled { background: #e2e8f0; color: #475569; text-decoration: line-through; }
 .status-final_pay_pending, .status-first_pay_pending, .status-invoice_pending { background: #fef3c7; color: #92400e; }
 .status-shipment_pending { background: #ddd6fe; color: #5b21b6; }
+.status-archived { background: #e2e8f0; color: #475569; }
+.status-contract_archived { background: #cbd5e1; color: #334155; font-weight: 600; }  /* V2.0：合同归档（浅灰）*/
+.status-project_archived { background: #475569; color: #f8fafc; font-weight: 700; }  /* V2.0：项目归档（深灰）*/
 
 .status-distribution {
   display: flex;
@@ -8493,3 +8497,34 @@ textarea:focus {
   padding-left: 8px;
   border-radius: 4px;
 }
+
+
+/* V2.0 业务阶段（10 阶段）颜色映射 */
+.stage-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+/* 业务阶段 1-10（V2.0 funnel）*/
+.stage-lead { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.stage-communicating { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+.stage-quoted { background: #ddd6fe; color: #5b21b6; border-color: #c4b5fd; }
+.stage-contract { background: #fed7aa; color: #9a3412; border-color: #fdba74; }
+.stage-contract-review { background: #a5f3fc; color: #155e75; border-color: #67e8f9; }
+.stage-auditing { background: #bae6fd; color: #0c4a6e; border-color: #7dd3fc; }
+.stage-correcting { background: #fde68a; color: #78350f; border-color: #facc15; }
+.stage-cert { background: #fbcfe8; color: #9d174d; border-color: #f472b6; }
+.stage-shipment { background: #d8b4fe; color: #6b21a8; border-color: #c084fc; }
+.stage-completed { background: #86efac; color: #14532d; border-color: #22c55e; font-weight: 700; }
+
+/* 异常状态（红色系）*/
+.stage-paused { background: #fecaca; color: #991b1b; border-color: #f87171; }
+.stage-at-risk { background: #fed7aa; color: #9a3412; border-color: #fb923c; }
+.stage-cancelled { background: #e2e8f0; color: #475569; border-color: #94a3b8; text-decoration: line-through; }
+
+/* 项目最终归档（最深色）*/
+.stage-archived { background: #475569; color: #f8fafc; border-color: #334155; font-weight: 700; }
