@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Database,
   FileSearch,
+  FileType,
   FolderOpen,
   Activity,
   History,
@@ -20,6 +21,7 @@ import {
   Moon,
   Sun,
   Users,
+  Wrench,
   X
 } from "lucide-react";
 import type { Page } from "../types";
@@ -43,64 +45,67 @@ type NavGroup = {
 };
 
 const navigation: NavGroup[] = [
+  // 工作台（一级 - 默认入口）
   {
     id: "overview",
-    label: "中心总览",
+    label: "工作台",
     icon: LayoutDashboard,
     page: "overview"
   },
+  // 客户与项目（业务主线）
   {
-    id: "base-data-group",
-    label: "基础数据管理",
-    icon: Database,
+    id: "customer-group",
+    label: "客户与项目",
+    icon: Users,
     items: [
-      { id: "base-data", label: "基础资料", icon: Database },
-      { id: "customer-list", label: "客户管理", icon: Users }
+      { id: "customer-list", label: "客户管理", icon: Users, color: "#ec4899" },
+      { id: "project-workspace", label: "项目工作台", icon: Briefcase, color: "#64748b" },
+      { id: "follow-up", label: "客户跟进", icon: Activity, color: "#ec4899" }
     ]
   },
+  // 认证业务（核心 AI 能力）
   {
     id: "biz-center",
-    label: "认证业务中心",
+    label: "认证业务",
     icon: Award,
     items: [
-      { id: "project-workspace", label: "项目工作台", icon: Briefcase, color: "#64748b" },
-      { id: "consult", label: "开始咨询", icon: MessageSquareText, color: "#3b82f6" },          // 培训讲师 蓝
-      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#f59e0b" },    // 报价员 橙
-      { id: "auditor", label: "数字审核员", icon: ClipboardList, color: "#10b981" },          // 数字审核员 绿
-      { id: "follow-up", label: "客户跟进", icon: Activity, color: "#ec4899" },                // 跟进（用认证专家粉）
-      { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" },                 // 跟进联动绿
-      { id: "finance-dashboard", label: "财务管理", icon: Banknote, color: "#64748b" }
+      { id: "consult", label: "AI 咨询", icon: MessageSquareText, color: "#3b82f6" },           // 培训讲师 蓝
+      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#f59e0b" },     // 报价员 橙
+      { id: "auditor", label: "数字审核员", icon: ClipboardList, color: "#10b981" },            // 数字审核员 绿
+      { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" }                  // 跟进联动绿
     ]
   },
+  // 财务
   {
-    id: "files",
-    label: "文件浏览",
-    icon: FolderOpen,
-    page: "files"
+    id: "finance-group",
+    label: "财务",
+    icon: Banknote,
+    items: [
+      { id: "finance-dashboard", label: "财务看板", icon: Banknote, color: "#64748b" }
+    ]
   },
+  // 知识资产
   {
     id: "knowledge-group",
     label: "知识中心",
     icon: BookOpen,
     items: [
-      { id: "knowledge", label: "知识中心", icon: BookOpen },
-      { id: "knowledge-review", label: "知识审核", icon: ClipboardCheck }
+      { id: "knowledge", label: "知识库", icon: BookOpen, color: "#8b5cf6" },
+      { id: "knowledge-review", label: "知识审核", icon: ClipboardCheck, color: "#8b5cf6" },
+      { id: "files", label: "文件浏览", icon: FolderOpen, color: "#8b5cf6" }
     ]
   },
-  {
-    id: "documents",
-    label: "文档分析",
-    icon: FileSearch,
-    page: "documents"
-  },
+  // 工具
   {
     id: "tools",
     label: "工具",
-    icon: FileSearch,
+    icon: Wrench,
     items: [
-      { id: "pdf-to-word", label: "PDF 转 Word", icon: FileSearch }
+      { id: "documents", label: "文档分析", icon: FileSearch, color: "#64748b" },
+      { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" }
     ]
   },
+  // 历史成果
   {
     id: "results",
     label: "历史成果",
