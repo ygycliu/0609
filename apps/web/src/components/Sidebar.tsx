@@ -103,7 +103,7 @@ const navigation: NavGroup[] = [
     items: [
       { id: "documents", label: "文档分析", icon: FileSearch, color: "#64748b" },
       { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" },
-      { id: "system-enum", label: "系统枚举值", icon: ListChecks, color: "#3b82f6" }
+      { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6" }
     ]
   },
   // 历史成果

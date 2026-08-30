@@ -606,7 +606,7 @@ export const api = {
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }
     ),
 
-  // ===== V2.0 系统枚举值（签约主体/外协/风险等级）=====
+  // ===== V2.0 系统基础数据（签约主体/外协/风险等级）=====
   listSigningEntities: () => request<any[]>("/system-enum/signing-entities"),
   createSigningEntity: (input: any) =>
     request<any>("/system-enum/signing-entities", {

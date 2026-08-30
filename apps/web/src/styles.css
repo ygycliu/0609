@@ -8747,7 +8747,7 @@ textarea:focus {
 .muted.small { font-size: 12px; }
 
 
-/* V2.0 系统枚举值管理页面 */
+/* V2.0 系统基础数据管理页面 */
 .enum-tabs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -8925,3 +8925,51 @@ textarea:focus {
 
 .muted { color: #94a3b8; }
 .muted.small { font-size: 11px; margin-top: 2px; }
+
+
+/* V2.0 项目列表分页切换按钮 */
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  padding: 2px 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.page-size-label {
+  font-size: 12px;
+  color: #64748b;
+  padding: 0 6px 0 4px;
+}
+
+.page-size-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+.page-size-btn:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #3b82f6;
+}
+.page-size-btn.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+/* 让 project-list-meta 横向排版 */
+.project-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

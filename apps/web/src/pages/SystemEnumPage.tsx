@@ -1,5 +1,5 @@
 /**
- * V2.0 系统枚举值管理页面
+ * V2.0 系统基础数据管理页面
  *
  * 三个 Tab：
  * 1. 签约主体（signing_entity）- A/B/C 主体
@@ -23,8 +23,8 @@ export function SystemEnumPage() {
       <header className="page-header">
         <div>
           <span className="eyebrow">工具 · 系统配置</span>
-          <h1>系统枚举值管理</h1>
-          <p>管理签约主体、外协认证单位、风险等级等业务枚举值。所有改动会立即影响新建项目。</p>
+          <h1>系统基础数据</h1>
+          <p>管理签约主体、外协认证单位、风险等级等业务基础数据。所有改动会立即影响新建项目。</p>
         </div>
       </header>
 
