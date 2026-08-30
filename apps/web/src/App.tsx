@@ -12,6 +12,7 @@ import { DocumentsPage } from "./pages/DocumentsPage";
 import { KnowledgePage } from "./pages/KnowledgePage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ResultsPage } from "./pages/ResultsPage";
+import { SystemEnumPage } from "./pages/SystemEnumPage";
 import { AuditorPage } from "./pages/AuditorPage";
 import { FilesPage } from "./pages/FilesPage";
 import { PdfToWordPage } from "./pages/PdfToWordPage";
@@ -160,6 +161,7 @@ export default function App() {
         {page === "auditor" && <AuditorPage />}
         {page === "files" && <FilesPage />}
         {page === "pdf-to-word" && <PdfToWordPage />}
+        {page === "system-enum" && <SystemEnumPage />}
         {page === "follow-up" && (
           <FollowUpPage
             onOpenCustomer={(id) => setPage(`customer-detail:${id}` as Page)}

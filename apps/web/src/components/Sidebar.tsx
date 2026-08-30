@@ -16,6 +16,7 @@ import {
   Activity,
   History,
   LayoutDashboard,
+  ListChecks,
   Menu,
   MessageSquareText,
   Moon,
@@ -101,7 +102,8 @@ const navigation: NavGroup[] = [
     icon: Wrench,
     items: [
       { id: "documents", label: "文档分析", icon: FileSearch, color: "#64748b" },
-      { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" }
+      { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" },
+      { id: "system-enum", label: "系统枚举值", icon: ListChecks, color: "#3b82f6" }
     ]
   },
   // 历史成果

@@ -5053,5 +5053,114 @@ export function createApp() {
     response.json({ data: ASSISTANT_TOOLS });
   });
 
+  // ============================================================
+  // V2.0 系统枚举值管理 API
+  // （签约主体 / 外协单位 / 风险等级）
+  // ============================================================
+
+  // 通用枚举值 CRUD
+  const enumCrud = (
+    path: string,
+    table: "signing_entity" | "partner_cert_unit" | "risk_level",
+    fields: string[],
+    codeField: string | null
+  ) => {
+    // 列表
+    app.get(`/api${path}`, async (request, response, next) => {
+      try {
+        const u = getUserFromReq(request);
+        const orderField = codeField ?? "created_at";
+        const result = await query<any>(
+          `SELECT * FROM ${table}
+           WHERE company_id = $1 AND deleted_at IS NULL
+           ORDER BY ${orderField}`,
+          [u.companyId]
+        );
+        response.json({ data: result.rows });
+      } catch (e) { next(e); }
+    });
+
+    // 创建
+    app.post(`/api${path}`, async (request, response, next) => {
+      try {
+        const u = getUserFromReq(request);
+        const body = request.body as any;
+        if (!body?.name && !body?.label) {
+          throw new ValidationError("name/label 必填");
+        }
+        // 字段顺序：[company_id, created_by, ...其他]
+        const insertFields = ["company_id", "created_by", ...fields.filter(f => f !== "company_id" && f !== "created_by")];
+        // 补充默认值：status 默认为 active
+        const values: any[] = insertFields.map((f) => {
+          if (f === "company_id") return u.companyId;
+          if (f === "created_by") return u.id;
+          if (f === "status" && body[f] === undefined) return "active";
+          if (f === "multiplier" && body[f] === undefined) return 1.0;
+          if (f === "sort_order" && body[f] === undefined) return 0;
+          return body[f];
+        });
+        const cols = insertFields.join(", ");
+        const placeholders = insertFields.map((_, i) => `$${i + 1}`).join(", ");
+        const sql = `INSERT INTO ${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
+        const result = await query<any>(sql, values);
+        response.json({ data: result.rows[0] });
+      } catch (e) { next(e); }
+    });
+
+    // 更新
+    app.put(`/api${path}/:id`, async (request, response, next) => {
+      try {
+        const u = getUserFromReq(request);
+        const body = request.body as any;
+        const updates: string[] = [];
+        const values: any[] = [];
+        let idx = 3;
+        for (const f of fields) {
+          if (f === "company_id" || f === "created_by") continue;
+          if (body[f] !== undefined) {
+            updates.push(`${f} = $${idx}`);
+            values.push(body[f]);
+            idx++;
+          }
+        }
+        if (updates.length === 0) throw new ValidationError("无字段更新");
+        const sql = `UPDATE ${table} SET ${updates.join(", ")}, updated_at = NOW()
+                     WHERE company_id = $1 AND id = $2 RETURNING *`;
+        const result = await query<any>(sql, [u.companyId, request.params.id, ...values]);
+        response.json({ data: result.rows[0] });
+      } catch (e) { next(e); }
+    });
+
+    // 删除（软删）
+    app.delete(`/api${path}/:id`, async (request, response, next) => {
+      try {
+        const u = getUserFromReq(request);
+        await query(
+          `UPDATE ${table} SET deleted_at = NOW() WHERE company_id = $1 AND id = $2`,
+          [u.companyId, request.params.id]
+        );
+        response.json({ data: { id: request.params.id, deleted: true } });
+      } catch (e) { next(e); }
+    });
+  };
+
+  // 签约主体（signing_entity）：code/short_name/contact_person/...
+  enumCrud("/system-enum/signing-entities", "signing_entity", [
+    "company_id", "entity_code", "name", "short_name",
+    "contact_person", "contact_phone", "address", "status", "notes", "created_by"
+  ], "entity_code");
+
+  // 外协单位（partner_cert_unit）
+  enumCrud("/system-enum/partners", "partner_cert_unit", [
+    "company_id", "name", "contact_name", "contact_phone",
+    "address", "status", "remark", "created_by"
+  ], null);
+
+  // 风险等级（risk_level）
+  enumCrud("/system-enum/risk-levels", "risk_level", [
+    "company_id", "code", "label", "description",
+    "auditor_level", "multiplier", "sort_order", "status", "created_by"
+  ], "sort_order");
+
   return app;
 }

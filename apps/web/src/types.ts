@@ -17,7 +17,8 @@ export type Page =
   | "project-workspace"
   | "project-detail"
   | "project-new"
-  | "base-data";
+  | "base-data"
+  | "system-enum";
 
 export interface ReviewItem {
   id: string;

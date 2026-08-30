@@ -1,0 +1,2 @@
+-- Migration 022 ROLLBACK
+DROP TABLE IF EXISTS risk_level CASCADE;

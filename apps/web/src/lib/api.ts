@@ -605,6 +605,43 @@ export const api = {
       `/quality/reviews/${id}/decision`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }
     ),
+
+  // ===== V2.0 系统枚举值（签约主体/外协/风险等级）=====
+  listSigningEntities: () => request<any[]>("/system-enum/signing-entities"),
+  createSigningEntity: (input: any) =>
+    request<any>("/system-enum/signing-entities", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateSigningEntity: (id: string, input: any) =>
+    request<any>(`/system-enum/signing-entities/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deleteSigningEntity: (id: string) =>
+    request<any>(`/system-enum/signing-entities/${id}`, { method: "DELETE" }),
+
+  listPartners: () => request<any[]>("/system-enum/partners"),
+  createPartner: (input: any) =>
+    request<any>("/system-enum/partners", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updatePartner: (id: string, input: any) =>
+    request<any>(`/system-enum/partners/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deletePartner: (id: string) =>
+    request<any>(`/system-enum/partners/${id}`, { method: "DELETE" }),
+
+  listRiskLevels: () => request<any[]>("/system-enum/risk-levels"),
+  createRiskLevel: (input: any) =>
+    request<any>("/system-enum/risk-levels", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateRiskLevel: (id: string, input: any) =>
+    request<any>(`/system-enum/risk-levels/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  deleteRiskLevel: (id: string) =>
+    request<any>(`/system-enum/risk-levels/${id}`, { method: "DELETE" }),
   knowledgeVersions: (docCode: string) =>
     request<Array<{ id: string; version: number; change_summary: string; creator: string | null; created_at: string }>>(
       `/knowledge/${docCode}/versions`
