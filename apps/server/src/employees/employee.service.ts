@@ -164,7 +164,7 @@ export const employees: EmployeeDefinition[] = [
       "02-客户合同",
       "04-认证标准"
     ],
-    navigateTo: "consult"
+    navigateTo: "certification-quote"  // V2.0：认证专家直达认证报价（认证方案 + 报价建议）
   }
 ];
 

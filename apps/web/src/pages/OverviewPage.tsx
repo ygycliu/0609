@@ -63,20 +63,27 @@ export function OverviewPage({
         </div>
         <div className="category-grid">
           {[
-            { key: "consult", label: "开始咨询", desc: "AI 多角色协同", color: "yellow", icon: "💬" },
-            { key: "certification-quote", label: "认证报价", desc: "QES 三体系", color: "purple", icon: "📋" },
-            { key: "auditor", label: "数字审核员", desc: "智能模拟外审", color: "pink", icon: "✓" },
-            { key: "customer-list", label: "客户管理", desc: "CRM 基础数据", color: "green", icon: "👥" },
-            { key: "files", label: "文件浏览", desc: "知识资产", color: "cyan", icon: "📁" },
-            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "blue", icon: "📚" }
+            // 6 个核心入口，与员工卡片配色统一（V2.0 业务联动）
+            { key: "consult", label: "开始咨询", desc: "AI 多角色协同", color: "#3b82f6", icon: "💬", role: "trainer" },
+            { key: "certification-quote", label: "认证报价", desc: "QES 三体系", color: "#f59e0b", icon: "📋", role: "quote-specialist" },
+            { key: "auditor", label: "数字审核员", desc: "智能模拟外审", color: "#10b981", icon: "✓", role: "auditor-digital" },
+            { key: "customer-list", label: "客户管理", desc: "CRM 基础数据", color: "#ec4899", icon: "👥", role: "certification-expert" },
+            { key: "files", label: "文件浏览", desc: "知识资产", color: "#8b5cf6", icon: "📁", role: "knowledge-assistant" },
+            { key: "knowledge", label: "知识中心", desc: "标准与法规", color: "#8b5cf6", icon: "📚", role: "knowledge-assistant" }
           ].map((item) => (
             <button
               key={item.key}
-              className={`category-card cat-${item.color}`}
+              className={`category-card`}
+              style={{
+                '--cat-color': item.color,
+                '--cat-bg': item.color + '12'
+              } as any}
               onClick={() => onNavigate(item.key as Page)}
             >
-              <span className="cat-icon">{item.icon}</span>
-              <strong>{item.label}</strong>
+              <span className="cat-icon" style={{ background: item.color + '20', color: item.color }}>
+                {item.icon}
+              </span>
+              <strong style={{ color: item.color }}>{item.label}</strong>
               <small>{item.desc}</small>
             </button>
           ))}
