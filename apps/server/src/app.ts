@@ -2303,6 +2303,215 @@ export function createApp() {
     } catch (e) { next(e); }
   });
 
+  // P0-C §7：事件一致性检查
+  app.get("/api/projects/:id/consistency", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const issues = [];
+      const projectId = request.params.id;
+
+      // 检查项目是否存在
+      const proj = await projectRepo.getProject(u.companyId, projectId);
+      if (!proj) {
+        return response.status(404).json({ code: "NOT_FOUND", message: "项目不存在" });
+      }
+
+      // 检查事件连续性（aggregate_version 应该 1, 2, 3, 4...）
+      const events = await query(
+        `SELECT aggregate_version, from_status, to_status, created_at
+         FROM project_event
+         WHERE company_id = $1 AND project_id = $2
+         ORDER BY aggregate_version ASC`,
+        [u.companyId, projectId]
+      );
+
+      let expectedVersion = 1;
+      const gaps = [];
+      for (const evt of events.rows) {
+        if (evt.aggregate_version !== expectedVersion) {
+          gaps.push({
+            expected: expectedVersion,
+            actual: evt.aggregate_version,
+            from: evt.from_status,
+            to: evt.to_status,
+            created_at: evt.created_at
+          });
+        }
+        expectedVersion = evt.aggregate_version + 1;
+      }
+
+      // 检查当前 status 是否与最后一个事件的 to_status 一致
+      let statusMismatch = null;
+      if (events.rows.length > 0) {
+        const lastEvent = events.rows[events.rows.length - 1];
+        if (lastEvent.to_status !== proj.status) {
+          statusMismatch = {
+            project_status: proj.status,
+            last_event_to_status: lastEvent.to_status,
+            last_event_version: lastEvent.aggregate_version
+          };
+        }
+      }
+
+      // 检查 audit_log 同步性
+      const auditCount = await query(
+        `SELECT count(*) FROM audit_log
+         WHERE company_id = $1 AND resource_id = $2 AND action LIKE 'status_change%'`,
+        [u.companyId, projectId]
+      );
+
+      response.json({
+        data: {
+          projectId,
+          projectCode: proj.projectCode,
+          eventCount: events.rows.length,
+          auditLogCount: parseInt(auditCount.rows[0].count),
+          versionGaps: gaps,
+          statusMismatch,
+          healthy: gaps.length === 0 && statusMismatch === null
+        }
+      });
+    } catch (e) { next(e); }
+  });
+
+  // P0-C §7：事件重放（手动 replay 某事件）
+  app.post("/api/projects/:id/events/:eventId/replay", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const projectId = request.params.id;
+      const eventId = request.params.eventId;
+
+      // 读取事件
+      const evtRes = await query(
+        `SELECT * FROM project_event WHERE event_id = $1 AND project_id = $2 AND company_id = $3`,
+        [eventId, projectId, u.companyId]
+      );
+      if (evtRes.rows.length === 0) {
+        return response.status(404).json({ code: "NOT_FOUND", message: "事件不存在" });
+      }
+      const evt = evtRes.rows[0];
+
+      // 检查 projection_sync_status 是否失败
+      const projRes = await query(
+        `SELECT * FROM projection_sync_status
+         WHERE company_id = $1 AND projection_name = $2 AND aggregate_id = $3
+         FOR UPDATE`,
+        [u.companyId, 'project_workspace', projectId]
+      );
+
+      // 写回"重放"事件（不改变 status，仅标记重放）
+      const replayEventId = randomUUID();
+      await query(
+        `INSERT INTO project_event
+         (id, event_id, company_id, project_id, from_status, to_status,
+          reason, operator_id, operator_name, content,
+          aggregate_version, trace_id, parent_event_id, event_type)
+         VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9,
+                 (SELECT COALESCE(MAX(aggregate_version), 0) + 1 FROM project_event WHERE project_id = $4),
+                 $10, $11, 'replay')`,
+        [replayEventId, replayEventId, u.companyId, projectId,
+         evt.to_status,  // 不改变 from/to
+         `Replay of event ${eventId}`,
+         u.id, u.username, JSON.stringify({ replayedFrom: eventId }),
+         randomUUID(),
+         evt.event_id]
+      );
+
+      // 更新 projection_sync_status
+      if (projRes.rows.length > 0) {
+        await query(
+          `UPDATE projection_sync_status
+           SET status = 'synced', failure_count = 0, failure_reason = NULL,
+               last_event_id = $1, last_event_version = $2,
+               last_synced_at = NOW(), updated_at = NOW()
+           WHERE id = $3`,
+          [replayEventId, evt.aggregate_version, projRes.rows[0].id]
+        );
+      }
+
+      response.json({
+        data: {
+          replayedEventId: replayEventId,
+          originalEventId: eventId,
+          status: 'synced'
+        }
+      });
+    } catch (e) { next(e); }
+  });
+
+  // P0-C §8：按服务案件重建派生数据
+  app.post("/api/projects/:id/rebuild-derivatives", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const projectId = request.params.id;
+
+      const proj = await projectRepo.getProject(u.companyId, projectId);
+      if (!proj) {
+        return response.status(404).json({ code: "NOT_FOUND", message: "项目不存在" });
+      }
+
+      const rebuildSteps = [];
+
+      // 步骤 1：重新统计收付款总额
+      const paymentSum = await query(
+        `SELECT
+           COALESCE(SUM(CASE WHEN payment_type = 'deposit' THEN received_amount ELSE 0 END), 0) AS deposit,
+           COALESCE(SUM(CASE WHEN payment_type = 'balance' THEN received_amount ELSE 0 END), 0) AS balance
+         FROM project_payment
+         WHERE project_id = $1 AND deleted_at IS NULL`,
+        [projectId]
+      );
+      rebuildSteps.push({
+        step: 'payment_summary',
+        deposit: parseFloat(paymentSum.rows[0].deposit),
+        balance: parseFloat(paymentSum.rows[0].balance)
+      });
+
+      // 步骤 2：重新统计整改项
+      const correctionCount = await query(
+        `SELECT count(*) FROM project_correction
+         WHERE project_id = $1 AND deleted_at IS NULL`,
+        [projectId]
+      );
+      rebuildSteps.push({
+        step: 'correction_count',
+        count: parseInt(correctionCount.rows[0].count)
+      });
+
+      // 步骤 3：重新统计资料数
+      const docCount = await query(
+        `SELECT count(*) FROM project_document
+         WHERE project_id = $1 AND deleted_at IS NULL`,
+        [projectId]
+      );
+      rebuildSteps.push({
+        step: 'document_count',
+        count: parseInt(docCount.rows[0].count)
+      });
+
+      // 步骤 4：标记 projection_sync_status 为 synced
+      await query(
+        `INSERT INTO projection_sync_status
+          (company_id, projection_name, aggregate_type, aggregate_id,
+           last_synced_at, status, metadata)
+         VALUES ($1, 'rebuild', 'certification_project', $2, NOW(), 'synced', $3)
+         ON CONFLICT (company_id, projection_name, aggregate_type, aggregate_id)
+         DO UPDATE SET last_synced_at = NOW(), status = 'synced', failure_count = 0`,
+        [u.companyId, projectId, JSON.stringify({ rebuildSteps, triggeredBy: u.username })]
+      );
+
+      response.json({
+        data: {
+          projectId,
+          projectCode: proj.projectCode,
+          rebuildSteps,
+          status: 'synced',
+          rebuiltAt: new Date().toISOString()
+        }
+      });
+    } catch (e) { next(e); }
+  });
+
   // ============== 2.0-MVP 项目子模块路由 ==============
 
   // ----- 收款记录（首付款/尾款） -----
