@@ -1,4 +1,4 @@
-import { BookOpen, FileUp, History, LoaderCircle, Search, Trash2, X } from "lucide-react";
+import { BookOpen, Eye, FileUp, History, LoaderCircle, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import type { KnowledgeItem } from "../types";
@@ -32,6 +32,12 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
   const [error, setError] = useState("");
   const [versionsDoc, setVersionsDoc] = useState<{ id: string; title: string } | null>(null);
   const [versions, setVersions] = useState<Array<{ version: number; change_summary: string; creator: string | null; created_at: string }>>([]);
+  // V2.0：预览状态
+  const [previewDoc, setPreviewDoc] = useState<KnowledgeItem | null>(null);
+
+  function previewItem(item: KnowledgeItem) {
+    setPreviewDoc(item);
+  }
 
   async function showVersions(item: KnowledgeItem) {
     setVersionsDoc({ id: item.id, title: item.title });
@@ -176,7 +182,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
                   <div className="knowledge-main">
                     <div className="knowledge-heading">
                       <h3>{item.title}</h3>
-                      <span>{item.fileType.toUpperCase()}</span>
+                      <span>{item.fileType ? item.fileType.toUpperCase() : "TXT"}</span>
                     </div>
                     <p>{item.content.slice(0, 130)}{item.content.length > 130 ? "..." : ""}</p>
                     <div className="knowledge-meta">
@@ -193,6 +199,14 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
                       title="查看版本历史"
                     >
                       <History size={17} />
+                    </button>
+                    <button
+                      className="ghost-icon"
+                      onClick={() => previewItem(item)}
+                      aria-label={`预览 ${item.title}`}
+                      title="预览内容"
+                    >
+                      <Eye size={17} />
                     </button>
                     <button
                       className="danger-icon"
@@ -240,6 +254,45 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
                 </ol>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* V2.0：预览弹窗 */}
+      {previewDoc && (
+        <div className="modal-scrim" onClick={() => setPreviewDoc(null)}>
+          <div className="modal preview-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <div>
+                <h3>{previewDoc.title}</h3>
+                <div className="preview-meta">
+                  <span className={`status-pill status-${previewDoc.fileType ? "completed" : "cancelled"}`}>
+                    {previewDoc.fileType ? previewDoc.fileType.toUpperCase() : "TXT"}
+                  </span>
+                  <span className="muted small">{previewDoc.category}</span>
+                  {previewDoc.tags.map((tag) => (
+                    <span key={tag} className="muted small">#{tag}</span>
+                  ))}
+                </div>
+              </div>
+              <button className="ghost-icon" onClick={() => setPreviewDoc(null)} title="关闭">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="modal-body preview-body">
+              <pre>{previewDoc.content}</pre>
+            </div>
+            <footer className="modal-footer">
+              <span className="muted small">
+                共 {previewDoc.content.length} 字符 · 创建于 {new Date(previewDoc.createdAt).toLocaleString("zh-CN")}
+              </span>
+              <button className="primary-button small" onClick={() => {
+                navigator.clipboard.writeText(previewDoc.content);
+                alert("已复制到剪贴板");
+              }}>
+                复制内容
+              </button>
+            </footer>
           </div>
         </div>
       )}

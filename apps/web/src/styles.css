@@ -8973,3 +8973,62 @@ textarea:focus {
   gap: 12px;
   flex-wrap: wrap;
 }
+
+
+/* V2.0 知识预览弹窗 */
+.preview-modal {
+  width: min(900px, 95vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.preview-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0 !important;
+}
+
+.preview-body pre {
+  margin: 0;
+  padding: 20px 24px;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f8fafc;
+  min-height: 100%;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+}
+
+.modal-footer .muted {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.primary-button.small {
+  padding: 6px 14px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
