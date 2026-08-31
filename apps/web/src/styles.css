@@ -1223,10 +1223,11 @@ select:focus-visible {
 
 .knowledge-row {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 34px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   gap: 12px;
   padding: 18px 20px;
   border-bottom: 1px solid #e8ecea;
+  align-items: center;
 }
 
 .knowledge-row:last-child {
@@ -2676,7 +2677,7 @@ select:focus-visible {
 .btn-approve:hover:not(:disabled) { background: #059669; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.knowledge-actions { display: flex; gap: 4px; }
+.knowledge-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
 .ghost-icon {
   background: transparent;
   border: 1px solid transparent;

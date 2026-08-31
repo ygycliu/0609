@@ -129,7 +129,7 @@ export interface KnowledgeItem {
   sourceName: string;
   fileType: string;
   createdAt: string;
-  tags: string[];
+  tags?: string[];  // V2.0：可选，后端偶发返回 undefined
 }
 
 export interface ConsultationRecord {

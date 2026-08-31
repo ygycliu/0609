@@ -1,4 +1,4 @@
-import { BookOpen, Eye, FileUp, History, LoaderCircle, Search, Trash2, X } from "lucide-react";
+import { BookOpen, Eye, FileUp, History, LoaderCircle, Search, Trash2, X, AlertCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import type { KnowledgeItem } from "../types";
@@ -37,6 +37,14 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
   const [versionsDoc, setVersionsDoc] = useState<{ id: string; title: string } | null>(null);
   const [versions, setVersions] = useState<Array<{ version: number; change_summary: string; creator: string | null; created_at: string }>>([]);
   // V2.0：预览状态
+  // 纠错弹窗状态
+  const [correctingItem, setCorrectingItem] = useState<KnowledgeItem | null>(null);
+  const [correctContent, setCorrectContent] = useState("");
+  const [correctComment, setCorrectComment] = useState("");
+  const [correcting, setCorrecting] = useState(false);
+  const [correctError, setCorrectError] = useState("");
+
+  // 预览状态
   const [previewDoc, setPreviewDoc] = useState<KnowledgeItem | null>(null);
   // V2.0：本地 loading 状态（prop 为空时自己 fetch）
   const [localKnowledge, setLocalKnowledge] = useState<KnowledgeItem[] | null>(null);
@@ -91,7 +99,7 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
   const filtered = useMemo(() => {
     const normalized = query.toLowerCase();
     return effectiveKnowledge.filter((item) =>
-      `${item.title} ${item.category} ${item.tags.join(" ")}`
+      `${item.title} ${item.category} ${(item.tags || []).join(" ")}`
         .toLowerCase()
         .includes(normalized)
     );
@@ -224,7 +232,7 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
                     <div className="knowledge-meta">
                       <span>{item.category}</span>
                       <span>{new Date(item.createdAt).toLocaleDateString("zh-CN")}</span>
-                      {item.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+                      {(item.tags || []).map((tag) => <span key={tag}>#{tag}</span>)}
                     </div>
                   </div>
                   <div className="knowledge-actions">
@@ -243,6 +251,19 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
                       title="预览内容"
                     >
                       <Eye size={17} />
+                    </button>
+                    <button
+                      className="ghost-icon"
+                      onClick={() => {
+                        setCorrectingItem(item);
+                        setCorrectContent(item.content);
+                        setCorrectComment("");
+                        setCorrectError("");
+                      }}
+                      aria-label={`纠错 ${item.title}`}
+                      title="纠错"
+                    >
+                      <AlertCircle size={17} />
                     </button>
                     {canDelete && (
                     <button
@@ -308,7 +329,7 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
                     {previewDoc.fileType ? previewDoc.fileType.toUpperCase() : "TXT"}
                   </span>
                   <span className="muted small">{previewDoc.category}</span>
-                  {previewDoc.tags.map((tag) => (
+                  {(previewDoc.tags || []).map((tag) => (
                     <span key={tag} className="muted small">#{tag}</span>
                   ))}
                 </div>
@@ -329,6 +350,81 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
                 alert("已复制到剪贴板");
               }}>
                 复制内容
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* 纠错弹窗 */}
+      {correctingItem && (
+        <div className="modal-scrim" onClick={() => setCorrectingItem(null)}>
+          <div className="modal" style={{maxWidth: 680}} onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <div>
+                <h3>纠错：{correctingItem.title}</h3>
+                <div className="preview-meta">
+                  <span className="muted small">{correctingItem.category}</span>
+                  <span className="muted small">doc_code: {correctingItem.id}</span>
+                </div>
+              </div>
+              <button className="ghost-icon" onClick={() => setCorrectingItem(null)} title="关闭">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="modal-body">
+              <p style={{fontSize:13, color:'var(--muted)', margin:'0 0 12px'}}>
+                请修改下方内容后提交。管理员审核通过后，新内容将替换当前版本。
+              </p>
+              <label className="field" style={{marginBottom:12}}>
+                <span>建议的新内容</span>
+                <textarea
+                  rows={10}
+                  style={{width:'100%',background:'var(--bg-input)',border:'1px solid var(--border)',borderRadius:8,padding:'8px 10px',color:'var(--text)',fontSize:13,resize:'vertical',fontFamily:'monospace'}}
+                  value={correctContent}
+                  onChange={(e) => setCorrectContent(e.target.value)}
+                  placeholder="请输入正确的内容"
+                />
+              </label>
+              <label className="field">
+                <span>纠错说明（选填）</span>
+                <input
+                  type="text"
+                  style={{width:'100%',background:'var(--bg-input)',border:'1px solid var(--border)',borderRadius:8,padding:'8px 10px',color:'var(--text)',fontSize:13}}
+                  value={correctComment}
+                  onChange={(e) => setCorrectComment(e.target.value)}
+                  placeholder="例如：第3行数据有误，应为 xxx"
+                />
+              </label>
+              {correctError && <div className="login-error" style={{marginTop:10}}>{correctError}</div>}
+            </div>
+            <footer className="modal-footer">
+              <span className="muted small">提交后将进入审核流程</span>
+              <button
+                className="primary-button"
+                style={{marginLeft:'auto'}}
+                disabled={correcting || !correctContent.trim() || correctContent === correctingItem.content}
+                onClick={async () => {
+                  if (!correctContent.trim()) { setCorrectError("内容不能为空"); return; }
+                  if (correctContent === correctingItem.content) { setCorrectError("内容未做任何修改"); return; }
+                  setCorrecting(true);
+                  setCorrectError("");
+                  try {
+                    await api.postFeedback(correctingItem.id, {
+                      isHelpful: true,
+                      correctContent: correctContent.trim(),
+                      comment: correctComment.trim()
+                    });
+                    setCorrectingItem(null);
+                    alert("纠错已提交，等待管理员审核");
+                  } catch (err: any) {
+                    setCorrectError(err?.message || "提交失败，请重试");
+                  } finally {
+                    setCorrecting(false);
+                  }
+                }}
+              >
+                {correcting ? "提交中..." : "提交纠错"}
               </button>
             </footer>
           </div>
