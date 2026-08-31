@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Banknote,
@@ -98,6 +98,41 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
       .finally(() => setLoading(false));
   }, [startDate, endDate, typeFilter, page]);
 
+  // V2.0：月度趋势聚合（从交易按月统计收入/支出）
+  const monthlyTrend = useMemo(() => {
+    const trend: Record<string, { income: number; expense: number }> = {};
+    for (const tx of transactions) {
+      const date = tx.transactionDate || tx.transaction_date || tx.createdAt || tx.created_at;
+      if (!date) continue;
+      const month = String(date).slice(0, 7); // YYYY-MM
+      if (!trend[month]) trend[month] = { income: 0, expense: 0 };
+      const amount = Number(tx.amount ?? 0);
+      if (tx.type === "income") trend[month].income += amount;
+      else if (tx.type === "expense") trend[month].expense += amount;
+    }
+    // 生成最近 6 个月（包括零数据）
+    const result: Array<{ month: string; income: number; expense: number }> = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      result.push({
+        month: key,
+        income: trend[key]?.income ?? 0,
+        expense: trend[key]?.expense ?? 0
+      });
+    }
+    return result;
+  }, [transactions]);
+
+  // V2.0：AR 总额汇总
+  const arSummary = useMemo(() => {
+    const totalAmount = arTop.reduce((s, r) => s + Number(r.totalAmount ?? 0), 0);
+    const remainingAmount = arTop.reduce((s, r) => s + Number(r.remainingAmount ?? 0), 0);
+    const overdueCount = arTop.filter((r) => Number(r.maxOverdueDays ?? 0) > 0).length;
+    return { totalAmount, remainingAmount, overdueCount };
+  }, [arTop]);
+
   // 加载穿透客户的交易
   useEffect(() => {
     if (!drillCustomer) {
@@ -173,6 +208,75 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
           <strong>¥{summary?.netProfit?.toLocaleString() ?? "0"}</strong>
           <small>收入 - 支出</small>
           <CircleDollarSign size={32} className="metric-icon" />
+        </div>
+        {/* V2.0：应收总额 / 未收总额 / 逾期客户数 */}
+        <div className="metric metric-ar">
+          <span>应收总额</span>
+          <strong>¥{arSummary.totalAmount.toLocaleString()}</strong>
+          <small>已签合同未收齐</small>
+          <Banknote size={32} className="metric-icon" />
+        </div>
+        <div className="metric metric-ar-remaining">
+          <span>未收总额</span>
+          <strong style={{ color: arSummary.remainingAmount > 0 ? "#dc2626" : "#059669" }}>
+            ¥{arSummary.remainingAmount.toLocaleString()}
+          </strong>
+          <small>未收回金额</small>
+          <Receipt size={32} className="metric-icon" />
+        </div>
+        <div className="metric metric-overdue">
+          <span>逾期客户</span>
+          <strong style={{ color: arSummary.overdueCount > 0 ? "#dc2626" : "#059669" }}>
+            {arSummary.overdueCount} 个
+          </strong>
+          <small>有逾期应收</small>
+          <AlertCircle size={32} className="metric-icon" />
+        </div>
+      </section>
+
+      {/* V2.0：6 个月趋势图 */}
+      <section className="card trend-card">
+        <div className="card-header">
+          <h3>📈 最近 6 个月收入/支出趋势</h3>
+          <span className="muted small">基于当前交易数据</span>
+        </div>
+        <div className="card-body">
+          <div className="trend-chart">
+            {monthlyTrend.map((m, idx) => {
+              const maxVal = Math.max(...monthlyTrend.map(t => Math.max(t.income, t.expense)), 1);
+              const incomeH = Math.max((m.income / maxVal) * 180, 2);
+              const expenseH = Math.max((m.expense / maxVal) * 180, 2);
+              const monthLabel = m.month.slice(5);
+              return (
+                <div key={m.month} className="trend-bar-group">
+                  <div className="trend-bar-pair">
+                    <div
+                      className="trend-bar trend-income"
+                      style={{ height: `${incomeH}px` }}
+                      title={`收入 ¥${m.income.toLocaleString()}`}
+                    >
+                      {m.income > 0 && <span className="trend-value">¥{(m.income / 1000).toFixed(1)}k</span>}
+                    </div>
+                    <div
+                      className="trend-bar trend-expense"
+                      style={{ height: `${expenseH}px` }}
+                      title={`支出 ¥${m.expense.toLocaleString()}`}
+                    >
+                      {m.expense > 0 && <span className="trend-value">¥{(m.expense / 1000).toFixed(1)}k</span>}
+                    </div>
+                  </div>
+                  <div className="trend-label">{monthLabel}月</div>
+                  <div className="trend-netto">
+                    净 {m.income - m.expense >= 0 ? "+" : ""}¥{((m.income - m.expense) / 1000).toFixed(1)}k
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="trend-legend">
+            <span className="trend-legend-item"><span className="dot dot-income" /> 收入</span>
+            <span className="trend-legend-item"><span className="dot dot-expense" /> 支出</span>
+          </div>
         </div>
       </section>
 
