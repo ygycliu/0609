@@ -269,83 +269,7 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
             <p className="role-readonly-notice">⚠️ 当前为只读模式（普通用户），无法编辑交易。如需操作请联系管理员。</p>
           )}
         </div>
-        <div className="finance-export-buttons">
-          {/* V2.0：录入按钮（仅 admin） */}
-          {isAdmin && (
-            <>
-              <button
-                className="ghost-button small"
-                onClick={() => setShowExcelImport(true)}
-                title="批量导入交易（自动匹配客户）"
-              >
-                📊 Excel导入
-              </button>
-              <button
-                className="primary-button small"
-                onClick={() => setShowForm("income")}
-                title="录入新的收入"
-              >
-                ➕ 录入收入
-              </button>
-              <button
-                className="danger-button small"
-                onClick={() => setShowForm("expense")}
-                title="录入新的支出"
-              >
-                ➖ 录入支出
-              </button>
-            </>
-          )}
-          <button
-            className="ghost-button small"
-            disabled={!summary}
-            onClick={() => summary && exportFinanceSummary(summary, { start: startDate, end: endDate })}
-            title="导出财务汇总为 CSV"
-          >
-            <Download size={14} /> 导出汇总
-          </button>
-          <button
-            className="ghost-button small"
-            disabled={total === 0}
-            onClick={async () => {
-              // V2.0：拉全部数据（不受分页限制）
-              try {
-                setLoading(true);
-                let all: any[] = [];
-                let offset = 0;
-                const limit = 200;
-                while (true) {
-                  const res = await api.listTransactions({
-                    type: typeFilter === "all" ? undefined : typeFilter,
-                    start_date: startDate,
-                    end_date: endDate,
-                    limit,
-                    offset
-                  });
-                  const items = res?.data ?? [];
-                  all = all.concat(items);
-                  if (items.length < limit) break;
-                  offset += limit;
-                  if (offset > 5000) break; // 安全限制
-                }
-                if (all.length === 0) {
-                  ToastManager.warning("当前筛选条件下没有交易");
-                  return;
-                }
-                exportTransactions(all, { start: startDate, end: endDate });
-                ToastManager.success(`已导出 ${all.length} 条交易（覆盖全部数据，不受分页限制）`);
-              } catch (e: any) {
-                ToastManager.error("导出失败：" + (e?.message ?? "未知错误"));
-              } finally {
-                setLoading(false);
-              }
-            }}
-            title={`导出全部 ${total} 条交易明细（不受分页限制）`}
-          >
-            <Download size={14} /> 导出明细（共 {total} 条）
-          </button>
-        </div>
-      </header>
+        </header>
 
       {/* 统计区 */}
       <section className="finance-metric-grid">
@@ -460,26 +384,6 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
               setEndDate(e.target.value);
             }}
           />
-        </div>
-        <div className="toolbar-group">
-          <button
-            className={typeFilter === "all" ? "type-pill active" : "type-pill"}
-            onClick={() => { setPage(0); setTypeFilter("all"); }}
-          >
-            全部
-          </button>
-          <button
-            className={typeFilter === "income" ? "type-pill active green" : "type-pill green"}
-            onClick={() => { setPage(0); setTypeFilter("income"); }}
-          >
-            <TrendingUp size={14} /> 收入
-          </button>
-          <button
-            className={typeFilter === "expense" ? "type-pill active pink" : "type-pill pink"}
-            onClick={() => { setPage(0); setTypeFilter("expense"); }}
-          >
-            <TrendingDown size={14} /> 支出
-          </button>
         </div>
         {/* V2.0：快捷期间按钮 + 日期字段模式切换 */}
         <div className="toolbar-group quick-range">
