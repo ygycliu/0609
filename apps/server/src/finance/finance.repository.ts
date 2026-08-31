@@ -37,6 +37,7 @@ export interface TransactionRecord {
   category: string;
   amount: number;
   transDate: string;
+  transMonth?: string | null;  // V2.0：业务归属月份（YYYY-MM-01）
   description: string | null;
   paymentMethod: string | null;
   reference: string | null;
@@ -83,6 +84,7 @@ function rowToTransaction(r: any): TransactionRecord {
     category: r.category,
     amount: Number(r.amount ?? 0),
     transDate: r.trans_date,
+    transMonth: r.trans_month ?? null,  // V2.0：业务归属月份
     description: r.description,
     paymentMethod: r.payment_method,
     reference: r.reference,
@@ -94,6 +96,33 @@ function rowToTransaction(r: any): TransactionRecord {
     createdAt: r.created_at,
     updatedAt: r.updated_at
   };
+}
+
+/**
+ * V2.0：从 description 或 transDate 推导 trans_month
+ * 优先级：
+ * 1. description 开头 "YYYY-MM |"
+ * 2. transDate 的月份
+ * 3. 当前月
+ */
+export function deriveTransMonth(transDate?: string, description?: string | null): string {
+  // 1. 从 description 提取
+  if (description) {
+    const m = String(description).match(/^(\d{4})-(\d{2})\s*\|/);
+    if (m) {
+      return `${m[1]}-${m[2]}-01`;
+    }
+  }
+  // 2. 从 transDate 取月份
+  if (transDate) {
+    const d = new Date(transDate);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    }
+  }
+  // 3. 当前月
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 const PROJECT_SELECT = `
@@ -282,10 +311,12 @@ export class FinanceRepository {
     customerId?: string;
     startDate?: string;
     endDate?: string;
+    /** V2.0：日期字段模式 'trans_date' | 'trans_month'，默认 trans_month */
+    dateField?: "trans_date" | "trans_month";
     offset?: number;
     limit?: number;
   } = {}): Promise<{ items: TransactionRecord[]; total: number }> {
-    const { type, category, projectId, customerId, startDate, endDate, offset = 0, limit = 50 } = options;
+    const { type, category, projectId, customerId, startDate, endDate, dateField = "trans_month", offset = 0, limit = 50 } = options;
     const conditions: string[] = ["t.company_id = $1", "t.deleted_at IS NULL"];
     const params: any[] = [companyId];
     let paramIdx = 2;
@@ -311,12 +342,12 @@ export class FinanceRepository {
       paramIdx++;
     }
     if (startDate) {
-      conditions.push(`t.trans_date >= $${paramIdx}`);
+      conditions.push(`t.${dateField} >= $${paramIdx}`);
       params.push(startDate);
       paramIdx++;
     }
     if (endDate) {
-      conditions.push(`t.trans_date <= $${paramIdx}`);
+      conditions.push(`t.${dateField} <= $${paramIdx}`);
       params.push(endDate);
       paramIdx++;
     }
@@ -396,8 +427,8 @@ export class FinanceRepository {
     const r = await query<any>(
       `INSERT INTO finance_transaction
         (company_id, project_id, customer_id, type, category, amount,
-         trans_date, description, payment_method, reference, ps, invoice_no)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         trans_date, trans_month, description, payment_method, reference, ps, invoice_no)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         companyId,
@@ -407,6 +438,8 @@ export class FinanceRepository {
         input.category || "",
         input.amount ?? 0,
         input.transDate || new Date().toISOString(),
+        // V2.0：trans_month 优先用传入值，否则从 description 或 transDate 自动提取
+        input.transMonth || deriveTransMonth(input.transDate, input.description),
         input.description || null,
         input.paymentMethod || null,
         input.reference || null,
@@ -437,6 +470,7 @@ export class FinanceRepository {
       category: "category",
       amount: "amount",
       transDate: "trans_date",
+      transMonth: "trans_month",  // V2.0：业务归属月份
       description: "description",
       paymentMethod: "payment_method",
       reference: "reference",
@@ -504,7 +538,12 @@ export class FinanceRepository {
   }
 
   // ==================== 统计 ====================
-  async getSummary(companyId: string, options: { startDate?: string; endDate?: string } = {}): Promise<{
+  async getSummary(companyId: string, options: {
+    startDate?: string;
+    endDate?: string;
+    /** V2.0：日期字段模式 'trans_date' | 'trans_month'，默认 trans_month */
+    dateField?: "trans_date" | "trans_month";
+  } = {}): Promise<{
     totalIncome: number;
     totalExpense: number;
     netProfit: number;
@@ -513,18 +552,18 @@ export class FinanceRepository {
     incomeByCustomer: Array<{ customerId: string; customerName: string | null; total: number }>;
     expenseByCustomer: Array<{ customerId: string; customerName: string | null; total: number }>;
   }> {
-    const { startDate, endDate } = options;
+    const { startDate, endDate, dateField = "trans_month" } = options;
     const conditions: string[] = ["t.company_id = $1", "t.deleted_at IS NULL"];
     const params: any[] = [companyId];
     let paramIdx = 2;
 
     if (startDate) {
-      conditions.push(`trans_date >= $${paramIdx}`);
+      conditions.push(`${dateField} >= $${paramIdx}`);
       params.push(startDate);
       paramIdx++;
     }
     if (endDate) {
-      conditions.push(`trans_date <= $${paramIdx}`);
+      conditions.push(`${dateField} <= $${paramIdx}`);
       params.push(endDate);
       paramIdx++;
     }

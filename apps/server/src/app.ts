@@ -3219,9 +3219,38 @@ export function createApp() {
       const u = getUserFromReq(request);
       const result = await financeRepository.getSummary(u.companyId, {
         startDate: (request.query.start_date as string) || "",
-        endDate: (request.query.end_date as string) || ""
+        endDate: (request.query.end_date as string) || "",
+        // V2.0：dateField 默认 trans_month（业务归属月份），传 trans_date 则用制单日期
+        dateField: (request.query.date_field as "trans_date" | "trans_month") || "trans_month"
       });
       response.json({ data: result });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：按月汇总（用 trans_month 分组，用于趋势图）
+  app.get("/api/finance/summary/by-month", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const startDate = (request.query.start_date as string) || "2024-01-01";
+      const endDate = (request.query.end_date as string) || "2025-12-31";
+      const result = await query<{ month: string; type: string; total: string; count: string }>(
+        `SELECT TO_CHAR(trans_month, 'YYYY-MM') AS month, type,
+                COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+         FROM finance_transaction
+         WHERE company_id = $1 AND deleted_at IS NULL
+           AND trans_month >= $2 AND trans_month <= $3
+         GROUP BY trans_month, type
+         ORDER BY trans_month, type`,
+        [u.companyId, startDate, endDate]
+      );
+      response.json({
+        data: result.rows.map((r) => ({
+          month: r.month,  // YYYY-MM 字符串
+          type: r.type,
+          total: Number(r.total),
+          count: Number(r.count)
+        }))
+      });
     } catch (error) { next(error); }
   });
 

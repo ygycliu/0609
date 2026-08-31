@@ -271,11 +271,20 @@ export const api = {
     request<{ data: { id: string; deleted: boolean } }>(`/finance/transactions/${id}`, {
       method: "DELETE"
     }),
-  getFinanceSummary: (params: { start_date?: string; end_date?: string } = {}) => {
+  getFinanceSummary: (params: { start_date?: string; end_date?: string; date_field?: "trans_date" | "trans_month" } = {}) => {
     const qs = new URLSearchParams();
     if (params.start_date) qs.set("start_date", params.start_date);
     if (params.end_date) qs.set("end_date", params.end_date);
+    if (params.date_field) qs.set("date_field", params.date_field);
     const path = qs.toString() ? `/finance/summary?${qs.toString()}` : "/finance/summary";
+    return request<any>(path);
+  },
+  // V2.0：按月汇总（用 trans_month 聚合，用于趋势图）
+  financeSummaryByMonth: (params: { start_date?: string; end_date?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.start_date) qs.set("start_date", params.start_date);
+    if (params.end_date) qs.set("end_date", params.end_date);
+    const path = qs.toString() ? `/finance/summary/by-month?${qs.toString()}` : "/finance/summary/by-month";
     return request<any>(path);
   },
 

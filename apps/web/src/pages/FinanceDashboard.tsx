@@ -64,6 +64,8 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
   });
+  // V2.0：日期字段模式（默认按 trans_month 业务归属月份）
+  const [dateField, setDateField] = useState<"trans_month" | "trans_date">("trans_month");
 
   // V2.0：快捷期间切换
   const setThisMonth = () => {
@@ -130,7 +132,11 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
     setLoading(true);
     setError("");
     Promise.all([
-      api.getFinanceSummary({ start_date: startDate, end_date: endDate }),
+      api.getFinanceSummary({
+        start_date: startDate,
+        end_date: endDate,
+        date_field: dateField
+      }),
       api.listTransactions({
         type: typeFilter === "all" ? undefined : typeFilter,
         start_date: startDate,
@@ -150,32 +156,53 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
       .finally(() => setLoading(false));
   }, [startDate, endDate, typeFilter, page]);
 
-  // V2.0：月度趋势聚合（从交易按月统计收入/支出）
-  const monthlyTrend = useMemo(() => {
-    const trend: Record<string, { income: number; expense: number }> = {};
-    for (const tx of transactions) {
-      const date = tx.transactionDate || tx.transaction_date || tx.createdAt || tx.created_at;
-      if (!date) continue;
-      const month = String(date).slice(0, 7); // YYYY-MM
-      if (!trend[month]) trend[month] = { income: 0, expense: 0 };
-      const amount = Number(tx.amount ?? 0);
-      if (tx.type === "income") trend[month].income += amount;
-      else if (tx.type === "expense") trend[month].expense += amount;
-    }
-    // 生成最近 6 个月（包括零数据）
-    const result: Array<{ month: string; income: number; expense: number }> = [];
+    // V2.0：月度趋势（从后端 /by-month 接口，按 trans_month 聚合）
+  const [monthlyTrend, setMonthlyTrend] = useState<Array<{ month: string; income: number; expense: number }>>([]);
+  useEffect(() => {
+    // 默认显示最近 6 个月（含当月）
     const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      result.push({
-        month: key,
-        income: trend[key]?.income ?? 0,
-        expense: trend[key]?.expense ?? 0
+    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
+    const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    api.financeSummaryByMonth({ start_date: startDate, end_date: endDate })
+      .then((res: any) => {
+        const arr: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+        // 按月聚合
+        const map: Record<string, { income: number; expense: number }> = {};
+        for (const r of arr) {
+          const m = String(r.month);
+          if (!map[m]) map[m] = { income: 0, expense: 0 };
+          const amount = Number(r.total ?? 0);
+          if (r.type === "income") map[m].income += amount;
+          else if (r.type === "expense") map[m].expense += amount;
+        }
+        // 生成最近 6 个月（含零数据）
+        const out: Array<{ month: string; income: number; expense: number }> = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          out.push({
+            month: key,
+            income: map[key]?.income ?? 0,
+            expense: map[key]?.expense ?? 0
+          });
+        }
+        setMonthlyTrend(out);
+      })
+      .catch(() => {
+        // fallback：显示最近 6 个月空柱
+        const out: Array<{ month: string; income: number; expense: number }> = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          out.push({
+            month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+            income: 0,
+            expense: 0
+          });
+        }
+        setMonthlyTrend(out);
       });
-    }
-    return result;
-  }, [transactions]);
+  }, []);  // 只加载一次（6 个月趋势）
 
   // V2.0：AR 总额汇总
   const arSummary = useMemo(() => {
@@ -454,7 +481,7 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
             <TrendingDown size={14} /> 支出
           </button>
         </div>
-        {/* V2.0：快捷期间按钮 */}
+        {/* V2.0：快捷期间按钮 + 日期字段模式切换 */}
         <div className="toolbar-group quick-range">
           <span style={{ fontSize: 12, color: "#64748b" }}>快捷：</span>
           <button className="quick-pill" onClick={() => { setPage(0); setThisMonth(); }}>本月</button>
@@ -462,6 +489,17 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           <button className="quick-pill" onClick={() => { setPage(0); setThisQuarter(); }}>本季</button>
           <button className="quick-pill" onClick={() => { setPage(0); setThisYear(); }}>今年</button>
           <button className="quick-pill" onClick={() => { setPage(0); setAllTime(); }}>全部</button>
+          <span style={{ fontSize: 12, color: "#64748b", marginLeft: 8 }}>口径：</span>
+          <button
+            className={`quick-pill ${dateField === "trans_month" ? "active" : ""}`}
+            onClick={() => setDateField("trans_month")}
+            title="按业务归属月份统计"
+          >所属月份</button>
+          <button
+            className={`quick-pill ${dateField === "trans_date" ? "active" : ""}`}
+            onClick={() => setDateField("trans_date")}
+            title="按制单日期统计"
+          >制单日期</button>
         </div>
       </section>
 
