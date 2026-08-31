@@ -1777,28 +1777,64 @@ export function createApp() {
       const u = getUserFromReq(request);
       if (u.role !== "admin") throw new ForbiddenError("只有管理员可以上传知识");
       if (!request.file) throw new ValidationError("请选择需要入库的文件");
-      const content = (await extractDocumentText(request.file)).trim();
-      if (!content) throw new ValidationError("文件中没有提取到可用文本");
+      const extractedText = (await extractDocumentText(request.file)).trim();
+      if (!extractedText) throw new ValidationError("文件中没有提取到可用文本");
       const category = String(request.body.category ?? "").trim();
       if (!category) throw new ValidationError("请选择知识分类");
-      const id = randomUUID();
+      const title = String(request.body.title || request.file.originalname).trim();
+      const fileType = path.extname(request.file.originalname).slice(1).toLowerCase();
+      const tags = String(request.body.tags ?? "")
+        .split(/[,，]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+      const docId = randomUUID();
+
+      // 保存文件到 uploads 目录
       await fs.mkdir(config.uploadsDir, { recursive: true });
-      const storedName = `${id}${path.extname(request.file.originalname)}`;
+      const storedName = `${docId}${path.extname(request.file.originalname)}`;
       await fs.writeFile(path.join(config.uploadsDir, storedName), request.file.buffer);
-      const item = await knowledgeRepository.add(u.companyId, {
-        id,
-        title: String(request.body.title || request.file.originalname).trim(),
+
+      // V2.0 修复：先存 knowledge_document（status='pending_review'），再存审核记录
+      await knowledgeRepository.add(u.companyId, {
+        id: docId,  // 用作 doc_code
+        companyId: u.companyId,
         category,
-        sourceName: request.file.originalname,
-        fileType: path.extname(request.file.originalname).slice(1).toLowerCase(),
-        content: content.slice(0, 100_000),
-        createdAt: new Date().toISOString(),
-        tags: String(request.body.tags ?? "")
-          .split(/[,，]/)
-          .map((tag) => tag.trim())
-          .filter(Boolean)
+        title,
+        fileType,
+        tags,
+        content: extractedText.slice(0, 100_000),
+        sourceName: request.file.originalname
+      } as any);
+      // 更新状态为 pending_review（用 doc_code 定位，因为 id 列是 default uuid）
+      await query(
+        `UPDATE knowledge_document SET status = 'pending_review' WHERE doc_code = $1 AND company_id = $2`,
+        [docId, u.companyId]
+      );
+      // 获取真实的 document id（用于 review 表的外键）
+      const docRow = await query<{ id: string }>(
+        `SELECT id FROM knowledge_document WHERE doc_code = $1 AND company_id = $2`,
+        [docId, u.companyId]
+      );
+      const realDocId = docRow.rows[0]?.id;
+
+      // 存入审核队列表，关联到刚创建的 document_id
+      const reviewId = randomUUID();
+      const uploadMeta = JSON.stringify({
+        title, category, fileType, tags,
+        content: extractedText.slice(0, 100_000),
+        sourceName: request.file.originalname
       });
-      response.status(201).json({ data: item });
+      await query(
+        `INSERT INTO knowledge_review
+           (id, company_id, document_id, submitted_by, review_type,
+            proposed_content, reason, status, created_at)
+         VALUES ($1, $2, $3, $4, 'upload', $5, $6, 'pending', NOW())`,
+        [reviewId, u.companyId, realDocId, u.id, uploadMeta, "上传文件待审核"]
+      );
+
+      response.status(201).json({
+        data: { id: reviewId, documentId: docId, title, status: "pending_review", message: "文件已提交，请等待管理员审核" }
+      });
     } catch (error) {
       next(error);
     }
@@ -4555,9 +4591,9 @@ export function createApp() {
 
       const r = await query<{
         id: string;
-        document_id: string;
-        document_title: string;
-        doc_code: string;
+        document_id: string | null;
+        document_title: string | null;
+        doc_code: string | null;
         review_type: string;
         proposed_content: string;
         reason: string;
@@ -4566,18 +4602,26 @@ export function createApp() {
         submitter_display: string | null;
         reviewed_by: string | null;
         reviewer_display: string | null;
-        reviewed_at: Date;
+        reviewed_at: Date | null;
         review_note: string | null;
         new_version: number | null;
         created_at: Date;
       }>(
-        `SELECT kr.id, kr.document_id, kd.title AS document_title, kd.doc_code,
-                kr.review_type, kr.proposed_content, kr.reason, kr.status,
+        `SELECT kr.id, kr.document_id,
+                kd.title AS document_title, kd.doc_code,
+                kr.review_type,
+                CASE WHEN kr.review_type = 'upload'
+                     THEN COALESCE((kr.proposed_content::json->>'title'), kr.review_note, '待审核上传文件')
+                     ELSE kr.reason END AS reason,
+                CASE WHEN kr.review_type = 'upload'
+                     THEN COALESCE((kr.proposed_content::json->>'title'), '待审核上传文件')
+                     ELSE kd.title END AS document_title,
+                kr.proposed_content, kr.status,
                 kr.submitted_by, su.display_name AS submitter_display,
                 kr.reviewed_by, ru.display_name AS reviewer_display,
                 kr.reviewed_at, kr.review_note, kr.new_version, kr.created_at
          FROM knowledge_review kr
-         JOIN knowledge_document kd ON kr.document_id = kd.id
+         LEFT JOIN knowledge_document kd ON kr.document_id = kd.id
          LEFT JOIN app_user su ON kr.submitted_by = su.id
          LEFT JOIN app_user ru ON kr.reviewed_by = ru.id
          WHERE kr.company_id = $1 ${where}
@@ -4617,45 +4661,79 @@ export function createApp() {
       if (review.rows.length === 0) throw new ValidationError("审核记录不存在");
       if (review.rows[0].status !== "pending") throw new ValidationError("该审核已处理");
 
-      if (parsed.data.action === "approve" && review.rows[0].review_type === "correction") {
-        // 1. 创建新版本
-        const ver = await query<{ v: number }>(
-          `SELECT COALESCE(MAX(version), 0) + 1 AS v
-           FROM knowledge_version_v2 WHERE document_id = $1`,
-          [review.rows[0].document_id]
-        );
-        const newVersion = ver.rows[0].v;
+      const reviewType = review.rows[0].review_type;
 
-        await query(
-          `INSERT INTO knowledge_version_v2
-             (company_id, document_id, version, content_text, change_summary, created_by, review_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            u.companyId, review.rows[0].document_id, newVersion,
-            review.rows[0].proposed_content,
-            parsed.data.note ?? "管理员批准的用户纠正",
-            u.id, reviewId
-          ]
-        );
+      if (parsed.data.action === "approve") {
+        if (reviewType === "correction") {
+          // 纠正类：创建新版本并替换主表内容
+          const ver = await query<{ v: number }>(
+            `SELECT COALESCE(MAX(version), 0) + 1 AS v
+             FROM knowledge_version_v2 WHERE document_id = $1`,
+            [review.rows[0].document_id]
+          );
+          const newVersion = ver.rows[0].v;
+          await query(
+            `INSERT INTO knowledge_version_v2
+               (company_id, document_id, version, content_text, change_summary, created_by, review_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [u.companyId, review.rows[0].document_id, newVersion,
+             review.rows[0].proposed_content,
+             parsed.data.note ?? "管理员批准的用户纠正", u.id, reviewId]
+          );
+          await query(
+            `UPDATE knowledge_document SET content_text = $1, updated_at = NOW() WHERE id = $2`,
+            [review.rows[0].proposed_content, review.rows[0].document_id]
+          );
+          await query(
+            `UPDATE knowledge_review
+               SET status = 'applied', reviewed_by = $1, reviewed_at = NOW(),
+                   review_note = $2, new_version = $3, updated_at = NOW()
+             WHERE id = $4`,
+            [u.id, parsed.data.note ?? "已批准并应用", newVersion, reviewId]
+          );
+          response.json({ data: { ok: true, action: "approve", newVersion, applied: true } });
 
-        // 2. 替换主表内容
-        await query(
-          `UPDATE knowledge_document SET content_text = $1, updated_at = NOW() WHERE id = $2`,
-          [review.rows[0].proposed_content, review.rows[0].document_id]
-        );
-
-        // 3. 标记审核完成
-        await query(
-          `UPDATE knowledge_review
-             SET status = 'applied', reviewed_by = $1, reviewed_at = NOW(),
-                 review_note = $2, new_version = $3, updated_at = NOW()
-           WHERE id = $4`,
-          [u.id, parsed.data.note ?? "已批准并应用", newVersion, reviewId]
-        );
-
-        response.json({
-          data: { ok: true, action: "approve", newVersion, applied: true }
-        });
+        } else if (reviewType === "upload") {
+          // 上传类：从 proposed_content JSON 中解析元数据，创建知识文档
+          let meta: { title: string; category: string; fileType: string; tags: string[]; content: string; sourceName: string };
+          try {
+            meta = JSON.parse(review.rows[0].proposed_content);
+          } catch {
+            throw new ValidationError("上传审核数据格式错误，无法解析");
+          }
+          const newDocId = randomUUID();
+          await knowledgeRepository.add(u.companyId, {
+            id: newDocId,
+            title: meta.title,
+            category: meta.category,
+            sourceName: meta.sourceName,
+            fileType: meta.fileType,
+            content: meta.content,
+            createdAt: new Date().toISOString(),
+            tags: meta.tags
+          });
+          // V2.0 修复：verify 新文档确实存在（避免 FK 错误）
+          const verifyRow = await query<{ id: string }>(
+            `SELECT id FROM knowledge_document WHERE company_id = $1 AND doc_code = $2`,
+            [u.companyId, newDocId]
+          );
+          if (verifyRow.rows.length === 0) {
+            throw new ValidationError("入库失败：文档未持久化，请重试");
+          }
+          const realNewDocId = verifyRow.rows[0].id;
+          // 更新审核记录，关联新建的文档
+          await query(
+            `UPDATE knowledge_review
+               SET status = 'applied', reviewed_by = $1, reviewed_at = NOW(),
+                   review_note = $2, new_version = 1, updated_at = NOW(),
+                   document_id = $3
+             WHERE id = $4`,
+            [u.id, parsed.data.note ?? "已批准并入库", realNewDocId, reviewId]
+          );
+          response.json({ data: { ok: true, action: "approve", newVersion: 1, applied: true, documentId: newDocId } });
+        } else {
+          throw new ValidationError("不支持的审核类型: " + reviewType);
+        }
       } else {
         // 拒绝
         await query(

@@ -116,8 +116,10 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
     form.append("category", category);
     form.append("tags", tags);
     try {
-      const item = await api.uploadKnowledge(form);
-      onChange([item, ...knowledge]);
+      const result: any = await api.uploadKnowledge(form);
+      // V2.0：上传进入审核流程，不直接入库
+      const msg = result?.data?.message || result?.message || "已提交审核，请等待管理员审核";
+      alert(`✅ ${msg}\n\n您可以在「知识中心 → 知识审核」查看审核进度。`);
       setFile(null);
       setTitle("");
       setTags("");

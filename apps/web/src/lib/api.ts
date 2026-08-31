@@ -126,7 +126,7 @@ export const api = {
     request<KnowledgeItem[]>(`/knowledge?limit=${limit}`),
   searchKnowledge: (query: string, options?: { limit?: number; categories?: string[] }) =>
     request<KnowledgeItem[]>(`/knowledge${options ? `?${new URLSearchParams(options as any).toString()}` : ""}`),
-  // V2.0：upload 修复 - 显式加 credentials + 中文错误
+  // V2.0：upload 修复 - 显式加 credentials + 中文错误 + 提取 data
   uploadKnowledge: (form: FormData) =>
     fetch(`${API_BASE_URL}/knowledge`, {
       method: "POST",
@@ -134,7 +134,11 @@ export const api = {
       credentials: "include"
     })
       .then(async (r) => {
-        if (r.ok) return r.json();
+        if (r.ok) {
+          // V2.0：后端返回 { data: {...} }，提取 data 字段
+          const json = await r.json();
+          return json?.data || json;
+        }
         // V2.0：友好错误映射
         const status = r.status;
         let msg = "上传失败，请稍后重试";
@@ -748,6 +752,14 @@ export const api = {
   createProjectReview: (projectId: string, input: any) =>
     request<{ data: any }>(`/projects/${projectId}/reviews`, {
       method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+
+  // 知识纠错反馈（提交后进审核流）
+  postFeedback: (docCode: string, input: { isHelpful: boolean; correctContent?: string; comment?: string }) =>
+    request<{ ok: boolean }>(`/knowledge/${docCode}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input)
     }),
 };
