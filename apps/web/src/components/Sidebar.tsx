@@ -73,6 +73,7 @@ const navigation: NavGroup[] = [
     icon: Award,
     items: [
       { id: "consult", label: "AI 咨询", icon: MessageSquareText, color: "#3b82f6" },
+      { id: "auditor", label: "数字审核", icon: ClipboardCheck, color: "#10b981" },
       { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#ec4899" },
       { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" }
     ]
