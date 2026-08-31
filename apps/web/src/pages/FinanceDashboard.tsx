@@ -54,8 +54,49 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   // 默认覆盖所有历史数据（2024-2025）
-  const [startDate, setStartDate] = useState("2024-01-01");
-  const [endDate, setEndDate] = useState("2025-12-31");
+  // V2.0：默认期间为当前月份（用户可手动修改）
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+  });
+
+  // V2.0：快捷期间切换
+  const setThisMonth = () => {
+    const now = new Date();
+    setStartDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    setEndDate(`${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`);
+  };
+  const setThisQuarter = () => {
+    const now = new Date();
+    const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+    const start = new Date(now.getFullYear(), quarterStart, 1);
+    const end = new Date(now.getFullYear(), quarterStart + 3, 0);
+    setStartDate(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`);
+    setEndDate(`${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`);
+  };
+  const setThisYear = () => {
+    const now = new Date();
+    setStartDate(`${now.getFullYear()}-01-01`);
+    setEndDate(`${now.getFullYear()}-12-31`);
+  };
+  const setLastMonth = () => {
+    const now = new Date();
+    const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    setStartDate(`${year}-${String(lastMonth + 1).padStart(2, "0")}-01`);
+    const lastDay = new Date(year, lastMonth + 1, 0);
+    setEndDate(`${year}-${String(lastMonth + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`);
+  };
+  const setAllTime = () => {
+    setStartDate("2024-01-01");
+    setEndDate("2025-12-31");
+  };
   const [page, setPage] = useState(0);
 
   // 客户穿透查看状态
@@ -412,6 +453,15 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           >
             <TrendingDown size={14} /> 支出
           </button>
+        </div>
+        {/* V2.0：快捷期间按钮 */}
+        <div className="toolbar-group quick-range">
+          <span style={{ fontSize: 12, color: "#64748b" }}>快捷：</span>
+          <button className="quick-pill" onClick={() => { setPage(0); setThisMonth(); }}>本月</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setLastMonth(); }}>上月</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setThisQuarter(); }}>本季</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setThisYear(); }}>今年</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setAllTime(); }}>全部</button>
         </div>
       </section>
 

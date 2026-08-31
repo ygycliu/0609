@@ -10093,3 +10093,35 @@ textarea:focus {
   color: #3b82f6;
   font-weight: 700;
 }
+
+
+/* V2.0 快捷期间按钮 */
+.quick-range {
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid #e5e7eb;
+}
+
+.quick-pill {
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quick-pill:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+.quick-pill.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
