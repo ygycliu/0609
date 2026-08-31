@@ -4644,7 +4644,8 @@ export function createApp() {
       const reviewId = request.params.id;
       const parsed = z.object({
         action: z.enum(["approve", "reject"]),
-        note: z.string().max(1000).optional()
+        note: z.string().max(1000).optional(),
+        editedContent: z.string().max(500_000).optional()  // V2.0：审核员编辑后的内容
       }).safeParse(request.body);
       if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "参数无效");
 
@@ -4701,6 +4702,23 @@ export function createApp() {
           } catch {
             throw new ValidationError("上传审核数据格式错误，无法解析");
           }
+          // V2.0：如果审核员编辑了内容，覆盖
+          if (parsed.data.editedContent) {
+            try {
+              const edited = JSON.parse(parsed.data.editedContent);
+              meta = {
+                ...meta,
+                title: edited.title ?? meta.title,
+                category: edited.category ?? meta.category,
+                tags: edited.tags ?? meta.tags,
+                content: edited.content ?? meta.content,
+                sourceName: edited.sourceName ?? meta.sourceName
+              };
+            } catch (parseErr) {
+              // 如果 editedContent 不是 JSON（correction 类型的纯文本编辑），当作纯文本
+              meta.content = parsed.data.editedContent;
+            }
+          }
           const newDocId = randomUUID();
           await knowledgeRepository.add(u.companyId, {
             id: newDocId,
@@ -4722,13 +4740,16 @@ export function createApp() {
           }
           const realNewDocId = verifyRow.rows[0].id;
           // 更新审核记录，关联新建的文档
+          const finalNote = parsed.data.editedContent
+            ? `${parsed.data.note ?? "已批准并入库"}（审核员编辑）`
+            : parsed.data.note ?? "已批准并入库";
           await query(
             `UPDATE knowledge_review
                SET status = 'applied', reviewed_by = $1, reviewed_at = NOW(),
                    review_note = $2, new_version = 1, updated_at = NOW(),
                    document_id = $3
              WHERE id = $4`,
-            [u.id, parsed.data.note ?? "已批准并入库", realNewDocId, reviewId]
+            [u.id, finalNote, realNewDocId, reviewId]
           );
           response.json({ data: { ok: true, action: "approve", newVersion: 1, applied: true, documentId: newDocId } });
         } else {

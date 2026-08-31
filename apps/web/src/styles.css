@@ -9118,3 +9118,129 @@ textarea:focus {
   gap: 12px;
   justify-content: center;
 }
+
+
+/* V2.0 知识审核 - 预览/修改弹窗 */
+
+/* btn-edit 蓝色按钮（中性操作）*/
+.btn-edit {
+  background: #0ea5e9;
+  color: white;
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-edit:hover:not(:disabled) { background: #0284c7; }
+.btn-edit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* preview-modal 和 edit-modal 共享 */
+.preview-modal,
+.edit-modal {
+  width: min(880px, 95vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+}
+
+.preview-meta-info {
+  padding: 0 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.preview-meta-info p {
+  margin: 6px 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.preview-meta-info strong {
+  display: inline-block;
+  min-width: 60px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.preview-content-text {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.preview-actions,
+.edit-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.edit-body {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+.edit-body .field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.edit-body .field > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.edit-body .field input,
+.edit-body .field textarea {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.edit-body .field input:focus,
+.edit-body .field textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.edit-textarea {
+  resize: vertical;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important;
+  line-height: 1.7;
+  min-height: 200px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  font-size: 13px;
+  color: #64748b;
+}

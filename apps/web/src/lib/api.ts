@@ -634,7 +634,7 @@ export const api = {
   // ===== Quality (knowledge review) =====
   qualityReviews: (status: "pending" | "applied" | "rejected" | "all" = "pending") =>
     request<ReviewItem[]>(`/quality/reviews?status=${status}`),
-  reviewDecision: (id: string, input: { action: "approve" | "reject"; note?: string }) =>
+  reviewDecision: (id: string, input: { action: "approve" | "reject"; note?: string; editedContent?: string }) =>
     request<{ ok: boolean; action: string; newVersion?: number; applied?: boolean }>(
       `/quality/reviews/${id}/decision`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }
