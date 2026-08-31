@@ -230,6 +230,7 @@ export default function App() {
                 onOpenTransaction={(id) => {
                   window.alert(`交易 ${id} 详情页待实现`);
                 }}
+                currentUser={{ ...auth.user, isAdmin: permissions.isAdmin }}
               />
             : <PermissionDenied permission="FINANCE_DASHBOARD" hint="财务报表涉及敏感数据，仅管理员可查看。" />
         )}

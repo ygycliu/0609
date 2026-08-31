@@ -9367,3 +9367,94 @@ textarea:focus {
   .trend-chart { grid-template-columns: repeat(3, 1fr); }
   .trend-bar { width: 20px; }
 }
+
+
+/* V2.0 AR 逾期高亮 + 进度条 */
+
+.ar-row-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.ar-progress {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* 逾期行背景色（渐变 + 左侧描边）*/
+.ar-row.overdue {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%) !important;
+  border-left: 4px solid #ef4444;
+}
+
+.ar-row.overdue-low {
+  background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%) !important;
+  border-left: 4px solid #f59e0b;
+}
+
+.ar-row.overdue-high {
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%) !important;
+  border-left: 4px solid #ef4444;
+}
+
+.ar-row.overdue-critical {
+  background: linear-gradient(135deg, #fef2f2 0%, #fca5a5 100%) !important;
+  border-left: 4px solid #b91c1c;
+  animation: pulse-overdue 2s infinite;
+}
+
+@keyframes pulse-overdue {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+/* 逾期徽章（3 级）*/
+.overdue-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.overdue-badge.overdue-low {
+  background: #fef3c7;
+  color: #92400e;
+}
+.overdue-badge.overdue-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.overdue-badge.overdue-critical {
+  background: #dc2626;
+  color: white;
+  animation: blink 1.5s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+
+/* V2.0 财务导出按钮 */
+.finance-export-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+
+/* V2.0 财务 - 只读模式提示 */
+.role-readonly-notice {
+  margin-top: 10px !important;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 500;
+}

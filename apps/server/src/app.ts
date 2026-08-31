@@ -3117,6 +3117,14 @@ export function createApp() {
   app.delete("/api/finance/projects/:id", async (request, response, next) => {
     try {
       const u = getUserFromReq(request);
+      // V2.0：删除财务项目需 admin
+      if (u.role !== "admin") {
+        return response.status(403).json({
+          code: "FORBIDDEN",
+          message: "❌ 权限不足：删除财务项目需要管理员权限。请联系管理员。",
+          requestId: request.id
+        });
+      }
       const ok = await financeRepository.deleteProject(u.companyId, request.params.id);
       if (!ok) throw new NotFoundError("项目");
       response.json({ data: { id: request.params.id, deleted: true } });
@@ -3191,6 +3199,14 @@ export function createApp() {
   app.delete("/api/finance/transactions/:id", async (request, response, next) => {
     try {
       const u = getUserFromReq(request);
+      // V2.0：删除交易需 admin
+      if (u.role !== "admin") {
+        return response.status(403).json({
+          code: "FORBIDDEN",
+          message: "❌ 权限不足：删除交易需要管理员权限。请联系管理员。",
+          requestId: request.id
+        });
+      }
       const ok = await financeRepository.deleteTransaction(u.companyId, request.params.id);
       if (!ok) throw new NotFoundError("交易");
       response.json({ data: { id: request.params.id, deleted: true } });

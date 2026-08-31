@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { api } from "../lib/api";
+import { exportFinanceSummary, exportTransactions } from "../lib/finance-export";
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   income: { label: "收入", color: "green" },
@@ -33,9 +34,12 @@ const PAGE_SIZE = 50;
 
 interface FinanceDashboardProps {
   onOpenTransaction: (id: string) => void;
+  currentUser?: { role: string; isAdmin?: boolean };  // V2.0 权限
 }
 
-export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
+export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDashboardProps) {
+  // V2.0：权限判断
+  const isAdmin = currentUser?.isAdmin ?? currentUser?.role === "admin";
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -186,6 +190,27 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
           <span className="eyebrow">认证业务中心 · 财务</span>
           <h1>财务管理</h1>
           <p>记录项目、客户、公司的收入 / 支出 / 利润；客户档案与客户管理模块统一。</p>
+          {!isAdmin && (
+            <p className="role-readonly-notice">⚠️ 当前为只读模式（普通用户），无法编辑交易。如需操作请联系管理员。</p>
+          )}
+        </div>
+        <div className="finance-export-buttons">
+          <button
+            className="ghost-button small"
+            disabled={!summary}
+            onClick={() => summary && exportFinanceSummary(summary, { start: startDate, end: endDate })}
+            title="导出财务汇总为 CSV"
+          >
+            <Download size={14} /> 导出汇总
+          </button>
+          <button
+            className="ghost-button small"
+            disabled={transactions.length === 0}
+            onClick={() => exportTransactions(transactions, { start: startDate, end: endDate })}
+            title="导出当前显示的交易明细为 CSV"
+          >
+            <Download size={14} /> 导出明细
+          </button>
         </div>
       </header>
 
@@ -443,26 +468,40 @@ export function FinanceDashboard({ onOpenTransaction }: FinanceDashboardProps) {
             ) : arTop.length === 0 ? (
               <div className="empty-row">暂无应收账款</div>
             ) : (
-              arTop.map((c) => (
+              arTop.map((c) => {
+                const overdueDays = Number(c.maxOverdueDays ?? 0);
+                const isOverdue = overdueDays > 0;
+                const overdueLevel = overdueDays > 90 ? "critical" : overdueDays > 30 ? "high" : overdueDays > 0 ? "low" : "";
+                return (
                 <div
                   key={c.customerId}
-                  className="customer-row clickable ar-row"
+                  className={`customer-row clickable ar-row ${isOverdue ? "overdue" : ""} ${overdueLevel ? `overdue-${overdueLevel}` : ""}`}
                   onClick={() => setArDrill({ customerId: c.customerId, customerName: c.customerName })}
-                  title="点击查看该客户的应收账款明细"
+                  title={`点击查看该客户的应收账款明细${isOverdue ? `（逾期${overdueDays}天）` : ""}`}
                 >
                   <div className="ar-row-main">
                     <span className="customer-name">{c.customerName}</span>
                     <span className="ar-meta">
                       {c.arCount} 笔
-                      {c.maxOverdueDays > 0 && (
-                        <span className="overdue-badge">逾期 {c.maxOverdueDays} 天</span>
+                      {isOverdue && (
+                        <span className={`overdue-badge overdue-${overdueLevel}`}>
+                          ⚠️ 逾期 {overdueDays} 天
+                        </span>
                       )}
                     </span>
                   </div>
-                  <span className="customer-amount">¥{c.remainingAmount.toLocaleString()}</span>
+                  <div className="ar-row-amount">
+                    <span className="customer-amount">¥{c.remainingAmount.toLocaleString()}</span>
+                    {Number(c.totalAmount ?? 0) > 0 && (
+                      <span className="ar-progress">
+                        {((Number(c.paidAmount ?? 0) / Number(c.totalAmount)) * 100).toFixed(0)}% 已收
+                      </span>
+                    )}
+                  </div>
                   <ChevronRight size={14} />
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
