@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { TransactionForm } from "../components/TransactionForm";
 import {
   AlertCircle,
   Banknote,
@@ -40,6 +41,8 @@ interface FinanceDashboardProps {
 export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDashboardProps) {
   // V2.0：权限判断
   const isAdmin = currentUser?.isAdmin ?? currentUser?.role === "admin";
+  // V2.0：录入弹窗状态
+  const [showForm, setShowForm] = useState<false | "income" | "expense">(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -195,6 +198,25 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           )}
         </div>
         <div className="finance-export-buttons">
+          {/* V2.0：录入按钮（仅 admin） */}
+          {isAdmin && (
+            <>
+              <button
+                className="primary-button small"
+                onClick={() => setShowForm("income")}
+                title="录入新的收入"
+              >
+                ➕ 录入收入
+              </button>
+              <button
+                className="danger-button small"
+                onClick={() => setShowForm("expense")}
+                title="录入新的支出"
+              >
+                ➖ 录入支出
+              </button>
+            </>
+          )}
           <button
             className="ghost-button small"
             disabled={!summary}
@@ -720,6 +742,18 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
             下一页
           </button>
         </div>
+      )}
+
+      {/* V2.0：录入交易弹窗 */}
+      {showForm && (
+        <TransactionForm
+          defaultType={showForm}
+          onClose={() => setShowForm(false)}
+          onSuccess={() => {
+            // 触发重新加载
+            window.location.reload();
+          }}
+        />
       )}
     </div>
   );

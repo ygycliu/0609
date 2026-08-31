@@ -9458,3 +9458,123 @@ textarea:focus {
   font-size: 13px;
   font-weight: 500;
 }
+
+
+/* V2.0 财务交易录入表单 */
+.transaction-form-modal {
+  width: min(720px, 95vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+}
+
+.transaction-form-body {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+/* 类型切换按钮组 */
+.type-toggle-group {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.type-toggle-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.type-toggle-btn.income:hover { border-color: #10b981; background: #ecfdf5; }
+.type-toggle-btn.income.active {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #047857;
+}
+
+.type-toggle-btn.expense:hover { border-color: #ef4444; background: #fef2f2; }
+.type-toggle-btn.expense.active {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+  color: #991b1b;
+}
+
+/* 表单网格 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.transaction-form-body .field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.transaction-form-body .field > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.transaction-form-body .field input,
+.transaction-form-body .field select,
+.transaction-form-body .field textarea {
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.transaction-form-body .field input:focus,
+.transaction-form-body .field select:focus,
+.transaction-form-body .field textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.transaction-form-body .field.full {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+/* 操作按钮组 */
+.form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.danger-button.small {
+  background: #ef4444;
+  color: white;
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.danger-button.small:hover:not(:disabled) { background: #dc2626; }
+.danger-button.small:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
