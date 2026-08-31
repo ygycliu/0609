@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { TransactionForm } from "../components/TransactionForm";
+import { ExcelImport } from "../components/ExcelImport";
 import {
   AlertCircle,
   Banknote,
@@ -31,7 +32,7 @@ interface SummaryData {
   expenseByCustomer: Array<{ customerId: string; customerName: string | null; total: number }>;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 200;  // V2.0：默认 200（一次拉完避免分页导出限制）
 
 interface FinanceDashboardProps {
   onOpenTransaction: (id: string) => void;
@@ -43,6 +44,8 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
   const isAdmin = currentUser?.isAdmin ?? currentUser?.role === "admin";
   // V2.0：录入弹窗状态
   const [showForm, setShowForm] = useState<false | "income" | "expense">(false);
+  // V2.0：Excel 批量导入弹窗
+  const [showExcelImport, setShowExcelImport] = useState(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -202,6 +205,13 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           {isAdmin && (
             <>
               <button
+                className="ghost-button small"
+                onClick={() => setShowExcelImport(true)}
+                title="批量导入交易（自动匹配客户）"
+              >
+                📊 Excel导入
+              </button>
+              <button
                 className="primary-button small"
                 onClick={() => setShowForm("income")}
                 title="录入新的收入"
@@ -227,11 +237,43 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           </button>
           <button
             className="ghost-button small"
-            disabled={transactions.length === 0}
-            onClick={() => exportTransactions(transactions, { start: startDate, end: endDate })}
-            title="导出当前显示的交易明细为 CSV"
+            disabled={total === 0}
+            onClick={async () => {
+              // V2.0：拉全部数据（不受分页限制）
+              try {
+                setLoading(true);
+                let all: any[] = [];
+                let offset = 0;
+                const limit = 200;
+                while (true) {
+                  const res = await api.listTransactions({
+                    type: typeFilter === "all" ? undefined : typeFilter,
+                    start_date: startDate,
+                    end_date: endDate,
+                    limit,
+                    offset
+                  });
+                  const items = res?.data ?? [];
+                  all = all.concat(items);
+                  if (items.length < limit) break;
+                  offset += limit;
+                  if (offset > 5000) break; // 安全限制
+                }
+                if (all.length === 0) {
+                  alert("当前筛选条件下没有交易");
+                  return;
+                }
+                exportTransactions(all, { start: startDate, end: endDate });
+                alert(`✅ 已导出 ${all.length} 条交易（覆盖全部数据，不受分页限制）`);
+              } catch (e: any) {
+                alert("导出失败：" + (e?.message ?? "未知错误"));
+              } finally {
+                setLoading(false);
+              }
+            }}
+            title={`导出全部 ${total} 条交易明细（不受分页限制）`}
           >
-            <Download size={14} /> 导出明细
+            <Download size={14} /> 导出明细（共 {total} 条）
           </button>
         </div>
       </header>
@@ -751,6 +793,18 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           onClose={() => setShowForm(false)}
           onSuccess={() => {
             // 触发重新加载
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* V2.0：Excel 批量导入 */}
+      {showExcelImport && (
+        <ExcelImport
+          onClose={() => setShowExcelImport(false)}
+          onSuccess={() => {
+            // 成功导入后，关闭弹窗并刷新页面
+            setShowExcelImport(false);
             window.location.reload();
           }}
         />

@@ -18,13 +18,14 @@ export type Page =
   | "project-detail"
   | "project-new"
   | "base-data"
-  | "system-enum";
+  | "system-enum"
+  | "data-exchange";
 
 export interface ReviewItem {
   id: string;
-  document_id: string;
-  document_title: string;
-  doc_code: string;
+  document_id: string | null;
+  document_title: string | null;
+  doc_code: string | null;
   review_type: string;
   proposed_content: string;
   reason: string;

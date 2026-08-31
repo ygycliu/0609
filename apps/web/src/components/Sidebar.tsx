@@ -1,5 +1,6 @@
 import {
   Award,
+  ArrowLeftRight,
   Banknote,
   BookOpen,
   BrainCircuit,
@@ -99,7 +100,7 @@ const navigation: NavGroup[] = [
       { id: "files", label: "文件浏览", icon: FolderOpen, color: "#8b5cf6" }
     ]
   },
-  // 工具（系统基础数据仅管理员）
+  // 工具（系统基础数据 + 数据导入导出 仅管理员）
   {
     id: "tools",
     label: "工具",
@@ -107,7 +108,8 @@ const navigation: NavGroup[] = [
     items: [
       { id: "documents", label: "文档分析", icon: FileSearch, color: "#64748b" },
       { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" },
-      { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6", requireModule: "SYSTEM_BASIC_DATA" }
+      { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6", requireModule: "SYSTEM_BASIC_DATA" },
+      { id: "data-exchange", label: "数据导入导出", icon: ArrowLeftRight, color: "#10b981", requireModule: "SYSTEM_BASIC_DATA" }
     ]
   },
   // 历史成果（所有人可见）
