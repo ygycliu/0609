@@ -32,6 +32,7 @@ import {
   type CustomerImportResult,
   type TransactionImportResult
 } from "../lib/data-exchange";
+import { ToastManager } from "../components/Toast";
 
 type Tab = "customer-export" | "customer-import" | "finance-export" | "finance-import";
 
@@ -69,9 +70,12 @@ export function DataExchangePage({ onClose }: DataExchangePageProps) {
     setInfo("");
     try {
       const count = await exportCustomersCSV();
+      ToastManager.success(`已导出 ${count} 个客户`);
       setInfo(`✅ 已导出 ${count} 个客户`);
     } catch (e: any) {
-      setError("导出失败：" + (e?.message ?? "未知错误"));
+      const msg = "导出失败：" + (e?.message ?? "未知错误");
+      ToastManager.error(msg);
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -89,11 +93,13 @@ export function DataExchangePage({ onClose }: DataExchangePageProps) {
         onProgress: (current, total) => setProgress({ current, total })
       });
       setCustomerResult(result);
-      setInfo(
-        `✅ 完成！导入 ${result.imported}，更新 ${result.updated}，跳过 ${result.skipped}，失败 ${result.failed}`
-      );
+      const msg = `✅ 完成！导入 ${result.imported}，更新 ${result.updated}，跳过 ${result.skipped}，失败 ${result.failed}`;
+      ToastManager.success(msg);
+      setInfo(msg);
     } catch (e: any) {
-      setError("导入失败：" + (e?.message ?? "未知错误"));
+      const msg = "导入失败：" + (e?.message ?? "未知错误");
+      ToastManager.error(msg);
+      setError(msg);
     } finally {
       setBusy(false);
       setProgress(null);
@@ -111,9 +117,12 @@ export function DataExchangePage({ onClose }: DataExchangePageProps) {
         endDate: financeEndDate,
         type: financeType === "all" ? undefined : financeType
       });
+      ToastManager.success(`已导出 ${count} 条交易`);
       setInfo(`✅ 已导出 ${count} 条交易`);
     } catch (e: any) {
-      setError("导出失败：" + (e?.message ?? "未知错误"));
+      const msg = "导出失败：" + (e?.message ?? "未知错误");
+      ToastManager.error(msg);
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -131,11 +140,13 @@ export function DataExchangePage({ onClose }: DataExchangePageProps) {
         onProgress: (current, total) => setProgress({ current, total })
       });
       setFinanceResult(result);
-      setInfo(
-        `✅ 完成！导入 ${result.imported}，新建客户 ${result.newCustomers}，跳过 ${result.skipped}，失败 ${result.failed}`
-      );
+      const msg = `✅ 完成！导入 ${result.imported}，新建客户 ${result.newCustomers}，跳过 ${result.skipped}，失败 ${result.failed}`;
+      ToastManager.success(msg);
+      setInfo(msg);
     } catch (e: any) {
-      setError("导入失败：" + (e?.message ?? "未知错误"));
+      const msg = "导入失败：" + (e?.message ?? "未知错误");
+      ToastManager.error(msg);
+      setError(msg);
     } finally {
       setBusy(false);
       setProgress(null);

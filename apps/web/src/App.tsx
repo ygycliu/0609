@@ -35,6 +35,7 @@ import type {
 } from "./types";
 import { usePermissions } from "./lib/usePermissions";
 import { PermissionDenied } from "./components/PermissionDenied";
+import { ToastContainer, useToasts } from "./components/Toast";
 
 export default function App() {
   const [auth, setAuth] = useState<{ user: any } | null>(null);
@@ -54,6 +55,8 @@ export default function App() {
 
   // V2.0：用户权限（从 auth.user.role 派生）
   const { permissions } = usePermissions(auth?.user?.role);
+  // V2.0：全局 toast 订阅
+  const { toasts, dismiss } = useToasts();
 
 
   useEffect(() => {
@@ -240,6 +243,10 @@ export default function App() {
               />
             : <PermissionDenied permission="FINANCE_DASHBOARD" hint="财务报表涉及敏感数据，仅管理员可查看。" />
         )}
+
+        {/* V2.0：全局 toast 容器 */}
+        <ToastContainer toasts={toasts} onClose={dismiss} />
+
         <footer className="app-copyright" aria-label="版权信息">
           版权所有上海缘起卢卡智能科技有限公司
         </footer>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { TransactionForm } from "../components/TransactionForm";
 import { ExcelImport } from "../components/ExcelImport";
+import { ToastManager } from "../components/Toast";
 import {
   AlertCircle,
   Banknote,
@@ -260,13 +261,13 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
                   if (offset > 5000) break; // 安全限制
                 }
                 if (all.length === 0) {
-                  alert("当前筛选条件下没有交易");
+                  ToastManager.warning("当前筛选条件下没有交易");
                   return;
                 }
                 exportTransactions(all, { start: startDate, end: endDate });
-                alert(`✅ 已导出 ${all.length} 条交易（覆盖全部数据，不受分页限制）`);
+                ToastManager.success(`已导出 ${all.length} 条交易（覆盖全部数据，不受分页限制）`);
               } catch (e: any) {
-                alert("导出失败：" + (e?.message ?? "未知错误"));
+                ToastManager.error("导出失败：" + (e?.message ?? "未知错误"));
               } finally {
                 setLoading(false);
               }
