@@ -1,5 +1,5 @@
 import { BookOpen, Eye, FileUp, History, LoaderCircle, Search, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import type { KnowledgeItem } from "../types";
 
@@ -34,10 +34,40 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
   const [versions, setVersions] = useState<Array<{ version: number; change_summary: string; creator: string | null; created_at: string }>>([]);
   // V2.0：预览状态
   const [previewDoc, setPreviewDoc] = useState<KnowledgeItem | null>(null);
+  // V2.0：本地 loading 状态（prop 为空时自己 fetch）
+  const [localKnowledge, setLocalKnowledge] = useState<KnowledgeItem[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
   function previewItem(item: KnowledgeItem) {
     setPreviewDoc(item);
   }
+
+  // V2.0 兜底：如果父组件没传 knowledge，自动 fetch
+  useEffect(() => {
+    if (knowledge && knowledge.length > 0) {
+      setLocalKnowledge(null);  // 用 prop 的数据
+      return;
+    }
+    // prop 空，自己 fetch（调用 list 接口而不是 search，避免 tokenize 慢）
+    setLoading(true);
+    api.listKnowledgeLight(100)
+      .then((items: any) => {
+        const arr = Array.isArray(items) ? items : [];
+        setLocalKnowledge(arr);
+        onChange(arr);
+      })
+      .catch((e: any) => {
+        console.error("KnowledgePage fallback fetch failed", e);
+        setError(e?.message || "加载知识库失败");
+      })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 实际数据源：prop 优先，否则用本地 fetch
+  const effectiveKnowledge = knowledge && knowledge.length > 0
+    ? knowledge
+    : (localKnowledge || []);
 
   async function showVersions(item: KnowledgeItem) {
     setVersionsDoc({ id: item.id, title: item.title });
@@ -56,12 +86,12 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
 
   const filtered = useMemo(() => {
     const normalized = query.toLowerCase();
-    return knowledge.filter((item) =>
+    return effectiveKnowledge.filter((item) =>
       `${item.title} ${item.category} ${item.tags.join(" ")}`
         .toLowerCase()
         .includes(normalized)
     );
-  }, [knowledge, query]);
+  }, [effectiveKnowledge, query]);
 
   async function upload(event: React.FormEvent) {
     event.preventDefault();
@@ -92,7 +122,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
     if (!window.confirm(`确认删除知识条目“${item.title}”？`)) return;
     try {
       await api.deleteKnowledge(item.id);
-      onChange(knowledge.filter((entry) => entry.id !== item.id));
+      onChange(effectiveKnowledge.filter((entry) => entry.id !== item.id));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "删除失败");
     }
@@ -162,7 +192,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
           <div className="list-toolbar">
             <div>
               <h2>知识条目</h2>
-              <span>{knowledge.length} 条</span>
+              <span>{loading ? "加载中..." : `${effectiveKnowledge.length} 条${filtered.length !== effectiveKnowledge.length ? `（已筛选 ${filtered.length}）` : ""}`}</span>
             </div>
             <label className="search-field">
               <Search size={17} />

@@ -121,11 +121,41 @@ export const api = {
   listModels: () => request<{ providers: ModelProvider[]; options: ModelOption[] }>("/models"),
 
   // ===== Knowledge =====
+  // V2.0：轻量列表（带 limit，避免大数据阻塞）
+  listKnowledgeLight: (limit: number = 100) =>
+    request<KnowledgeItem[]>(`/knowledge?limit=${limit}`),
   searchKnowledge: (query: string, options?: { limit?: number; categories?: string[] }) =>
     request<KnowledgeItem[]>(`/knowledge${options ? `?${new URLSearchParams(options as any).toString()}` : ""}`),
+  // V2.0：upload 修复 - 显式加 credentials + 中文错误
   uploadKnowledge: (form: FormData) =>
-    fetch(`${API_BASE_URL}/knowledge`, { method: "POST", body: form, credentials: "include" })
-      .then(async (r) => { if (!r.ok) throw new Error(`upload failed: ${r.status}`); return r.json(); }),
+    fetch(`${API_BASE_URL}/knowledge`, {
+      method: "POST",
+      body: form,
+      credentials: "include"
+    })
+      .then(async (r) => {
+        if (r.ok) return r.json();
+        // V2.0：友好错误映射
+        const status = r.status;
+        let msg = "上传失败，请稍后重试";
+        try {
+          const j = await r.json();
+          msg = j.message || msg;
+        } catch {
+          msg = `上传失败（HTTP ${status}）`;
+        }
+        // 403/401 特殊处理
+        if (status === 403) {
+          msg = "❌ 权限不足：上传知识库需要管理员权限。请联系管理员获取授权。";
+        } else if (status === 401) {
+          msg = "❌ 会话已过期，请重新登录。";
+        } else if (status === 413) {
+          msg = "❌ 文件太大，请压缩后重试。";
+        } else if (status === 415) {
+          msg = "❌ 不支持的文件类型。";
+        }
+        throw new Error(msg);
+      }),
   deleteKnowledge: (id: string) =>
     request<{ ok: true }>(`/knowledge/${id}`, { method: "DELETE" }),
 
