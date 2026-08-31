@@ -32,6 +32,8 @@ import type {
   ModelOption,
   Page
 } from "./types";
+import { usePermissions } from "./lib/usePermissions";
+import { PermissionDenied } from "./components/PermissionDenied";
 
 export default function App() {
   const [auth, setAuth] = useState<{ user: any } | null>(null);
@@ -48,6 +50,10 @@ export default function App() {
   const [consultations, setConsultations] = useState<ConsultationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // V2.0：用户权限（从 auth.user.role 派生）
+  const { permissions } = usePermissions(auth?.user?.role);
+
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -128,6 +134,7 @@ export default function App() {
         onOpen={() => setSidebarOpen(true)}
         onClose={() => setSidebarOpen(false)}
         currentUser={auth.user}
+        permissions={permissions}
         onLogout={handleLogout}
         theme={theme}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -152,7 +159,11 @@ export default function App() {
         {page === "certification-quote" && <CertificationQuotePage />}
         {page === "knowledge-review" && <KnowledgeReviewPage currentUser={auth.user} />}
         {page === "knowledge" && (
-          <KnowledgePage knowledge={knowledge} onChange={setKnowledge} />
+          <KnowledgePage
+            knowledge={knowledge}
+            onChange={setKnowledge}
+            currentUser={{ ...auth.user, isAdmin: permissions.isAdmin }}
+          />
         )}
         {page === "documents" && <DocumentsPage models={models} />}
         {page === "results" && (
@@ -161,7 +172,11 @@ export default function App() {
         {page === "auditor" && <AuditorPage />}
         {page === "files" && <FilesPage />}
         {page === "pdf-to-word" && <PdfToWordPage />}
-        {page === "system-enum" && <SystemEnumPage />}
+        {page === "system-enum" && (
+          permissions.modules.SYSTEM_BASIC_DATA
+            ? <SystemEnumPage />
+            : <PermissionDenied permission="SYSTEM_BASIC_DATA" hint="系统基础数据（签约主体/外协/风险等级）只对管理员开放。" />
+        )}
         {page === "follow-up" && (
           <FollowUpPage
             onOpenCustomer={(id) => setPage(`customer-detail:${id}` as Page)}
@@ -210,11 +225,13 @@ export default function App() {
           />
         )}
         {page === "finance-dashboard" && (
-          <FinanceDashboard
-            onOpenTransaction={(id) => {
-              window.alert(`交易 ${id} 详情页待实现`);
-            }}
-          />
+          permissions.modules.FINANCE_DASHBOARD
+            ? <FinanceDashboard
+                onOpenTransaction={(id) => {
+                  window.alert(`交易 ${id} 详情页待实现`);
+                }}
+              />
+            : <PermissionDenied permission="FINANCE_DASHBOARD" hint="财务报表涉及敏感数据，仅管理员可查看。" />
         )}
         <footer className="app-copyright" aria-label="版权信息">
           版权所有上海缘起卢卡智能科技有限公司

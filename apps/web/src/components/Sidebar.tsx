@@ -35,6 +35,7 @@ type NavItem = {
   label: string;
   icon: IconType;
   color?: string; // V2.0 业务联动色（与员工卡片同色）
+  requireModule?: string; // V2.0 权限：需要的模块权限
 };
 
 type NavGroup = {
@@ -43,17 +44,18 @@ type NavGroup = {
   icon: IconType;
   items?: NavItem[];
   page?: Page; // 一级菜单自身跳转页面（可选）
+  requireModule?: string; // V2.0 权限：整个 group 需要的权限
 };
 
 const navigation: NavGroup[] = [
-  // 工作台（一级 - 默认入口）
+  // 工作台（一级 - 默认入口，所有人可见）
   {
     id: "overview",
     label: "工作台",
     icon: LayoutDashboard,
     page: "overview"
   },
-  // 客户与项目（业务主线）
+  // 客户与项目（业务主线，所有登录用户可见）
   {
     id: "customer-group",
     label: "客户与项目",
@@ -70,32 +72,33 @@ const navigation: NavGroup[] = [
     label: "认证业务",
     icon: Award,
     items: [
-      { id: "consult", label: "AI 咨询", icon: MessageSquareText, color: "#3b82f6" },           // 培训讲师 蓝
-      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#ec4899" },     // 认证专家 粉
-      { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" }                  // 跟进联动绿
+      { id: "consult", label: "AI 咨询", icon: MessageSquareText, color: "#3b82f6" },
+      { id: "certification-quote", label: "认证报价", icon: Calculator, color: "#ec4899" },
+      { id: "todo", label: "待办事项", icon: CheckSquare, color: "#10b981" }
     ]
   },
-  // 财务
+  // 财务（仅管理员）
   {
     id: "finance-group",
     label: "财务",
     icon: Banknote,
+    requireModule: "FINANCE_DASHBOARD",  // 仅 admin 可见
     items: [
       { id: "finance-dashboard", label: "财务看板", icon: Banknote, color: "#64748b" }
     ]
   },
-  // 知识资产
+  // 知识资产（知识库/文件浏览所有人可见；知识审核仅管理员）
   {
     id: "knowledge-group",
     label: "知识中心",
     icon: BookOpen,
     items: [
       { id: "knowledge", label: "知识库", icon: BookOpen, color: "#8b5cf6" },
-      { id: "knowledge-review", label: "知识审核", icon: ClipboardCheck, color: "#8b5cf6" },
+      { id: "knowledge-review", label: "知识审核", icon: ClipboardCheck, color: "#8b5cf6", requireModule: "KNOWLEDGE_REVIEW" },
       { id: "files", label: "文件浏览", icon: FolderOpen, color: "#8b5cf6" }
     ]
   },
-  // 工具
+  // 工具（系统基础数据仅管理员）
   {
     id: "tools",
     label: "工具",
@@ -103,10 +106,10 @@ const navigation: NavGroup[] = [
     items: [
       { id: "documents", label: "文档分析", icon: FileSearch, color: "#64748b" },
       { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" },
-      { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6" }
+      { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6", requireModule: "SYSTEM_BASIC_DATA" }
     ]
   },
-  // 历史成果
+  // 历史成果（所有人可见）
   {
     id: "results",
     label: "历史成果",
@@ -122,6 +125,12 @@ interface SidebarProps {
   onOpen: () => void;
   onClose: () => void;
   currentUser?: { username: string; role: string; displayName?: string };
+  permissions?: {
+    isAdmin: boolean;
+    modules: Record<string, boolean>;
+    actions: Record<string, boolean>;
+    roleLabel: string;
+  };
   onLogout?: () => void | Promise<void>;
   theme: "light" | "dark";
   onToggleTheme: () => void;
@@ -134,14 +143,35 @@ export function Sidebar({
   onOpen,
   onClose,
   currentUser,
+  permissions,
   onLogout,
   theme,
   onToggleTheme
 }: SidebarProps) {
+  // V2.0 权限：根据 permissions 过滤菜单项
+  const filteredNavigation = navigation
+    .map((group) => {
+      // group 级权限检查
+      if (group.requireModule && !permissions?.modules[group.requireModule]) {
+        return null;
+      }
+      // item 级权限过滤
+      const items = group.items
+        ?.filter((item) => !item.requireModule || permissions?.modules[item.requireModule])
+        ?.filter((item) => permissions?.isAdmin || (!item.id.includes("review") && !item.id.includes("financial")))
+        .map((item) => item);
+      // group 无 item 时（自身跳转），保留
+      if (!group.items) return group;
+      // 如果过滤后无 item，group 也不显示
+      if (!items || items.length === 0) return null;
+      return { ...group, items };
+    })
+    .filter(Boolean) as NavGroup[];
+
   // 默认展开包含当前页的 group
   const getInitialOpen = () => {
     const openGroups = new Set<string>();
-    navigation.forEach((group) => {
+    filteredNavigation.forEach((group) => {
       if (group.items) {
         if (group.items.some((item) => item.id === page)) {
           openGroups.add(group.id);
@@ -159,7 +189,7 @@ export function Sidebar({
 
   useEffect(() => {
     // 当前页面变化时，自动展开对应 group
-    navigation.forEach((group) => {
+    filteredNavigation.forEach((group) => {
       if (group.items && group.items.some((item) => item.id === page)) {
         setExpanded((prev) => new Set([...Array.from(prev), group.id]));
       }
@@ -200,7 +230,7 @@ export function Sidebar({
 
         <nav className="nav-list" aria-label="主导航">
           <span className="nav-label">工作台</span>
-          {navigation.map((group) => {
+          {filteredNavigation.map((group) => {
             const GroupIcon = group.icon;
             const isExpanded = expanded.has(group.id);
             const isActiveGroup =

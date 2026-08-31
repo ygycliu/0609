@@ -5065,6 +5065,27 @@ export function createApp() {
     fields: string[],
     codeField: string | null
   ) => {
+    // V2.0：admin 权限拦截 middleware（直接返回 403 JSON，不 throw）
+    const requireAdmin = (request: express.Request, response: express.Response, next: express.NextFunction) => {
+      try {
+        const u = getUserFromReq(request);
+        if (u.role !== "admin") {
+          response.status(403).json({
+            code: "FORBIDDEN",
+            message: "系统基础数据修改需要管理员权限。请联系管理员获取授权。",
+            requestId: request.id
+          });
+          return;
+        }
+        next();
+      } catch (e: any) {
+        response.status(500).json({
+          code: "INTERNAL_ERROR",
+          message: e?.message || "权限检查失败",
+          requestId: request.id
+        });
+      }
+    };
     // 列表
     app.get(`/api${path}`, async (request, response, next) => {
       try {
@@ -5080,8 +5101,8 @@ export function createApp() {
       } catch (e) { next(e); }
     });
 
-    // 创建
-    app.post(`/api${path}`, async (request, response, next) => {
+    // 创建（V2.0：需要管理员权限）
+    app.post(`/api${path}`, requireAdmin, async (request, response, next) => {
       try {
         const u = getUserFromReq(request);
         const body = request.body as any;
@@ -5107,8 +5128,8 @@ export function createApp() {
       } catch (e) { next(e); }
     });
 
-    // 更新
-    app.put(`/api${path}/:id`, async (request, response, next) => {
+    // 更新（V2.0：需要管理员权限）
+    app.put(`/api${path}/:id`, requireAdmin, async (request, response, next) => {
       try {
         const u = getUserFromReq(request);
         const body = request.body as any;
@@ -5131,8 +5152,8 @@ export function createApp() {
       } catch (e) { next(e); }
     });
 
-    // 删除（软删）
-    app.delete(`/api${path}/:id`, async (request, response, next) => {
+    // 删除（软删，V2.0：需要管理员权限）
+    app.delete(`/api${path}/:id`, requireAdmin, async (request, response, next) => {
       try {
         const u = getUserFromReq(request);
         await query(

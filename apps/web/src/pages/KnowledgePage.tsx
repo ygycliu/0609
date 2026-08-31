@@ -24,9 +24,13 @@ const categories = [
 interface KnowledgePageProps {
   knowledge: KnowledgeItem[];
   onChange: (items: KnowledgeItem[]) => void;
+  currentUser?: { role?: string; isAdmin?: boolean };  // V2.0 权限
 }
 
-export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
+export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePageProps) {
+  // V2.0：权限判断
+  const canUpload = currentUser?.isAdmin || currentUser?.role === "admin";
+  const canDelete = canUpload;
   const [query, setQuery] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -139,6 +143,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
       </header>
 
       <section className="knowledge-layout">
+        {canUpload && (
         <form className="upload-panel" onSubmit={upload}>
           <div className="panel-title">
             <FileUp size={20} />
@@ -187,6 +192,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
           </button>
           {error && <div className="error-banner">{error}</div>}
         </form>
+        )}
 
         <section className="knowledge-list-panel">
           <div className="list-toolbar">
@@ -238,6 +244,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
                     >
                       <Eye size={17} />
                     </button>
+                    {canDelete && (
                     <button
                       className="danger-icon"
                       onClick={() => remove(item)}
@@ -246,6 +253,7 @@ export function KnowledgePage({ knowledge, onChange }: KnowledgePageProps) {
                     >
                       <Trash2 size={17} />
                     </button>
+                    )}
                   </div>
                 </article>
               ))
