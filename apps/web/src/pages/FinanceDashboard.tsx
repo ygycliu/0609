@@ -271,6 +271,51 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
         </div>
         </header>
 
+      {/* V2.0：期间筛选（移到 KPI 卡片上方） */}
+      <section className="finance-toolbar">
+        <div className="toolbar-group">
+          <Filter size={16} />
+          <span>期间：</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setPage(0);
+              setStartDate(e.target.value);
+            }}
+          />
+          <span>~</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setPage(0);
+              setEndDate(e.target.value);
+            }}
+          />
+        </div>
+        {/* V2.0：快捷期间按钮 + 日期字段模式切换 */}
+        <div className="toolbar-group quick-range">
+          <span style={{ fontSize: 12, color: "#64748b" }}>快捷：</span>
+          <button className="quick-pill" onClick={() => { setPage(0); setThisMonth(); }}>本月</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setLastMonth(); }}>上月</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setThisQuarter(); }}>本季</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setThisYear(); }}>今年</button>
+          <button className="quick-pill" onClick={() => { setPage(0); setAllTime(); }}>全部</button>
+          <span style={{ fontSize: 12, color: "#64748b", marginLeft: 8 }}>口径：</span>
+          <button
+            className={`quick-pill ${dateField === "trans_month" ? "active" : ""}`}
+            onClick={() => setDateField("trans_month")}
+            title="按业务归属月份统计"
+          >所属月份</button>
+          <button
+            className={`quick-pill ${dateField === "trans_date" ? "active" : ""}`}
+            onClick={() => setDateField("trans_date")}
+            title="按制单日期统计"
+          >制单日期</button>
+        </div>
+      </section>
+
       {/* 统计区 */}
       <section className="finance-metric-grid">
         <div className="metric metric-income">
@@ -359,51 +404,6 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
             <span className="trend-legend-item"><span className="dot dot-income" /> 收入</span>
             <span className="trend-legend-item"><span className="dot dot-expense" /> 支出</span>
           </div>
-        </div>
-      </section>
-
-      {/* 期间筛选 */}
-      <section className="finance-toolbar">
-        <div className="toolbar-group">
-          <Filter size={16} />
-          <span>期间：</span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => {
-              setPage(0);
-              setStartDate(e.target.value);
-            }}
-          />
-          <span>~</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => {
-              setPage(0);
-              setEndDate(e.target.value);
-            }}
-          />
-        </div>
-        {/* V2.0：快捷期间按钮 + 日期字段模式切换 */}
-        <div className="toolbar-group quick-range">
-          <span style={{ fontSize: 12, color: "#64748b" }}>快捷：</span>
-          <button className="quick-pill" onClick={() => { setPage(0); setThisMonth(); }}>本月</button>
-          <button className="quick-pill" onClick={() => { setPage(0); setLastMonth(); }}>上月</button>
-          <button className="quick-pill" onClick={() => { setPage(0); setThisQuarter(); }}>本季</button>
-          <button className="quick-pill" onClick={() => { setPage(0); setThisYear(); }}>今年</button>
-          <button className="quick-pill" onClick={() => { setPage(0); setAllTime(); }}>全部</button>
-          <span style={{ fontSize: 12, color: "#64748b", marginLeft: 8 }}>口径：</span>
-          <button
-            className={`quick-pill ${dateField === "trans_month" ? "active" : ""}`}
-            onClick={() => setDateField("trans_month")}
-            title="按业务归属月份统计"
-          >所属月份</button>
-          <button
-            className={`quick-pill ${dateField === "trans_date" ? "active" : ""}`}
-            onClick={() => setDateField("trans_date")}
-            title="按制单日期统计"
-          >制单日期</button>
         </div>
       </section>
 
