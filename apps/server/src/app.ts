@@ -5545,19 +5545,102 @@ export async function createApp() {
   app.patch("/api/certificates/:id/acknowledge", async (request, response, next) => {
     try {
       const u = getUserFromReq(request);
-      if (u.role !== "admin") {
-        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可标记证书" });
-        return;
-      }
-      const r = await query(
-        `UPDATE project_certificate 
-         SET notes = COALESCE(notes, '') || E'\n[已确认] ' || $1 || ' @ ' || NOW()::text
-         WHERE id = $2 AND deleted_at IS NULL
-         RETURNING id`,
-        [((u as any).username || (u as any).email || 'admin'), request.params.id]
+      const note = ((request.body as any)?.note || "") as string;
+      const userId = (u as any).userId || (u as any).id || null;
+
+      // 1. 查询证书信息（含客户 + 阶段）
+      const certInfo = await query(
+        `SELECT pc.id, pc.cert_type, pc.certificate_no, pc.valid_until,
+                cp.customer_id, cp.customer_name, cp.company_id
+         FROM project_certificate pc
+         JOIN certification_project cp ON cp.id = pc.project_id
+         WHERE pc.id = $1 AND pc.deleted_at IS NULL`,
+        [request.params.id]
       );
-      if (r.rows.length === 0) throw new NotFoundError("证书");
-      response.json({ data: { id: request.params.id, acknowledged: true } });
+      if (certInfo.rows.length === 0) throw new NotFoundError("证书");
+      const cert = certInfo.rows[0];
+
+      // 2. 查询阶段信息（决定模式：推送代办 vs 隐藏）
+      const stageInfo = await query(
+        `SELECT current_stage, next_stage, next_stage_date, days_until_next, urgency_level
+         FROM certificate_next_stage($1::date, $2::date, $3)`,
+        [(await query(`SELECT issue_date FROM project_certificate WHERE id = $1`, [request.params.id])).rows[0]?.issue_date,
+         cert.valid_until,
+         cert.cert_type]
+      );
+      const stage = stageInfo.rows[0] || {
+        current_stage: null, next_stage: '再认证', urgency_level: 'NORMAL'
+      };
+
+      // 3. 推送代办（如果是紧急/已过期/再认证紧急 → 创建 todo）
+      //    紧急模式 = RENEW + CRITICAL → 推送代办
+      const shouldPushTodo = ['RENEW', 'CRITICAL'].includes(stage.urgency_level);
+      let todoId: string | null = null;
+
+      if (shouldPushTodo) {
+        const dueDate = (stage.days_until_next && stage.days_until_next < 0)
+          ? new Date().toISOString()
+          : (stage.next_stage_date || cert.valid_until) + 'T09:00:00.000Z';
+        const priority = stage.urgency_level === 'RENEW' ? 'urgent' : 'high';
+
+        const todoInsert = await query(
+          `INSERT INTO todo (
+            company_id, owner_user_id, title, description,
+            category, source, source_ref, due_at, remind_at,
+            status, priority, customer_id, metadata, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+          RETURNING id`,
+          [
+            cert.company_id,
+            userId,
+            `🔔 证书${stage.next_stage || '再认证'}：${cert.customer_name} - ${cert.cert_type}`,
+            `客户【${cert.customer_name}】\n` +
+            `当前阶段：${stage.current_stage || '已过期'}\n` +
+            `下一阶段：${stage.next_stage || '再认证'}\n` +
+            `证书号：${cert.certificate_no}\n` +
+            `证书类型：${cert.cert_type}\n` +
+            `有效期至：${cert.valid_until}\n\n` +
+            `已由 ${(u as any).username || 'admin'} 推送处理。${note ? '\n备注：' + note : ''}`,
+            'general',
+            'cert_acknowledge',
+            request.params.id,
+            dueDate,
+            new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+            'pending',
+            priority,
+            cert.customer_id,
+            JSON.stringify({
+              cert_id: cert.id,
+              next_stage: stage.next_stage,
+              valid_until: cert.valid_until,
+              urgency_level: stage.urgency_level,
+              acknowledged_by: userId
+            })
+          ]
+        );
+        todoId = todoInsert.rows[0]?.id || null;
+      }
+
+      // 4. 标记证书为已确认（会被视图过滤掉）
+      await query(
+        `UPDATE project_certificate
+         SET acknowledged_at = NOW(),
+             acknowledged_by = $1,
+             acknowledged_note = $2
+         WHERE id = $3 AND deleted_at IS NULL`,
+        [userId, note || null, request.params.id]
+      );
+
+      response.json({
+        data: {
+          id: request.params.id,
+          acknowledged: true,
+          todo_created: !!todoId,
+          mode: shouldPushTodo ? 'push_todo' : 'hidden',
+          next_stage: stage.next_stage,
+          urgency_level: stage.urgency_level
+        }
+      });
     } catch (error) { next(error); }
   });
 

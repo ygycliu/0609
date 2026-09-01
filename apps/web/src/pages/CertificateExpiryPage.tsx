@@ -78,14 +78,17 @@ export function CertificateExpiryPage() {
     load();
   }, []);
 
-  const handleAck = async (certId: string, customer: string) => {
-    if (!window.confirm(`确认已处理 ${customer} 的证书预警？`)) return;
+  const handleAck = async (cert: CertificateItem) => {
     try {
-      await api.acknowledgeCert(certId);
-      ToastManager.success(`✅ ${customer} 已标记为已处理`);
-      await load();
+      const r = await api.acknowledgeCert(cert.certificate_id, "");
+      const data = (r as any)?.data || r;
+      const modeText = data.mode === 'push_todo' 
+        ? `📌 已推送待办（${data.urgency_level === 'RENEW' ? '已过期' : '紧急'}）` 
+        : `✅ 已隐藏（${cert.urgency_level}）`;
+      ToastManager.success(`${cert.customer_name} ${modeText}`);
+      await load();  // 刷新（视图过滤已确认）
     } catch (e: any) {
-      ToastManager.error(`标记失败：${e?.message ?? "未知错误"}`);
+      ToastManager.error(`操作失败：${e?.message ?? "未知错误"}`);
     }
   };
 
@@ -284,10 +287,16 @@ export function CertificateExpiryPage() {
                       {it.urgency_level !== "正常" && (
                         <button
                           className="ghost-button tiny"
-                          onClick={() => handleAck(it.certificate_id, it.customer_name)}
-                          title="标记为已处理（仅备注）"
+                          onClick={() => handleAck(it)}
+                          title={
+                            it.urgency_level === '已过期' || it.urgency_level === '再认证紧急' || it.urgency_level === '即将到期'
+                              ? '点击推送到待办，并从列表移除'
+                              : '点击从列表移除'
+                          }
                         >
-                          ✓ 已处理
+                          {it.urgency_level === '已过期' || it.urgency_level === '再认证紧急' || it.urgency_level === '即将到期'
+                            ? '📌 推送'
+                            : '✓ 隐藏'}
                         </button>
                       )}
                     </td>
