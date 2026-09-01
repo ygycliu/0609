@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Search, Edit3, Power, PowerOff, Trash2, X, User, Award,
-  Briefcase, Phone, Mail, MapPin, Tag, Save, LoaderCircle, AlertCircle
+  Briefcase, Phone, Mail, MapPin, Tag, Save, LoaderCircle, AlertCircle, Scan
 } from "lucide-react";
 import { api } from "../lib/api";
 import { ToastManager } from "../components/Toast";
@@ -431,6 +431,7 @@ function AuditorEditDrawer({
   onSave: () => void;
   onClose: () => void;
 }) {
+  const [ocrLoading, setOcrLoading] = useState(false);
   const update = (k: keyof Auditor, v: any) => {
     onChange({ ...auditor, [k]: v });
   };
@@ -454,9 +455,52 @@ function AuditorEditDrawer({
             <h2>{auditor.name || "未命名"}</h2>
             <p>审核员档案 · {auditor.organization || "未分类"}</p>
           </div>
-          <button className="ghost-button" onClick={onClose} title="关闭">
-            <X size={18} />
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            {/* V2.0：OCR 扫描按钮（admin only + 有证书时） */}
+            {isAdmin && !isCreating && auditor.id && (auditor.certificates && auditor.certificates.length > 0) && (
+              <button
+                className="ghost-button"
+                onClick={async () => {
+                  if (!window.confirm(`将使用 OCR 扫描该审核员的 ${auditor.certificates?.length ?? 0} 张证书图片。\n（首次扫描需 10-30 秒）`)) return;
+                  setOcrLoading(true);
+                  try {
+                    const r = await api.ocrAllAuditorCerts(auditor.id);
+                    const d = r?.data || r;
+                    if (d.results && d.results.length > 0) {
+                      const ok = d.results.filter((x: any) => !x.error);
+                      const fail = d.results.filter((x: any) => x.error);
+                      ToastManager.success(`✅ OCR 完成：${ok.length} 张成功${fail.length > 0 ? `，${fail.length} 张失败` : ""}`);
+                      // 用 OCR 推断的 specialties 覆盖现有
+                      const systems = new Set<string>();
+                      d.results.forEach((x: any) => {
+                        if (x.systems && Array.isArray(x.systems)) {
+                          x.systems.forEach((s: string) => systems.add(s));
+                        }
+                      });
+                      if (systems.size > 0) {
+                        onChange({ ...auditor, specialties: Array.from(systems) });
+                        ToastManager.info(`📋 已更新专业：${Array.from(systems).join(", ")}`);
+                      }
+                    } else {
+                      ToastManager.warning("OCR 扫描未返回结果");
+                    }
+                  } catch (e: any) {
+                    ToastManager.error(`❌ OCR 失败：${e?.message ?? "未知错误"}`);
+                  } finally {
+                    setOcrLoading(false);
+                  }
+                }}
+                disabled={ocrLoading}
+                title="用 OCR 自动识别证书图片内容"
+              >
+                {ocrLoading ? <LoaderCircle className="spin" size={18} /> : <Scan size={18} />}
+                {ocrLoading ? "OCR 扫描中" : "扫描证书"}
+              </button>
+            )}
+            <button className="ghost-button" onClick={onClose} title="关闭">
+              <X size={18} />
+            </button>
+          </div>
         </header>
         <div className="drawer-body">
           <div className="form-grid">

@@ -238,6 +238,29 @@ export const api = {
   deleteAuditor: (id: string) =>
     request<any>(`/auditors/${id}`, { method: "DELETE" }),
 
+  // V2.0：OCR 扫描所有证书
+  ocrAllAuditorCerts: (id: string) =>
+    request<any>(`/auditors/${id}/ocr-all`, {
+      method: "POST", headers: { "Content-Type": "application/json" }
+    }),
+  // V2.0：OCR 单个证书
+  ocrCertificate: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch(`${API_BASE_URL}/auditors/ocr`, {
+      method: "POST",
+      body: fd,
+      credentials: "include"
+    }).then(async (r) => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err?.message || `OCR 失败 (${r.status})`);
+      }
+      const j = await r.json();
+      return j?.data || j;
+    });
+  },
+
   // ===== Consultation =====
   listConsultations: () => request<ConsultationRecord[]>("/consultations"),
   createConsultation: (input: any) =>

@@ -145,6 +145,7 @@ export async function createApp() {
   // V2.0：审核员档案仓储（顶层 dynamic import，ESM 友好）
   const auditorModule = await import("./auditors/auditor.repository.js");
   const auditorRepo = new auditorModule.AuditorProfileRepository();
+  const ocrModule = await import("./auditors/ocr.service.js");
   const knowledgeRepository = new KnowledgeRepository();
   // 探测 DB 可用性（不阻塞启动，DB 不可用时 fallback 到 JSON）
   knowledgeRepository.init().catch((err) => {
@@ -5582,6 +5583,57 @@ export async function createApp() {
       const ok = await auditorRepo.delete(u.companyId, request.params.id);
       if (!ok) throw new NotFoundError("审核员");
       response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：OCR 识别证书图片
+  app.post("/api/auditors/ocr", upload.single("file"), async (request, response, next) => {
+    try {
+      const file = request.file;
+      if (!file) throw new ValidationError("请上传证书图片");
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (![".png", ".jpg", ".jpeg", ".pdf"].includes(ext)) {
+        throw new ValidationError("只支持 PNG/JPG/PDF 格式");
+      }
+      // multer memoryStorage：把 buffer 写临时文件
+      const tmpPath = `/tmp/ocr_${Date.now()}${ext}`;
+      const fsPromises = await import("fs/promises");
+      await fsPromises.writeFile(tmpPath, file.buffer);
+      const result = await ocrModule.ocrCertificate({
+        filePath: tmpPath,
+        fileName: file.originalname
+      });
+      // 清理
+      try { await fsPromises.unlink(tmpPath); } catch {}
+      response.json({ data: result });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：扫描并 OCR 单个审核员的所有证书图片（按 file 路径）
+  app.post("/api/auditors/:id/ocr-all", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可触发 OCR" });
+        return;
+      }
+      const auditor = await auditorRepo.get(u.companyId, request.params.id);
+      if (!auditor) throw new NotFoundError("审核员");
+      const certs = auditor.certificates || [];
+      const results: any[] = [];
+      for (const c of certs) {
+        const file = c.file;
+        if (!file) continue;
+        const fsPromises = await import("fs/promises");
+        try {
+          await fsPromises.access(file);
+          const r = await ocrModule.ocrCertificate({ filePath: file, fileName: c.source_name });
+          results.push({ source_name: c.source_name, file, ...r });
+        } catch (e: any) {
+          results.push({ source_name: c.source_name, file, error: e?.message || "文件不存在" });
+        }
+      }
+      response.json({ data: { total: certs.length, results } });
     } catch (error) { next(error); }
   });
 
