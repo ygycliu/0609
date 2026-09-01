@@ -16,6 +16,12 @@ import {
 import { api } from "../lib/api";
 import { ToastManager } from "../components/Toast";
 
+// 格式化日期：去掉 ISO 时间戳后缀，只保留 YYYY-MM-DD
+function fmtDate(s: string | null | undefined): string {
+  if (!s) return "";
+  return s.split("T")[0];
+}
+
 interface CertificateItem {
   certificate_id: string;
   customer_id: string;
@@ -124,28 +130,44 @@ export function CertificateExpiryPage() {
 
       {stats && (
         <section className="stats-cards">
-          <div className="stat-card expired">
+          <div
+            className={`stat-card expired ${filterLevel === '已过期' ? 'active' : ''}`}
+            onClick={() => setFilterLevel(filterLevel === '已过期' ? 'all' : '已过期')}
+            title="点击查看已过期证书"
+          >
             <div className="stat-icon"><AlertCircle size={28} /></div>
             <div>
               <strong>{stats.expired}</strong>
               <span>已过期</span>
             </div>
           </div>
-          <div className="stat-card recert-critical">
+          <div
+            className={`stat-card recert-critical ${filterLevel === '即将到期' || filterLevel === '再认证紧急' ? 'active' : ''}`}
+            onClick={() => setFilterLevel(filterLevel === '即将到期' ? 'all' : '即将到期')}
+            title="点击查看紧急证书"
+          >
             <div className="stat-icon"><AlertTriangle size={28} /></div>
             <div>
               <strong>{(stats.recert_critical || 0) + (stats.expiring_soon || 0)}</strong>
               <span>紧急（监督/再认证 ≤30天）</span>
             </div>
           </div>
-          <div className="stat-card recert-warning">
+          <div
+            className={`stat-card recert-warning ${filterLevel === '再认证预警' ? 'active' : ''}`}
+            onClick={() => setFilterLevel(filterLevel === '再认证预警' ? 'all' : '再认证预警')}
+            title="点击查看再认证预警证书"
+          >
             <div className="stat-icon"><Clock size={28} /></div>
             <div>
               <strong>{stats.recert_warning || 0}</strong>
               <span>再认证预警（91-180天）</span>
             </div>
           </div>
-          <div className="stat-card normal">
+          <div
+            className={`stat-card normal ${filterLevel === '正常' ? 'active' : ''}`}
+            onClick={() => setFilterLevel(filterLevel === '正常' ? 'all' : '正常')}
+            title="点击查看正常证书"
+          >
             <div className="stat-icon"><CheckCircle2 size={28} /></div>
             <div>
               <strong>{stats.normal || 0}</strong>
@@ -202,10 +224,8 @@ export function CertificateExpiryPage() {
                 <th>当前阶段</th>
                 <th>下一阶段</th>
                 <th>证书号</th>
-                <th>签发日期</th>
                 <th>到期日期</th>
                 <th>距下一阶段</th>
-                <th>颁发机构</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -222,7 +242,7 @@ export function CertificateExpiryPage() {
                     </td>
                     <td>
                       <div className="customer-cell">
-                        <strong>{it.customer_name}</strong>
+                        <strong title={it.customer_name}>{it.customer_name}</strong>
                         <small>{it.project_code}</small>
                       </div>
                     </td>
@@ -236,19 +256,15 @@ export function CertificateExpiryPage() {
                     </td>
                     <td>
                       {it.next_stage ? (
-                        <span className="next-stage-pill">
-                          {it.next_stage}
-                          {it.next_stage_date && <small className="muted"> ({it.next_stage_date})</small>}
-                        </span>
+                        <span className="next-stage-pill">{it.next_stage}</span>
                       ) : (
                         <span className="muted small">—</span>
                       )}
                     </td>
                     <td><code>{it.certificate_no}</code></td>
-                    <td>{it.issue_date || <span className="muted small">—</span>}</td>
                     <td>
                       <strong style={{ color: it.days_until_next <= 60 ? "#dc2626" : "inherit" }}>
-                        {it.valid_until}
+                        {fmtDate(it.valid_until)}
                       </strong>
                     </td>
                     <td>
@@ -264,7 +280,6 @@ export function CertificateExpiryPage() {
                           : `已过 ${-it.days_until_next} 天`}
                       </strong>
                     </td>
-                    <td className="muted small">{it.issuing_body || "—"}</td>
                     <td>
                       {it.urgency_level !== "正常" && (
                         <button

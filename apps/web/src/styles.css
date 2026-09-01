@@ -10764,13 +10764,16 @@ textarea:focus {
 .cert-table-section {
   background: white;
   border-radius: 6px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .cert-expiry-table {
   width: 100%;
+  min-width: 1050px;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
 
 .cert-expiry-table thead {
@@ -11007,4 +11010,129 @@ textarea:focus {
 
 .muted {
   color: #94a3b8;
+}
+
+
+.cert-table-section::-webkit-scrollbar {
+  height: 8px;
+}
+
+.cert-table-section::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.cert-table-section::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+
+/* V2.0 证书预警表格 - 列宽控制（9列） */
+.cert-expiry-table th,
+.cert-expiry-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cert-expiry-table th:nth-child(1),
+.cert-expiry-table td:nth-child(1) {
+  width: 110px;  /* 状态 */
+}
+
+.cert-expiry-table th:nth-child(2),
+.cert-expiry-table td:nth-child(2) {
+  width: 200px;  /* 客户 */
+}
+
+.cert-expiry-table th:nth-child(3),
+.cert-expiry-table td:nth-child(3) {
+  width: 130px;  /* 证书类型 */
+}
+
+.cert-expiry-table th:nth-child(4),
+.cert-expiry-table td:nth-child(4) {
+  width: 90px;  /* 当前阶段 */
+}
+
+.cert-expiry-table th:nth-child(5),
+.cert-expiry-table td:nth-child(5) {
+  width: 90px;  /* 下一阶段 */
+}
+
+.cert-expiry-table th:nth-child(6),
+.cert-expiry-table td:nth-child(6) {
+  width: 150px;  /* 证书号 */
+}
+
+.cert-expiry-table th:nth-child(7),
+.cert-expiry-table td:nth-child(7) {
+  width: 100px;  /* 到期日期 */
+}
+
+.cert-expiry-table th:nth-child(8),
+.cert-expiry-table td:nth-child(8) {
+  width: 100px;  /* 距下一阶段 */
+}
+
+.cert-expiry-table th:nth-child(9),
+.cert-expiry-table td:nth-child(9) {
+  width: 80px;  /* 操作 */
+}
+
+.cert-table-section::-webkit-scrollbar {
+  height: 8px;
+}
+
+.cert-table-section::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.cert-table-section::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+
+/* V2.0 统计卡片 - 穿透点击支持 */
+.cert-expiry-page .stat-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.cert-expiry-page .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+}
+
+.cert-expiry-page .stat-card:active {
+  transform: translateY(0);
+}
+
+/* 当前选中状态（高亮边框 + 背景变深） */
+.cert-expiry-page .stat-card.active {
+  outline: 3px solid currentColor;
+  outline-offset: -2px;
+  background: #fef3c7;
+}
+
+.cert-expiry-page .stat-card.expired.active {
+  background: #fecaca;
+  outline-color: #dc2626;
+}
+
+.cert-expiry-page .stat-card.recert-critical.active {
+  background: #fed7aa;
+  outline-color: #ea580c;
+}
+
+.cert-expiry-page .stat-card.recert-warning.active {
+  background: #fef3c7;
+  outline-color: #f59e0b;
+}
+
+.cert-expiry-page .stat-card.normal.active {
+  background: #bbf7d0;
+  outline-color: #16a34a;
 }
