@@ -330,7 +330,7 @@ function cover(record: ConsultationRecord, branding: DocxBranding): FileChild[] 
       spacing: { before: 1200, after: 260 },
       children: [
         new TextRun({
-          text: "AI数字化中心",
+          text: "AI数字化认证中心",
           font: FONTS.heading,
           size: 24,
           bold: true,
@@ -618,7 +618,7 @@ export async function generateConsultationDocx(
       spacing: { before: 160 },
       children: [
         textRun(
-          `本报告由 AI数字化中心基于客户需求、行业知识和咨询工作流生成，适用于项目研讨、内部立项与方案深化。`
+          `本报告由 AI数字化认证中心基于客户需求、行业知识和咨询工作流生成，适用于项目研讨、内部立项与方案深化。`
         )
       ]
     })
@@ -656,7 +656,7 @@ export async function generateConsultationDocx(
     creator: branding.preparedBy || branding.companyName,
     title: branding.documentTitle,
     subject: branding.projectName,
-    description: "AI数字化中心生成的可编辑企业咨询报告",
+    description: "AI数字化认证中心生成的可编辑企业咨询报告",
     styles: documentStyles(),
     numbering: {
       config: [

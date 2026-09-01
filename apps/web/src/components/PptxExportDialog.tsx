@@ -50,7 +50,7 @@ export function PptxExportDialog({ consultation }: PptxExportDialogProps) {
   const [form, setForm] = useState<ExportForm>(() => {
     const stored = storedOrganization();
     return {
-      companyName: stored.companyName ?? "本企业AI数字化中心",
+      companyName: stored.companyName ?? "本企业AI数字化认证中心",
       clientName: stored.clientName ?? "客户单位",
       projectName: `${consultation.industry}数字化建设项目`,
       presentationTitle: consultation.deliverable,

@@ -223,7 +223,7 @@ export function Sidebar({
             <BrainCircuit size={23} />
           </div>
           <div>
-            <strong>AI数字化</strong>
+            <strong>AI数字化认证</strong>
             <span>中心</span>
           </div>
           <button className="sidebar-close" onClick={onClose} aria-label="关闭导航">

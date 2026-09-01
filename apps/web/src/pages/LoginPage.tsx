@@ -67,7 +67,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">AI</div>
-        <h1 className="login-title">AI 数字化中心</h1>
+        <h1 className="login-title">AI数字化认证中心</h1>
         <p className="login-subtitle">中认认证宁夏分公司 · 数字员工系统</p>
 
         {step === "credentials" && (
