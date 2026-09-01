@@ -5494,17 +5494,31 @@ export async function createApp() {
     try {
       const warningDays = Number((request.query.warning_days as string) || "180");
       const criticalDays = Number((request.query.critical_days as string) || "60");
+      const includeNormal = (request.query.include_normal as string) !== "0";  // 默认含"正常"
+      
       // V2.0：通过 vw_certificate_expiry_alerts 视图查询（含 4 阶段信息）
+      // 默认返回全部证书，前端可筛选
+      const whereClause = includeNormal 
+        ? "" 
+        : "WHERE urgency_level != '正常'";
+      
       const r = await query(
-        `SELECT * FROM vw_certificate_expiry_alerts WHERE urgency_level != '正常'`
+        `SELECT * FROM vw_certificate_expiry_alerts ${whereClause}`
       );
-      // 统计
+      // 统计（基于全部证书视图，包含正常）
+      const allStats = await query(`SELECT urgency_level, COUNT(*) AS cnt FROM vw_certificate_expiry_alerts GROUP BY urgency_level`);
+      const statsMap: Record<string, number> = {};
+      for (const row of allStats.rows) {
+        statsMap[row.urgency_level] = Number(row.cnt);
+      }
+      
       const stats = {
-        total: r.rows.length,
-        expired: r.rows.filter((x: any) => x.urgency_level === '已过期').length,
-        recert_critical: r.rows.filter((x: any) => x.urgency_level === '再认证紧急').length,
-        recert_warning: r.rows.filter((x: any) => x.urgency_level === '再认证预警').length,
-        expiring_soon: r.rows.filter((x: any) => x.urgency_level === '即将到期').length,
+        total: Object.values(statsMap).reduce((a: number, b: number) => a + b, 0),
+        expired: statsMap['已过期'] || 0,
+        recert_critical: statsMap['再认证紧急'] || 0,
+        recert_warning: statsMap['再认证预警'] || 0,
+        expiring_soon: statsMap['即将到期'] || 0,
+        normal: statsMap['正常'] || 0,
         warning_days: warningDays,
         critical_days: criticalDays
       };
