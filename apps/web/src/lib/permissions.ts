@@ -38,6 +38,10 @@ export const MODULE_PERMISSIONS = {
   QUOTE_DELETE: ["admin"],
   /** 财务报表 */
   FINANCE_DASHBOARD: ["admin"],
+  /** 审核员档案（基础数据 - 管理员可读写，普通用户只读）*/
+  AUDITOR_PROFILE: ["admin", "regular"],
+  /** 审核员档案编辑 */
+  AUDITOR_PROFILE_EDIT: ["admin"],
 } as const;
 
 /** 操作级权限（决定页面内按钮）*/

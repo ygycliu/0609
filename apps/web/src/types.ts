@@ -19,6 +19,7 @@ export type Page =
   | "project-new"
   | "base-data"
   | "system-enum"
+  | "auditor-profile"
   | "data-exchange";
 
 export interface ReviewItem {

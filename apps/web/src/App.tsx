@@ -13,6 +13,7 @@ import { KnowledgePage } from "./pages/KnowledgePage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { SystemEnumPage } from "./pages/SystemEnumPage";
+import { AuditorProfilePage } from "./pages/AuditorProfilePage";
 import { DataExchangePage } from "./pages/DataExchangePage";
 import { AuditorPage } from "./pages/AuditorPage";
 import { FilesPage } from "./pages/FilesPage";
@@ -180,6 +181,9 @@ export default function App() {
           permissions.modules.SYSTEM_BASIC_DATA
             ? <SystemEnumPage />
             : <PermissionDenied permission="SYSTEM_BASIC_DATA" hint="系统基础数据（签约主体/外协/风险等级）只对管理员开放。" />
+        )}
+        {page === "auditor-profile" && (
+          <AuditorProfilePage currentUser={{ isAdmin: permissions.isAdmin, role: permissions.isAdmin ? "admin" : "regular" }} />
         )}
         {page === "data-exchange" && (
           permissions.isAdmin

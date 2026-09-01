@@ -14,6 +14,7 @@ import { config } from "./config.js";
 const execFile = promisify(execFileCb);
 import { ConsultationService } from "./consultations/consultation.service.js";
 import { extractDocumentText } from "./documents/document.service.js";
+import { ofdBufferToDocxBuffer } from "./docx/ofd-to-docx.js";
 import { ConsultationRepository } from "./consultations/consultation.repository.js";
 import { generateAuditPlan, generateChecklist, detectNonConformances, generateAuditReport } from "./auditor/auditor.service.js";
 import { autoGenerateAuditPlan, listTemplates as listAuditTemplates } from "./follow_up/autoAuditPlan.js";
@@ -139,8 +140,11 @@ function encodedFileName(value: string, extension: "docx" | "pptx") {
   return `UTF-8''${encodeURIComponent(`${safeName}.${extension}`)}`;
 }
 
-export function createApp() {
+export async function createApp() {
   const app = express();
+  // V2.0：审核员档案仓储（顶层 dynamic import，ESM 友好）
+  const auditorModule = await import("./auditors/auditor.repository.js");
+  const auditorRepo = new auditorModule.AuditorProfileRepository();
   const knowledgeRepository = new KnowledgeRepository();
   // 探测 DB 可用性（不阻塞启动，DB 不可用时 fallback 到 JSON）
   knowledgeRepository.init().catch((err) => {
@@ -1763,6 +1767,126 @@ export function createApp() {
   
 
   
+  // V2.0：OFD 转 Word（直接上传 OFD → 返回 docx 文件 + 提取的文本 + 标题）
+  app.post("/api/document/ofd-to-docx", upload.single("file"), async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") throw new ForbiddenError("只有管理员可以使用 OFD 转换功能");
+      if (!request.file) throw new ValidationError("请上传 OFD 文件");
+      const ext = path.extname(request.file.originalname).toLowerCase();
+      if (ext !== ".ofd") throw new ValidationError("只支持 .ofd 文件");
+
+      const result = await ofdBufferToDocxBuffer(request.file.buffer, {
+        titleHint: path.basename(request.file.originalname, ".ofd")
+      });
+
+      response.json({
+        data: {
+          docxBase64: result.docx.toString("base64"),
+          docxSize: result.docx.length,
+          title: result.title,
+          text: result.text.slice(0, 5000),  // 前 5000 字用于预览
+          textLength: result.text.length
+        }
+      });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：OFD 一键入库（OFD → 转换 → 自动入知识库 + 自动审批）
+  app.post("/api/document/ofd-to-knowledge", upload.single("file"), async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") throw new ForbiddenError("只有管理员可以使用 OFD 入库功能");
+      if (!request.file) throw new ValidationError("请上传 OFD 文件");
+      const ext = path.extname(request.file.originalname).toLowerCase();
+      if (ext !== ".ofd") throw new ValidationError("只支持 .ofd 文件");
+
+      const category = String(request.body.category ?? "").trim();
+      if (!category) throw new ValidationError("请选择知识分类");
+      const tags = String(request.body.tags ?? "").trim();
+      const userTitle = String(request.body.title ?? "").trim();
+
+      // 1. OFD → Word
+      const result = await ofdBufferToDocxBuffer(request.file.buffer, {
+        titleHint: userTitle || path.basename(request.file.originalname, ".ofd")
+      });
+      const finalTitle = userTitle || result.title;
+
+      // 2. 存 Word 文件到 uploads 目录
+      await fs.mkdir(config.uploadsDir, { recursive: true });
+      const docId = randomUUID();
+      const storedName = `${docId}.docx`;
+      await fs.writeFile(path.join(config.uploadsDir, storedName), result.docx);
+
+      // 3. 入 knowledge_document（pending_review）
+      await knowledgeRepository.add(u.companyId, {
+        id: docId,
+        companyId: u.companyId,
+        category,
+        title: finalTitle,
+        fileType: "docx",
+        tags: tags ? tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
+        content: result.text.slice(0, 100_000),
+        sourceName: request.file.originalname  // 保留原 OFD 文件名作为来源
+      } as any);
+      await query(
+        `UPDATE knowledge_document SET status = 'pending_review' WHERE doc_code = $1 AND company_id = $2`,
+        [docId, u.companyId]
+      );
+      const docRow = await query<{ id: string }>(
+        `SELECT id FROM knowledge_document WHERE doc_code = $1 AND company_id = $2`,
+        [docId, u.companyId]
+      );
+      const realDocId = docRow.rows[0]?.id;
+
+      // 4. 创建审核记录
+      const reviewId = randomUUID();
+      const uploadMeta = JSON.stringify({
+        title: finalTitle,
+        category,
+        fileType: "docx",
+        tags: tags ? tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
+        content: result.text.slice(0, 100_000),
+        sourceName: request.file.originalname
+      });
+      await query(
+        `INSERT INTO knowledge_review
+           (id, company_id, document_id, submitted_by, review_type,
+            proposed_content, reason, status, created_at)
+         VALUES ($1, $2, $3, $4, 'upload', $5, $6, 'pending', NOW())`,
+        [reviewId, u.companyId, realDocId, u.id, uploadMeta, `OFD 自动转换入库 - ${request.file.originalname}`]
+      );
+
+      // 5. 自动批准（admin 一键入库）- 直接 SQL
+      const reviewNote = `OFD 自动转换 + 自动入库 - 原文件：${request.file.originalname}`;
+      await query(
+        `UPDATE knowledge_review
+           SET status = 'applied', reviewed_by = $1, reviewed_at = NOW(),
+               review_note = $2
+         WHERE id = $3`,
+        [u.id, reviewNote, reviewId]
+      );
+      // 更新 document 为 active
+      await query(
+        `UPDATE knowledge_document SET status = 'active', updated_at = NOW()
+         WHERE id = $1 AND company_id = $2`,
+        [realDocId, u.companyId]
+      );
+
+      response.json({
+        data: {
+          ok: true,
+          title: finalTitle,
+          textLength: result.text.length,
+          docxSize: result.docx.length,
+          reviewId,
+          documentId: realDocId,
+          message: `OFD 文件已转换为 Word 并自动入库（${finalTitle}）`
+        }
+      });
+    } catch (error) { next(error); }
+  });
+
   app.get("/api/knowledge", async (request, response, next) => {
     try {
       const u = getUserFromReq(request);
@@ -5326,6 +5450,140 @@ export function createApp() {
     "company_id", "code", "label", "description",
     "auditor_level", "multiplier", "sort_order", "status", "created_by"
   ], "sort_order");
+
+  // ============== V2.0：审核员档案管理 ==============
+  // 与 enumCrud 不同：独立表，独立字段，独立业务逻辑
+  // auditorRepo 已在 createApp 顶部创建
+
+  // 列出审核员
+  app.get("/api/auditors", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const q = (request.query.q as string) || "";
+      const status = (request.query.status as string) || "";
+      const level = (request.query.level as string) || "";
+      const organization = (request.query.organization as string) || "";
+      const specialty = (request.query.specialty as string) || "";
+      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "100"), 1), 500);
+      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
+      const result = await auditorRepo.list(u.companyId, {
+        q: q.trim(),
+        status: status || undefined,
+        level: level || undefined,
+        organization: organization || undefined,
+        specialty: specialty || undefined,
+        limit,
+        offset
+      });
+      response.json({ data: result.items, total: result.total });
+    } catch (error) { next(error); }
+  });
+
+  // 统计
+  app.get("/api/auditors/stats", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const stats = await auditorRepo.getStats(u.companyId);
+      response.json({ data: stats });
+    } catch (error) { next(error); }
+  });
+
+  // 单个审核员
+  app.get("/api/auditors/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const auditor = await auditorRepo.get(u.companyId, request.params.id);
+      if (!auditor) throw new NotFoundError("审核员");
+      response.json({ data: auditor });
+    } catch (error) { next(error); }
+  });
+
+  // 创建审核员
+  app.post("/api/auditors", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可以新增审核员档案" });
+        return;
+      }
+      const body = request.body as Record<string, unknown>;
+      if (!body.name) throw new ValidationError("姓名必填");
+      const created = await auditorRepo.create(u.companyId, {
+        name: String(body.name),
+        code: body.code as string || null,
+        gender: body.gender as string || null,
+        idNumber: body.idNumber as string || null,
+        phone: body.phone as string || null,
+        email: body.email as string || null,
+        organization: body.organization as string || null,
+        department: body.department as string || null,
+        position: body.position as string || null,
+        level: (body.level as string) || "intermediate",
+        specialties: Array.isArray(body.specialties) ? body.specialties as string[] : [],
+        certNo: body.certNo as string || null,
+        certIssueDate: body.certIssueDate as string || null,
+        certExpiry: body.certExpiry as string || null,
+        certStatus: (body.certStatus as string) || "active",
+        dailyRate: Number(body.dailyRate ?? 0),
+        expertType: (body.expertType as string) || "auditor",
+        region: body.region as string || null,
+        languages: Array.isArray(body.languages) ? body.languages as string[] : [],
+        bio: body.bio as string || null,
+        notes: body.notes as string || null,
+        status: (body.status as string) || "active",
+        tags: Array.isArray(body.tags) ? body.tags as string[] : [],
+        source: (body.source as string) || "manual",
+        sourcePath: body.sourcePath as string || null
+      });
+      response.status(201).json({ data: created });
+    } catch (error) { next(error); }
+  });
+
+  // 更新审核员
+  app.patch("/api/auditors/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可以修改审核员档案" });
+        return;
+      }
+      const updated = await auditorRepo.update(u.companyId, request.params.id, request.body);
+      if (!updated) throw new NotFoundError("审核员");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  // 停用/启用
+  app.patch("/api/auditors/:id/status", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可以停用审核员" });
+        return;
+      }
+      const body = request.body as { status?: string };
+      if (!body.status || !["active", "inactive", "retired"].includes(body.status)) {
+        throw new ValidationError("status 必须是 active / inactive / retired");
+      }
+      const updated = await auditorRepo.setStatus(u.companyId, request.params.id, body.status as any);
+      if (!updated) throw new NotFoundError("审核员");
+      response.json({ data: updated });
+    } catch (error) { next(error); }
+  });
+
+  // 软删除
+  app.delete("/api/auditors/:id", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可以删除审核员" });
+        return;
+      }
+      const ok = await auditorRepo.delete(u.companyId, request.params.id);
+      if (!ok) throw new NotFoundError("审核员");
+      response.json({ data: { id: request.params.id, deleted: true } });
+    } catch (error) { next(error); }
+  });
 
   return app;
 }

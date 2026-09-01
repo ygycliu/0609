@@ -68,7 +68,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const message = (body && (body.message || body.error)) || `Request failed (${response.status})`;
     throw new ApiError(message, response.status);
   }
-  if (body && typeof body === "object" && "data" in body) return body.data as T;
+  if (body && typeof body === "object" && !Array.isArray(body) && "data" in body) return body.data as T;
   return body as T;
 }
 
@@ -160,8 +160,83 @@ export const api = {
         }
         throw new Error(msg);
       }),
+  // V2.0：OFD 一键入库（自动转 Word + 自动审批）
+  ofdToKnowledge: async (form: FormData) => {
+    const r = await fetch(`${API_BASE_URL}/document/ofd-to-knowledge`, {
+      method: "POST",
+      body: form,
+      credentials: "include"
+    });
+    if (r.ok) {
+      const json = await r.json();
+      return json?.data || json;
+    }
+    const status = r.status;
+    let msg = "OFD 入库失败";
+    try {
+      const err = await r.json();
+      msg = err?.message || msg;
+    } catch {}
+    if (status === 401 || status === 403) {
+      msg = "❌ 权限不足，仅管理员可以入库。";
+    } else if (status === 413) {
+      msg = "❌ 文件太大，请压缩后重试。";
+    }
+    throw new Error(msg);
+  },
+  // V2.0：OFD 仅转 Word（不入库）
+  ofdToDocx: async (form: FormData) => {
+    const r = await fetch(`${API_BASE_URL}/document/ofd-to-docx`, {
+      method: "POST",
+      body: form,
+      credentials: "include"
+    });
+    if (r.ok) {
+      const json = await r.json();
+      return json?.data || json;
+    }
+    const status = r.status;
+    let msg = "OFD 转换失败";
+    try {
+      const err = await r.json();
+      msg = err?.message || msg;
+    } catch {}
+    if (status === 401 || status === 403) {
+      msg = "❌ 权限不足，仅管理员可以使用。";
+    }
+    throw new Error(msg);
+  },
   deleteKnowledge: (id: string) =>
     request<{ ok: true }>(`/knowledge/${id}`, { method: "DELETE" }),
+
+  // ===== 审核员档案 =====
+  listAuditors: (params: { q?: string; status?: string; level?: string; organization?: string; limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.status) qs.set("status", params.status);
+    if (params.level) qs.set("level", params.level);
+    if (params.organization) qs.set("organization", params.organization);
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.offset !== undefined) qs.set("offset", String(params.offset));
+    const path = qs.toString() ? `/auditors?${qs.toString()}` : `/auditors`;
+    return request<any>(path);
+  },
+  getAuditor: (id: string) => request<any>(`/auditors/${id}`),
+  auditorStats: () => request<any>(`/auditors/stats`),
+  createAuditor: (input: any) =>
+    request<any>("/auditors", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateAuditor: (id: string, input: any) =>
+    request<any>(`/auditors/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+  updateAuditorStatus: (id: string, status: string) =>
+    request<any>(`/auditors/${id}/status`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status })
+    }),
+  deleteAuditor: (id: string) =>
+    request<any>(`/auditors/${id}`, { method: "DELETE" }),
 
   // ===== Consultation =====
   listConsultations: () => request<ConsultationRecord[]>("/consultations"),

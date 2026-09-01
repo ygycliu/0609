@@ -6,7 +6,7 @@ import { assertCurrentProductionRuntimeOwnership } from "./shared/runtime-owners
 await assertCurrentProductionRuntimeOwnership();
 await fs.mkdir(config.dataDir, { recursive: true });
 
-const server = createApp().listen(config.port, config.host, () => {
+const server = (await createApp()).listen(config.port, config.host, () => {
   console.log(`AI 数字化中心 API: http://${config.host}:${config.port}`);
 });
 

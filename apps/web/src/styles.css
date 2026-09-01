@@ -10171,3 +10171,266 @@ textarea:focus {
   color: #94a3b8;
   font-size: 11px;
 }
+
+
+/* V2.0 审核员档案 */
+.auditor-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.auditor-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.auditor-stat {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border-left: 4px solid #3b82f6;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.auditor-stat.active-stat { border-left-color: #10b981; }
+.auditor-stat.inactive-stat { border-left-color: #94a3b8; }
+.auditor-stat.level-stat { border-left-color: #8b5cf6; }
+
+.auditor-stat span {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.auditor-stat strong {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.auditor-stat small {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.level-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.level-tag {
+  font-size: 11px;
+  background: #ede9fe;
+  color: #6d28d9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.auditor-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.auditor-toolbar select,
+.auditor-toolbar input {
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.auditor-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.auditor-table thead {
+  background: #f8fafc;
+}
+
+.auditor-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: #475569;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.auditor-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+}
+
+.auditor-table tr:hover {
+  background: #f8fafc;
+}
+
+.level-pill,
+.type-pill,
+.spec-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.level-pill {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.type-pill {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.type-pill.type-expert {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.spec-pill {
+  background: #f3e8ff;
+  color: #6d28d9;
+}
+
+.spec-more {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.action-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 4px;
+}
+
+.ghost-button.tiny {
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.ghost-button.tiny.success {
+  color: #059669;
+}
+
+.ghost-button.tiny.danger {
+  color: #dc2626;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.field.required > span::after {
+  content: " *";
+  color: #dc2626;
+}
+
+.field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.field > span {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.field textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.spec-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.spec-chip {
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 14px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.15s;
+}
+
+.spec-chip:hover {
+  border-color: #3b82f6;
+}
+
+.spec-chip.active {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  color: white;
+  border-color: transparent;
+}
+
+.drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+}

@@ -22,6 +22,7 @@ import {
   MessageSquareText,
   Moon,
   Sun,
+  UserCheck,
   Users,
   Wrench,
   X
@@ -109,6 +110,7 @@ const navigation: NavGroup[] = [
       { id: "documents", label: "文档分析", icon: FileSearch, color: "#64748b" },
       { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" },
       { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6", requireModule: "SYSTEM_BASIC_DATA" },
+      { id: "auditor-profile", label: "审核员档案", icon: UserCheck, color: "#8b5cf6", requireModule: "AUDITOR_PROFILE" },
       { id: "data-exchange", label: "数据导入导出", icon: ArrowLeftRight, color: "#10b981", requireModule: "SYSTEM_BASIC_DATA" }
     ]
   },
