@@ -23,12 +23,18 @@ export function DocumentsPage({ models }: { models: ModelOption[] }) {
     if (!file) return;
     setLoading(true);
     setError("");
+    setResult(null);
     const form = new FormData();
     form.append("file", file);
     form.append("industry", industry);
     form.append("model", model);
+    // V2.1：扫描版 PDF 会触发 OCR（最慢 1 分钟）
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("⏱️ 分析超时（>2分钟）。扫描版 PDF OCR 处理较慢，请尝试较小的文件或文字版 PDF。")), 120_000)
+    );
     try {
-      setResult(await api.analyzeDocument(form));
+      const data = await Promise.race([api.analyzeDocument(form), timeoutPromise]);
+      setResult(data as any);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "分析失败");
     } finally {
@@ -88,7 +94,7 @@ export function DocumentsPage({ models }: { models: ModelOption[] }) {
           </div>
           <button className="primary-button full-button" disabled={!file || loading}>
             {loading ? <LoaderCircle className="spin" size={18} /> : <FileSearch size={18} />}
-            {loading ? "正在解析与分析" : "开始文档分析"}
+            {loading ? "正在解析（扫描 PDF 可能需要 OCR 处理 1-2 分钟）" : "开始文档分析"}
           </button>
           {error && <div className="error-banner">{error}</div>}
         </form>
