@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { ToastManager } from "../components/Toast";
+import { CertPreviewModal } from "../components/CertPreviewModal";
 
 interface Auditor {
   id: string;
@@ -94,6 +95,8 @@ export function AuditorProfilePage({ currentUser }: { currentUser?: any }) {
   const [editing, setEditing] = useState<Auditor | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  // V2.0：证书预览
+  const [previewCert, setPreviewCert] = useState<{ auditor: Auditor; index: number } | null>(null);
   
   // 加载数据
   const load = async () => {
@@ -362,9 +365,16 @@ export function AuditorProfilePage({ currentUser }: { currentUser?: any }) {
                     </td>
                     <td>
                       {(a.certificates && a.certificates.length > 0) ? (
-                        <span className="cert-badge" title={a.certificates.map(c => c.code).join(", ")}>
+                        <button
+                          className="cert-badge-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewCert({ auditor: a, index: 0 });
+                          }}
+                          title={a.certificates.map(c => c.code).filter(Boolean).join(", ")}
+                        >
                           🏅 {a.certificates.length} 张
-                        </span>
+                        </button>
                       ) : <span className="muted small">无</span>}
                     </td>
                     <td>{a.phone || "—"}</td>
@@ -408,6 +418,16 @@ export function AuditorProfilePage({ currentUser }: { currentUser?: any }) {
           onChange={setEditing}
           onSave={save}
           onClose={closeEdit}
+          onPreviewCert={(index) => setPreviewCert({ auditor: editing, index })}
+        />
+      )}
+
+      {/* 证书预览 Modal（V2.0）*/}
+      {previewCert && previewCert.auditor.certificates && (
+        <CertPreviewModal
+          certificates={previewCert.auditor.certificates}
+          initialIndex={previewCert.index}
+          onClose={() => setPreviewCert(null)}
         />
       )}
     </div>
@@ -421,7 +441,8 @@ function AuditorEditDrawer({
   saving,
   onChange,
   onSave,
-  onClose
+  onClose,
+  onPreviewCert
 }: {
   auditor: Auditor;
   isCreating: boolean;
@@ -430,6 +451,7 @@ function AuditorEditDrawer({
   onChange: (a: Auditor) => void;
   onSave: () => void;
   onClose: () => void;
+  onPreviewCert: (index: number) => void;
 }) {
   const [ocrLoading, setOcrLoading] = useState(false);
   const update = (k: keyof Auditor, v: any) => {
@@ -641,15 +663,42 @@ function AuditorEditDrawer({
                     <th>证书名称</th>
                     <th>原文件</th>
                     <th>状态</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {auditor.certificates.map((c, i) => (
-                    <tr key={i}>
+                    <tr
+                      key={i}
+                      className="cert-table-row"
+                      onClick={() => {
+                        if (c.file) {
+                          onPreviewCert(i);
+                        } else {
+                          ToastManager.warning("该证书无文件路径");
+                        }
+                      }}
+                      style={{ cursor: c.file ? "pointer" : "default" }}
+                      title={"点击查看证书图片"}
+                    >
                       <td><span className="cert-code-pill">{c.code}</span></td>
                       <td>{c.name || "—"}</td>
                       <td className="muted small">{c.source_name || "—"}</td>
-                      <td><span className="status-pill status-completed">{c.status || "active"}</span></td>
+                      <td><span className="status-pill status-completed">{c.status || 'active'}</span></td>
+                      <td>
+                        {c.file && (
+                          <button
+                            className="ghost-button tiny"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPreviewCert(i);
+                            }}
+                            title={"查看证书图片"}
+                          >
+                            🔍 查看
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

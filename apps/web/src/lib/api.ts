@@ -243,6 +243,11 @@ export const api = {
     request<any>(`/auditors/${id}/ocr-all`, {
       method: "POST", headers: { "Content-Type": "application/json" }
     }),
+  // V2.0：获取证书图片（base64）
+  getCertImage: (filePath: string) => {
+    const qs = new URLSearchParams({ path: filePath });
+    return request<any>(`/auditors/cert-image?${qs.toString()}`);
+  },
   // V2.0：OCR 单个证书
   ocrCertificate: (file: File) => {
     const fd = new FormData();

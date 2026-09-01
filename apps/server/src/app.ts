@@ -5490,14 +5490,56 @@ export async function createApp() {
   });
 
   // 单个审核员
-  app.get("/api/auditors/:id", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const auditor = await auditorRepo.get(u.companyId, request.params.id);
-      if (!auditor) throw new NotFoundError("审核员");
-      response.json({ data: auditor });
-    } catch (error) { next(error); }
-  });
+  // V2.0：获取证书图片（base64 形式，便于前端预览）
+    // 安全：只允许 /mnt/renz/ 下的文件
+    // 注意：必须放在 /api/auditors/:id 路由之前，否则会被 id 路由拦截
+    app.get("/api/auditors/cert-image", async (request, response, next) => {
+      try {
+        const u = getUserFromReq(request);
+        const filePath = (request.query.path as string) || "";
+        if (!filePath) throw new ValidationError("文件路径必填");
+        // 安全检查：必须以 /mnt/renz/ 开头（避免任意文件读取）
+        if (!filePath.startsWith("/mnt/renz/")) {
+          response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅允许访问 /mnt/renz/ 下的证书图片" });
+          return;
+        }
+        const fsPromises = await import("fs/promises");
+        try {
+          await fsPromises.access(filePath);
+        } catch {
+          throw new NotFoundError("证书图片");
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeMap: Record<string, string> = {
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".webp": "image/webp"
+        };
+        const mime = mimeMap[ext] || "application/octet-stream";
+        const buffer = await fsPromises.readFile(filePath);
+        const base64 = buffer.toString("base64");
+        response.json({
+          data: {
+            path: filePath,
+            mime,
+            ext,
+            size: buffer.length,
+            base64: `data:${mime};base64,${base64}`
+          }
+        });
+      } catch (error) { next(error); }
+    });
+
+    app.get("/api/auditors/:id", async (request, response, next) => {
+      try {
+        const u = getUserFromReq(request);
+        const item = await auditorRepo.get(u.companyId, request.params.id);
+        if (!item) throw new NotFoundError("审核员");
+        response.json({ data: item });
+      } catch (error) { next(error); }
+    });
 
   // 创建审核员
   app.post("/api/auditors", async (request, response, next) => {
