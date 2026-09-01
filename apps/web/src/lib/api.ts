@@ -257,6 +257,14 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ note: note || "" })
     }),
+  acknowledgeBatch: (ids: string[], note?: string) =>
+    request<any>(`/certificates/acknowledge-batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ certificate_ids: ids, note: note || "" })
+    }),
+  unacknowledgeCert: (id: string) =>
+    request<any>(`/certificates/${id}/unacknowledge`, { method: "POST" }),
   // V2.0：OCR 单个证书
   ocrCertificate: (file: File) => {
     const fd = new FormData();

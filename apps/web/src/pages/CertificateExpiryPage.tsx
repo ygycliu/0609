@@ -59,6 +59,8 @@ export function CertificateExpiryPage() {
   const [loading, setLoading] = useState(true);
   const [filterLevel, setFilterLevel] = useState<string>("all");
   const [filterCertType, setFilterCertType] = useState<string>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -82,13 +84,53 @@ export function CertificateExpiryPage() {
     try {
       const r = await api.acknowledgeCert(cert.certificate_id, "");
       const data = (r as any)?.data || r;
-      const modeText = data.mode === 'push_todo' 
-        ? `📌 已推送待办（${data.urgency_level === 'RENEW' ? '已过期' : '紧急'}）` 
+      const modeText = data.mode === 'push_todo'
+        ? `📌 已推送待办（${data.urgency_level === 'RENEW' ? '已过期' : '紧急'}）`
         : `✅ 已隐藏（${cert.urgency_level}）`;
       ToastManager.success(`${cert.customer_name} ${modeText}`);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(cert.certificate_id);
+        return next;
+      });
       await load();  // 刷新（视图过滤已确认）
     } catch (e: any) {
       ToastManager.error(`操作失败：${e?.message ?? "未知错误"}`);
+    }
+  };
+
+  const handleBatchAck = async () => {
+    if (selectedIds.size === 0) return;
+    setBatchLoading(true);
+    try {
+      const r = await api.acknowledgeBatch(Array.from(selectedIds), "");
+      const data = (r as any)?.data || r;
+      ToastManager.success(
+        `✅ 批量处理 ${data.total} 张证书（推送 ${data.push_count} + 隐藏 ${data.hidden_count}）`
+      );
+      setSelectedIds(new Set());
+      await load();
+    } catch (e: any) {
+      ToastManager.error(`批量操作失败：${e?.message ?? "未知错误"}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(c => c.certificate_id)));
     }
   };
 
@@ -206,6 +248,29 @@ export function CertificateExpiryPage() {
         </div>
       </section>
 
+      {/* 批量操作条（选中后显示） */}
+      {selectedIds.size > 0 && (
+        <section className="batch-toolbar">
+          <div className="batch-info">
+            <strong>已选 {selectedIds.size} 张证书</strong>
+            <button
+              className="ghost-button tiny"
+              onClick={() => setSelectedIds(new Set())}
+              title="清除选择"
+            >
+              <X size={12} /> 清除
+            </button>
+          </div>
+          <button
+            className="primary-button tiny"
+            onClick={handleBatchAck}
+            disabled={batchLoading}
+          >
+            {batchLoading ? <><LoaderCircle className="spin" size={12} /> 处理中...</> : <>📌 批量确认 + 推送代办</>}
+          </button>
+        </section>
+      )}
+
       {/* 表格 */}
       <section className="cert-table-section">
         {loading ? (
@@ -221,6 +286,14 @@ export function CertificateExpiryPage() {
           <table className="cert-expiry-table">
             <thead>
               <tr>
+                <th className="checkbox-col">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={toggleSelectAll}
+                    title="全选当前筛选结果"
+                  />
+                </th>
                 <th>状态</th>
                 <th>客户</th>
                 <th>证书类型</th>
@@ -237,7 +310,14 @@ export function CertificateExpiryPage() {
                 const style = levelStyle(it.urgency_level);
                 const Icon = style.icon;
                 return (
-                  <tr key={it.certificate_id}>
+                  <tr key={it.certificate_id} className={selectedIds.has(it.certificate_id) ? 'selected' : ''}>
+                    <td className="checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(it.certificate_id)}
+                        onChange={() => toggleSelect(it.certificate_id)}
+                      />
+                    </td>
                     <td>
                       <span className="urgency-pill" style={{ background: style.bg, color: style.color }}>
                         <Icon size={14} /> {style.label}

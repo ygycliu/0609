@@ -5657,6 +5657,144 @@ export async function createApp() {
     } catch (error) { next(error); }
   });
 
+  // V2.0：批量确认证书
+  app.post("/api/certificates/acknowledge-batch", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      const { certificate_ids, note } = (request.body as any) || {};
+      const userId = (u as any).userId || (u as any).id || null;
+      
+      if (!Array.isArray(certificate_ids) || certificate_ids.length === 0) {
+        response.status(400).json({ code: "BAD_REQUEST", message: "❌ certificate_ids 必须是非空数组" });
+        return;
+      }
+      
+      let pushCount = 0, hiddenCount = 0;
+      
+      for (const certId of certificate_ids) {
+        try {
+          // 查询证书
+          const certInfo = await query(
+            `SELECT pc.id, pc.cert_type, pc.certificate_no, pc.valid_until, pc.issue_date,
+                    cp.customer_id, cp.customer_name, cp.company_id
+             FROM project_certificate pc
+             JOIN certification_project cp ON cp.id = pc.project_id
+             WHERE pc.id = $1 AND pc.deleted_at IS NULL`,
+            [certId]
+          );
+          if (certInfo.rows.length === 0) continue;
+          const cert = certInfo.rows[0];
+          
+          // 阶段判断
+          const stageInfo = await query(
+            `SELECT current_stage, next_stage, next_stage_date, days_until_next, urgency_level
+             FROM certificate_next_stage($1::date, $2::date, $3)`,
+            [cert.issue_date, cert.valid_until, cert.cert_type]
+          );
+          const stage = stageInfo.rows[0] || { urgency_level: 'NORMAL' };
+          
+          const shouldPushTodo = ['RENEW', 'CRITICAL'].includes(stage.urgency_level);
+          
+          // 推送 todo
+          if (shouldPushTodo) {
+            function toDateOnly(v: any): string {
+              if (!v) return '';
+              if (typeof v === 'string') return v.split('T')[0].split(' ')[0];
+              if (v instanceof Date) {
+                const y = v.getFullYear();
+                const m = String(v.getMonth() + 1).padStart(2, '0');
+                const d = String(v.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+              }
+              return String(v).split('T')[0];
+            }
+            const rawDate = toDateOnly(stage.next_stage_date || cert.valid_until);
+            const dueDate = (stage.days_until_next && stage.days_until_next < 0)
+              ? new Date().toISOString()
+              : (rawDate ? new Date(rawDate + 'T09:00:00').toISOString() : new Date().toISOString());
+            const priority = stage.urgency_level === 'RENEW' ? 'urgent' : 'high';
+            
+            await query(
+              `INSERT INTO todo (
+                company_id, owner_user_id, title, description,
+                category, source, source_ref, due_at, remind_at,
+                status, priority, customer_id, metadata, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+              [
+                cert.company_id, userId,
+                `🔔 证书${stage.next_stage || '再认证'}：${cert.customer_name} - ${cert.cert_type}`,
+                `客户【${cert.customer_name}】\n` +
+                `当前阶段：${stage.current_stage || '已过期'}\n` +
+                `下一阶段：${stage.next_stage || '再认证'}\n` +
+                `证书号：${cert.certificate_no}\n` +
+                `证书类型：${cert.cert_type}\n` +
+                `有效期至：${cert.valid_until}\n\n` +
+                `批量推送于 ${(u as any).username || 'admin'}。${note ? '\n备注：' + note : ''}`,
+                'general', 'cert_acknowledge', certId, dueDate,
+                new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+                'pending', priority, cert.customer_id,
+                JSON.stringify({
+                  cert_id: cert.id, urgency_level: stage.urgency_level, batch: true
+                })
+              ]
+            );
+            pushCount++;
+          } else {
+            hiddenCount++;
+          }
+          
+          // 标记已确认
+          await query(
+            `UPDATE project_certificate
+             SET acknowledged_at = NOW(), acknowledged_by = $1, acknowledged_note = $2
+             WHERE id = $3 AND deleted_at IS NULL`,
+            [userId, note || null, certId]
+          );
+        } catch (innerErr) {
+          // 单个失败不影响其他
+          console.error(`acknowledge failed for cert ${certId}:`, innerErr);
+        }
+      }
+      
+      response.json({
+        data: {
+          total: certificate_ids.length,
+          push_count: pushCount,
+          hidden_count: hiddenCount,
+          success: true
+        }
+      });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：撤销确认（恢复显示）
+  app.post("/api/certificates/:id/unacknowledge", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      
+      const r = await query(
+        `UPDATE project_certificate
+         SET acknowledged_at = NULL, acknowledged_by = NULL, acknowledged_note = NULL
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING id`,
+        [request.params.id]
+      );
+      
+      if (r.rows.length === 0) throw new NotFoundError("证书");
+      
+      // 删除由 acknowledge 创建的关联 todo（清理冗余）
+      await query(
+        `DELETE FROM todo 
+         WHERE source = 'cert_acknowledge' 
+           AND source_ref = $1
+           AND status = 'pending'`,
+        [request.params.id]
+      );
+      
+      response.json({ data: { id: request.params.id, unacknowledged: true } });
+    } catch (error) { next(error); }
+  });
+
   // 单个审核员
   // V2.0：获取证书图片（base64 形式，便于前端预览）
     // 安全：只允许 /mnt/renz/ 下的文件

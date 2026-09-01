@@ -11136,3 +11136,82 @@ textarea:focus {
   background: #bbf7d0;
   outline-color: #16a34a;
 }
+
+
+/* V2.0 证书预警 - checkbox 列 + 批量工具栏 */
+.cert-expiry-table .checkbox-col,
+.cert-expiry-table th.checkbox-col {
+  width: 36px !important;
+  text-align: center;
+  padding: 4px !important;
+}
+
+.cert-expiry-table .checkbox-col input[type="checkbox"],
+.cert-expiry-table th.checkbox-col input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #3b82f6;
+}
+
+.cert-expiry-table tbody tr.selected {
+  background: #eff6ff;
+}
+
+.cert-expiry-table tbody tr.selected:hover {
+  background: #dbeafe;
+}
+
+/* 批量操作工具栏 */
+.cert-expiry-page .batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  margin: 12px 0;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cert-expiry-page .batch-toolbar .batch-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+/* Primary 按钮 */
+.primary-button.tiny {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.primary-button.tiny:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  transform: translateY(-1px);
+}
+
+.primary-button.tiny:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
