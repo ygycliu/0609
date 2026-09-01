@@ -54,15 +54,14 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   // 默认覆盖所有历史数据（2024-2025）
-  // V2.0：默认期间为当前月份（用户可手动修改）
+  // V2.0：默认期间为"当年 1 月 1 日 ~ 今天"（用户可手动修改 + 快捷切换）
   const [startDate, setStartDate] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    return `${now.getFullYear()}-01-01`;
   });
   const [endDate, setEndDate] = useState(() => {
     const now = new Date();
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   });
   // V2.0：日期字段模式（默认按 trans_month 业务归属月份）
   const [dateField, setDateField] = useState<"trans_month" | "trans_date">("trans_month");
