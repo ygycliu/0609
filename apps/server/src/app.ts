@@ -5489,6 +5489,65 @@ export async function createApp() {
     } catch (error) { next(error); }
   });
 
+  // V2.0：认证证书预警 API
+  app.get("/api/certificates/expiring", async (request, response, next) => {
+    try {
+      const warningDays = Number((request.query.warning_days as string) || "180");
+      const criticalDays = Number((request.query.critical_days as string) || "60");
+      // 通过 check_certificate_expiry 函数查询
+      const r = await query(
+        `SELECT * FROM check_certificate_expiry($1, $2)`,
+        [warningDays, criticalDays]
+      );
+      // 统计
+      const stats = {
+        total: r.rows.length,
+        expired: r.rows.filter((x: any) => x.urgency_level === "EXPIRED").length,
+        critical: r.rows.filter((x: any) => x.urgency_level === "CRITICAL").length,
+        warning: r.rows.filter((x: any) => x.urgency_level === "WARNING").length,
+        normal: r.rows.filter((x: any) => x.urgency_level === "NORMAL").length,
+        warning_days: warningDays,
+        critical_days: criticalDays
+      };
+      response.json({ data: { stats, certificates: r.rows } });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：单证书详情
+  app.get("/api/certificates/:id", async (request, response, next) => {
+    try {
+      const r = await query(
+        `SELECT pc.*, cp.customer_name, cp.project_code
+         FROM project_certificate pc
+         JOIN certification_project cp ON cp.id = pc.project_id
+         WHERE pc.id = $1 AND pc.deleted_at IS NULL`,
+        [request.params.id]
+      );
+      if (r.rows.length === 0) throw new NotFoundError("证书");
+      response.json({ data: r.rows[0] });
+    } catch (error) { next(error); }
+  });
+
+  // V2.0：标记证书为"已处理"（仅 status 备注，不删除）
+  app.patch("/api/certificates/:id/acknowledge", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可标记证书" });
+        return;
+      }
+      const r = await query(
+        `UPDATE project_certificate 
+         SET notes = COALESCE(notes, '') || E'\n[已确认] ' || $1 || ' @ ' || NOW()::text
+         WHERE id = $2 AND deleted_at IS NULL
+         RETURNING id`,
+        [((u as any).username || (u as any).email || 'admin'), request.params.id]
+      );
+      if (r.rows.length === 0) throw new NotFoundError("证书");
+      response.json({ data: { id: request.params.id, acknowledged: true } });
+    } catch (error) { next(error); }
+  });
+
   // 单个审核员
   // V2.0：获取证书图片（base64 形式，便于前端预览）
     // 安全：只允许 /mnt/renz/ 下的文件

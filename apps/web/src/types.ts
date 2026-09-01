@@ -20,6 +20,7 @@ export type Page =
   | "base-data"
   | "system-enum"
   | "auditor-profile"
+  | "cert-expiry"
   | "data-exchange";
 
 export interface ReviewItem {

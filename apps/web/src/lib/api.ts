@@ -248,6 +248,12 @@ export const api = {
     const qs = new URLSearchParams({ path: filePath });
     return request<any>(`/auditors/cert-image?${qs.toString()}`);
   },
+
+  // V2.0：认证证书预警
+  getCertExpiring: (warningDays = 180, criticalDays = 60) =>
+    request<any>(`/certificates/expiring?warning_days=${warningDays}&critical_days=${criticalDays}`),
+  acknowledgeCert: (id: string) =>
+    request<any>(`/certificates/${id}/acknowledge`, { method: "PATCH" }),
   // V2.0：OCR 单个证书
   ocrCertificate: (file: File) => {
     const fd = new FormData();

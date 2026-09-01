@@ -2,6 +2,7 @@ import {
   Award,
   ArrowLeftRight,
   Banknote,
+  Bell,
   BookOpen,
   BrainCircuit,
   Briefcase,
@@ -65,7 +66,8 @@ const navigation: NavGroup[] = [
     items: [
       { id: "customer-list", label: "客户管理", icon: Users, color: "#ec4899" },
       { id: "project-workspace", label: "项目工作台", icon: Briefcase, color: "#64748b" },
-      { id: "follow-up", label: "客户跟进", icon: Activity, color: "#ec4899" }
+      { id: "follow-up", label: "客户跟进", icon: Activity, color: "#ec4899" },
+      { id: "cert-expiry", label: "认证预警", icon: Bell, color: "#f59e0b" }
     ]
   },
   // 认证业务（核心 AI 能力）

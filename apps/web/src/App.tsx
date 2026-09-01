@@ -14,6 +14,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { SystemEnumPage } from "./pages/SystemEnumPage";
 import { AuditorProfilePage } from "./pages/AuditorProfilePage";
+import { CertificateExpiryPage } from "./pages/CertificateExpiryPage";
 import { DataExchangePage } from "./pages/DataExchangePage";
 import { AuditorPage } from "./pages/AuditorPage";
 import { FilesPage } from "./pages/FilesPage";
@@ -184,6 +185,9 @@ export default function App() {
         )}
         {page === "auditor-profile" && (
           <AuditorProfilePage currentUser={{ isAdmin: permissions.isAdmin, role: permissions.isAdmin ? "admin" : "regular" }} />
+        )}
+        {page === "cert-expiry" && (
+          <CertificateExpiryPage />
         )}
         {page === "data-exchange" && (
           permissions.isAdmin
