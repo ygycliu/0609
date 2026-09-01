@@ -588,6 +588,15 @@ export const api = {
       headers: { Accept: "text/csv" }
     });
   },
+  // V2.1：导入客户（系统基础数据 → 单位信息）
+  importCustomers: (csv: string) =>
+    request<{ data: { total: number; inserted: number; updated: number; failed: number; errors: any[] } }>(
+      `/customers/import.csv`,
+      {
+        method: "POST",
+        body: JSON.stringify({ csv })
+      }
+    ),
   createCustomer: (input: any) =>
     request<any>("/customers", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)

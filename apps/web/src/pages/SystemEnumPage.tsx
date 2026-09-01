@@ -1,19 +1,22 @@
 /**
  * V2.0 系统基础数据管理页面
  *
- * 三个 Tab：
+ * 四个 Tab：
  * 1. 签约主体（signing_entity）- A/B/C 主体
  * 2. 外协单位（partner_cert_unit）- 动态外协认证机构
  * 3. 风险等级（risk_level）- low/medium/high/extreme + 倍率
+ * 4. 单位信息（customer）- 客户管理，支持导出/导入 CSV
  *
  * 每个 Tab 支持：新增、编辑、删除
+ * 单位信息额外支持：CSV 导出/导入
  */
 
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Edit3, Save, X, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Plus, Trash2, Edit3, Save, X, AlertTriangle, Download, Upload } from "lucide-react";
 import { api } from "../lib/api";
+import { ToastManager } from "../components/Toast";
 
-type EnumType = "signing" | "partner" | "risk";
+type EnumType = "signing" | "partner" | "risk" | "customer";
 
 export function SystemEnumPage() {
   const [activeTab, setActiveTab] = useState<EnumType>("signing");
@@ -33,7 +36,8 @@ export function SystemEnumPage() {
         {[
           { key: "signing" as EnumType, label: "🏢 签约主体", desc: "A/B/C 主体" },
           { key: "partner" as EnumType, label: "🤝 外协单位", desc: "外协认证机构" },
-          { key: "risk" as EnumType, label: "⚠️ 风险等级", desc: "审核员等级 + 倍率" }
+          { key: "risk" as EnumType, label: "⚠️ 风险等级", desc: "审核员等级 + 倍率" },
+          { key: "customer" as EnumType, label: "🏛️ 单位信息", desc: "客户列表 + 导出/导入" }
         ].map((t) => (
           <button
             key={t.key}
@@ -49,6 +53,7 @@ export function SystemEnumPage() {
       {activeTab === "signing" && <SigningEntityTab />}
       {activeTab === "partner" && <PartnerTab />}
       {activeTab === "risk" && <RiskLevelTab />}
+      {activeTab === "customer" && <CustomerUnitTab />}
     </div>
   );
 }
@@ -554,6 +559,195 @@ function RiskLevelForm({ initial, onClose, onSaved }: {
       <div className="form-actions">
         <button className="ghost-button" onClick={onClose}><X size={16} /> 取消</button>
         <button className="primary-button" onClick={handleSave}><Save size={16} /> 保存</button>
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// V2.1：单位信息 Tab（customer 表的 CSV 导入导出）
+// ============================================================
+function CustomerUnitTab() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [importResult, setImportResult] = useState<any | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r: any = await api.searchCustomers(filter.trim(), 100);
+      // searchCustomers 已被 request 解包 data 字段，r 直接是数组
+      setItems(Array.isArray(r) ? r : []);
+    } catch (e) {
+      ToastManager.error(`加载失败：${(e as any)?.message ?? "未知错误"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await api.exportCustomers({
+        q: filter.trim() || undefined
+      });
+      if (!response.ok) throw new Error(`导出失败: ${response.status}`);
+
+      const disposition = response.headers.get("content-disposition") || "";
+      const m = disposition.match(/filename\*=UTF-8''([^;]+)/);
+      const filename = m ? decodeURIComponent(m[1]) : `单位信息_${new Date().toISOString().slice(0, 10)}.csv`;
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      ToastManager.success(`✅ 已导出 ${items.length} 条单位信息`);
+    } catch (e) {
+      ToastManager.error(`导出失败：${(e as any)?.message ?? "未知错误"}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      ToastManager.error("❌ 请选择 .csv 文件");
+      e.target.value = "";
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const text = await file.text();
+      const r: any = await api.importCustomers(text);
+      // importCustomers 已被 request 解包 data 字段，r 直接是结果对象
+      const data = r && r.total !== undefined ? r : { total: 0, inserted: 0, updated: 0, failed: 0, errors: [] };
+      setImportResult(data);
+      ToastManager.success(
+        `✅ 导入完成：新建 ${data.inserted}，更新 ${data.updated}，失败 ${data.failed}`
+      );
+      await load();
+    } catch (err: any) {
+      ToastManager.error(`导入失败：${err?.message ?? "未知错误"}`);
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="enum-panel">
+      <div className="panel-header">
+        <h2>单位信息列表（{items.length}）</h2>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button className="ghost-button" onClick={handleExport} disabled={exporting}>
+            <Download size={16} /> {exporting ? "导出中..." : "导出 CSV"}
+          </button>
+          <button className="primary-button" onClick={handleImportClick} disabled={importing}>
+            <Upload size={16} /> {importing ? "导入中..." : "导入 CSV"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleFileSelected}
+            style={{ display: "none" }}
+          />
+        </div>
+      </div>
+
+      {/* 导入结果展示 */}
+      {importResult && (
+        <div className="import-result-banner">
+          <strong>📥 上次导入结果：</strong>
+          <span className="ok">新建 {importResult.inserted}</span> ·{" "}
+          <span className="info">更新 {importResult.updated}</span> ·{" "}
+          <span className={importResult.failed > 0 ? "err" : "muted"}>失败 {importResult.failed}</span>
+          <small> · 共 {importResult.total} 行</small>
+          {importResult.errors && importResult.errors.length > 0 && (
+            <details>
+              <summary>查看错误详情（前 {Math.min(50, importResult.errors.length)} 条）</summary>
+              <pre>{importResult.errors.map((e: any) =>
+                `第 ${e.row} 行: ${e.reason}`
+              ).join("\n")}</pre>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* 搜索 */}
+      <div className="filter-bar">
+        <input
+          type="text"
+          placeholder="按客户名称搜索..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") load(); }}
+        />
+        <button className="ghost-button tiny" onClick={load} disabled={loading}>
+          {loading ? "查询中..." : "查询"}
+        </button>
+      </div>
+
+      {/* 列表 */}
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>客户编号</th>
+            <th>客户名称</th>
+            <th>行业</th>
+            <th>地区</th>
+            <th>联系人</th>
+            <th>电话</th>
+            <th>信用代码</th>
+            <th>状态</th>
+            <th>创建时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>加载中...</td></tr>
+          ) : items.length === 0 ? (
+            <tr><td colSpan={9} style={{ textAlign: "center", padding: "20px", color: "#94a3b8" }}>暂无单位信息</td></tr>
+          ) : (
+            items.map((c: any) => (
+              <tr key={c.id}>
+                <td><code>{c.customer_code || "—"}</code></td>
+                <td><strong>{c.name}</strong></td>
+                <td>{c.industry || "—"}</td>
+                <td>{c.region || "—"}</td>
+                <td>{c.contact_person || "—"}</td>
+                <td>{c.contact_phone || "—"}</td>
+                <td><code className="small">{c.credit_code || "—"}</code></td>
+                <td><span className={`status-pill status-${c.status}`}>{c.status}</span></td>
+                <td className="muted small">{c.created_at?.slice(0, 10) || "—"}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      <div className="muted small" style={{ marginTop: "12px" }}>
+        💡 提示：导入 CSV 时按"客户名称"匹配：同名则更新，否则新建。必填列：<code>客户名称</code>。
+        可选列：<code>客户编号 / 行业 / 地区 / 联系人 / 电话 / 邮箱 / 信用代码 / 地址 / 业务范围 / 标签 / 备注</code>。
       </div>
     </div>
   );

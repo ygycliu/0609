@@ -2208,9 +2208,186 @@ export async function createApp() {
       ].join("\r\n");
 
       const filename = `客户列表_${new Date().toISOString().slice(0, 10)}.csv`;
+      const safeAscii = `customers_${new Date().toISOString().slice(0, 10)}.csv`;
       response.setHeader("Content-Type", "text/csv; charset=utf-8");
-      response.setHeader("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      response.setHeader("Content-Disposition", `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
       response.send(csv);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // V2.1：从 CSV 导入客户（系统基础数据 → 单位信息）
+  app.post("/api/customers/import.csv", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可导入单位信息" });
+        return;
+      }
+
+      const csvText = (request.body as any)?.csv as string;
+      if (!csvText || typeof csvText !== "string") {
+        response.status(400).json({ code: "BAD_REQUEST", message: "❌ 请提供 csv 字段（Base64 或原始文本）" });
+        return;
+      }
+
+      // 去掉 BOM
+      const cleanText = csvText.replace(/^\uFEFF/, "");
+
+      // 简易 CSV 解析（支持引号转义、逗号、换行）
+      function parseCSV(text: string): string[][] {
+        const rows: string[][] = [];
+        let row: string[] = [];
+        let cell = "";
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (text[i + 1] === '"') { cell += '"'; i++; }
+              else inQuotes = false;
+            } else cell += ch;
+          } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ",") { row.push(cell); cell = ""; }
+            else if (ch === "\n" || ch === "\r") {
+              if (ch === "\r" && text[i + 1] === "\n") i++;
+              row.push(cell); cell = "";
+              rows.push(row); row = [];
+            } else cell += ch;
+          }
+        }
+        if (cell || row.length) { row.push(cell); rows.push(row); }
+        return rows.filter(r => r.length > 1 || (r[0] && r[0].trim()));
+      }
+
+      const rows = parseCSV(cleanText);
+      if (rows.length < 2) {
+        response.status(400).json({ code: "BAD_REQUEST", message: "❌ CSV 内容为空或只有表头" });
+        return;
+      }
+
+      const headers = rows[0].map(h => h.trim());
+      // 必填列：客户名称
+      const nameIdx = headers.indexOf("客户名称");
+      const codeIdx = headers.indexOf("客户编号");
+      const industryIdx = headers.indexOf("行业");
+      const regionIdx = headers.indexOf("地区");
+      const contactIdx = headers.indexOf("联系人");
+      const phoneIdx = headers.indexOf("电话");
+      const emailIdx = headers.indexOf("邮箱");
+      const creditCodeIdx = headers.indexOf("信用代码");
+      const addressIdx = headers.indexOf("地址");
+      const businessIdx = headers.indexOf("业务范围");
+      const tagsIdx = headers.indexOf("标签");
+      const notesIdx = headers.indexOf("备注");
+
+      if (nameIdx === -1) {
+        response.status(400).json({ code: "BAD_REQUEST", message: "❌ 缺少必填列：客户名称" });
+        return;
+      }
+
+      let success = 0;
+      let updated = 0;
+      let failed = 0;
+      const errors: { row: number; reason: string; data: string }[] = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const name = (row[nameIdx] || "").trim();
+        if (!name) {
+          failed++;
+          errors.push({ row: i + 1, reason: "客户名称为空", data: row.join(",") });
+          continue;
+        }
+        try {
+          // 查找是否已存在（按名称）
+          const existing = await query<{ id: string; customer_code: string }>(
+            `SELECT id, customer_code FROM customer 
+             WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL 
+             LIMIT 1`,
+            [u.companyId, name]
+          );
+
+          const tagsRaw = tagsIdx >= 0 ? (row[tagsIdx] || "").trim() : "";
+          const tags = tagsRaw ? tagsRaw.split(/[;,、]/).map((t: string) => t.trim()).filter(Boolean) : [];
+
+          if (existing.rows.length > 0) {
+            // 更新
+            await query(
+              `UPDATE customer SET
+                industry = COALESCE(NULLIF($2, ''), industry),
+                region = COALESCE(NULLIF($3, ''), region),
+                contact_person = COALESCE(NULLIF($4, ''), contact_person),
+                contact_phone = COALESCE(NULLIF($5, ''), contact_phone),
+                contact_email = COALESCE(NULLIF($6, ''), contact_email),
+                credit_code = COALESCE(NULLIF($7, ''), credit_code),
+                address = COALESCE(NULLIF($8, ''), address),
+                business_scope = COALESCE(NULLIF($9, ''), business_scope),
+                tags = COALESCE($10, tags),
+                notes = COALESCE(NULLIF($11, ''), notes),
+                updated_at = NOW()
+              WHERE id = $1`,
+              [
+                existing.rows[0].id,
+                industryIdx >= 0 ? (row[industryIdx] || "").trim() : "",
+                regionIdx >= 0 ? (row[regionIdx] || "").trim() : "",
+                contactIdx >= 0 ? (row[contactIdx] || "").trim() : "",
+                phoneIdx >= 0 ? (row[phoneIdx] || "").trim() : "",
+                emailIdx >= 0 ? (row[emailIdx] || "").trim() : "",
+                creditCodeIdx >= 0 ? (row[creditCodeIdx] || "").trim() : "",
+                addressIdx >= 0 ? (row[addressIdx] || "").trim() : "",
+                businessIdx >= 0 ? (row[businessIdx] || "").trim() : "",
+                tags.length > 0 ? tags : null,
+                notesIdx >= 0 ? (row[notesIdx] || "").trim() : ""
+              ]
+            );
+            updated++;
+          } else {
+            // 新建
+            const customerCode = codeIdx >= 0 && (row[codeIdx] || "").trim()
+              ? (row[codeIdx] || "").trim()
+              : `IMP-${Date.now().toString(36)}-${i}`;
+            await query(
+              `INSERT INTO customer (
+                company_id, customer_code, name, industry, region,
+                contact_person, contact_phone, contact_email, credit_code,
+                address, business_scope, tags, notes, status, source,
+                created_by, source_channel, created_at, updated_at
+              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active','import',$14,'csv_import',NOW(),NOW())`,
+              [
+                u.companyId, customerCode, name,
+                industryIdx >= 0 ? (row[industryIdx] || "").trim() : "",
+                regionIdx >= 0 ? (row[regionIdx] || "").trim() : "",
+                contactIdx >= 0 ? (row[contactIdx] || "").trim() : "",
+                phoneIdx >= 0 ? (row[phoneIdx] || "").trim() : "",
+                emailIdx >= 0 ? (row[emailIdx] || "").trim() : "",
+                creditCodeIdx >= 0 ? (row[creditCodeIdx] || "").trim() : "",
+                addressIdx >= 0 ? (row[addressIdx] || "").trim() : "",
+                businessIdx >= 0 ? (row[businessIdx] || "").trim() : "",
+                tags.length > 0 ? tags : [],
+                notesIdx >= 0 ? (row[notesIdx] || "").trim() : "",
+                u.id || null
+              ]
+            );
+            success++;
+          }
+        } catch (err: any) {
+          failed++;
+          errors.push({ row: i + 1, reason: err.message || "未知错误", data: row.join(",") });
+        }
+      }
+
+      response.json({
+        data: {
+          total: rows.length - 1,
+          inserted: success,
+          updated,
+          failed,
+          errors: errors.slice(0, 50)
+        }
+      });
     } catch (error) {
       next(error);
     }
