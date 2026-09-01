@@ -5494,18 +5494,17 @@ export async function createApp() {
     try {
       const warningDays = Number((request.query.warning_days as string) || "180");
       const criticalDays = Number((request.query.critical_days as string) || "60");
-      // 通过 check_certificate_expiry 函数查询
+      // V2.0：通过 vw_certificate_expiry_alerts 视图查询（含 4 阶段信息）
       const r = await query(
-        `SELECT * FROM check_certificate_expiry($1, $2)`,
-        [warningDays, criticalDays]
+        `SELECT * FROM vw_certificate_expiry_alerts WHERE urgency_level != '正常'`
       );
       // 统计
       const stats = {
         total: r.rows.length,
-        expired: r.rows.filter((x: any) => x.urgency_level === "EXPIRED").length,
-        critical: r.rows.filter((x: any) => x.urgency_level === "CRITICAL").length,
-        warning: r.rows.filter((x: any) => x.urgency_level === "WARNING").length,
-        normal: r.rows.filter((x: any) => x.urgency_level === "NORMAL").length,
+        expired: r.rows.filter((x: any) => x.urgency_level === '已过期').length,
+        recert_critical: r.rows.filter((x: any) => x.urgency_level === '再认证紧急').length,
+        recert_warning: r.rows.filter((x: any) => x.urgency_level === '再认证预警').length,
+        expiring_soon: r.rows.filter((x: any) => x.urgency_level === '即将到期').length,
         warning_days: warningDays,
         critical_days: criticalDays
       };
