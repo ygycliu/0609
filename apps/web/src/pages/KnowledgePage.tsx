@@ -1,6 +1,7 @@
-import { BookOpen, Eye, FileUp, History, LoaderCircle, Search, Trash2, X, AlertCircle } from "lucide-react";
+import { BookOpen, Eye, FileUp, History, LoaderCircle, Search, Sparkles, Trash2, X, AlertCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { ToastManager } from "../components/Toast";
 import type { KnowledgeItem } from "../types";
 
 const categories = [
@@ -116,17 +117,25 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
     form.append("category", category);
     form.append("tags", tags);
     try {
-      const result: any = await api.uploadKnowledge(form);
-      // V2.0：上传进入审核流程，不直接入库
-      const msg = result?.data?.message || result?.message || "已提交审核，请等待管理员审核";
-      alert(`✅ ${msg}\n\n您可以在「知识中心 → 知识审核」查看审核进度。`);
+      // V2.0：OFD 文件走专门接口（自动转 Word + 自动审批入库）
+      if (file.name.toLowerCase().endsWith(".ofd")) {
+        const result: any = await api.ofdToKnowledge(form);
+        const msg = result?.message || `OFD 已转换为 Word 并入库：${result?.title || title}`;
+        ToastManager.success(msg);
+      } else {
+        const result: any = await api.uploadKnowledge(form);
+        const msg = result?.data?.message || result?.message || "已提交审核，请等待管理员审核";
+        ToastManager.info(`✅ ${msg}\n\n您可以在「知识中心 → 知识审核」查看审核进度。`);
+      }
       setFile(null);
       setTitle("");
       setTags("");
       const input = document.getElementById("knowledge-file") as HTMLInputElement | null;
       if (input) input.value = "";
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "上传失败");
+      const msg = caught instanceof Error ? caught.message : "上传失败";
+      setError(msg);
+      ToastManager.error(msg);
     } finally {
       setUploading(false);
     }
@@ -159,7 +168,7 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
             <FileUp size={20} />
             <div>
               <h2>新增知识</h2>
-              <p>单个文件不超过 15MB</p>
+              <p>单个文件不超过 200MB</p>
             </div>
           </div>
           <label className="file-drop" htmlFor="knowledge-file">
@@ -169,7 +178,7 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
             <input
               id="knowledge-file"
               type="file"
-              accept=".txt,.md,.csv,.json,.pdf,.docx,.pptx"
+              accept=".txt,.md,.csv,.json,.pdf,.docx,.pptx,.ofd"
               onChange={(event) => {
                 const selected = event.target.files?.[0] ?? null;
                 setFile(selected);
@@ -178,6 +187,11 @@ export function KnowledgePage({ knowledge, onChange, currentUser }: KnowledgePag
               required
             />
           </label>
+          {file?.name.toLowerCase().endsWith(".ofd") && (
+            <div className="ofd-hint">
+              <Sparkles size={14} /> OFD 文件将自动转换为 Word 格式后入库
+            </div>
+          )}
           <label className="field">
             <span>知识标题</span>
             <input value={title} onChange={(event) => setTitle(event.target.value)} required />

@@ -1,11 +1,13 @@
 import { FileSearch, FileUp, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { MarkdownResult } from "../components/MarkdownResult";
+import { ToastManager } from "../components/Toast";
 import { api } from "../lib/api";
 import type { ModelOption, ModelProvider } from "../types";
 
 export function DocumentsPage({ models }: { models: ModelOption[] }) {
   const [file, setFile] = useState<File | null>(null);
+  const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
   const [industry, setIndustry] = useState("通用");
   const [model, setModel] = useState<ModelProvider>("demo");
   const [loading, setLoading] = useState(false);
@@ -49,13 +51,22 @@ export function DocumentsPage({ models }: { models: ModelOption[] }) {
           <label className="document-drop" htmlFor="analysis-file">
             <FileSearch size={34} />
             <strong>{file ? file.name : "选择需要分析的文件"}</strong>
-            <p>支持 PDF、Word、PPT 和常用文本格式，最大 15MB</p>
+            <p>支持 PDF、Word、PPT 和常用文本格式，最大 200MB</p>
             <span className="secondary-button"><FileUp size={17} /> 浏览文件</span>
             <input
               id="analysis-file"
               type="file"
               accept=".txt,.md,.csv,.json,.pdf,.docx,.pptx"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const selected = event.target.files?.[0] ?? null;
+                if (selected && selected.size > MAX_FILE_SIZE) {
+                  ToastManager.error(`❌ 文件 ${selected.name} 超过 200MB 限制（当前 ${(selected.size / 1024 / 1024).toFixed(1)}MB）`);
+                  event.target.value = "";
+                  setFile(null);
+                  return;
+                }
+                setFile(selected);
+              }}
               required
             />
           </label>

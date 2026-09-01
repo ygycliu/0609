@@ -56,7 +56,7 @@ import { getVersionInfo } from "./version/version.service.js";
 const logger = createLogger();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 }
+  limits: { fileSize: 200 * 1024 * 1024 }  // 200MB（V2.1 提升）
 });
 
 const consultationSchema = z.object({

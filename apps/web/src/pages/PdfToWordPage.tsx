@@ -66,7 +66,7 @@ export function PdfToWordPage() {
           <label className="document-drop" htmlFor="pdf-file">
             <FileText size={34} />
             <strong>{file ? file.name : "选择需要转换的 PDF"}</strong>
-            <p>支持 .pdf 文件，最大 15 MB</p>
+            <p>支持 .pdf 文件，最大 200 MB</p>
             <span className="secondary-button">
               <Upload size={17} /> 选择文件
             </span>
