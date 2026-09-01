@@ -10125,3 +10125,49 @@ textarea:focus {
   border-color: #3b82f6;
   color: #ffffff;
 }
+
+
+/* V2.0 OFD 文件提示 */
+.ofd-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #92400e;
+  font-weight: 500;
+}
+
+
+/* V2.0 微型按钮（AR 标记已收） */
+.tiny-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.tiny-button.primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+.tiny-button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+.tiny-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.muted.small {
+  color: #94a3b8;
+  font-size: 11px;
+}

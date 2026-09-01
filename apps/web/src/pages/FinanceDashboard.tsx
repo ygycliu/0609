@@ -5,6 +5,7 @@ import { ToastManager } from "../components/Toast";
 import {
   AlertCircle,
   Banknote,
+  Check,
   ChevronRight,
   CircleDollarSign,
   Download,
@@ -126,6 +127,33 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
   } | null>(null);
   const [arDrillList, setArDrillList] = useState<any[]>([]);
   const [arDrillLoading, setArDrillLoading] = useState(false);
+  const [payingAR, setPayingAR] = useState<string | null>(null);  // V2.0：标记已收 loading 状态
+
+  // V2.0：标记 AR 为已收
+  async function handleMarkARPaiement(ar: any) {
+    if (!window.confirm(`确认标记「${ar.title}」¥${Number(ar.remainingAmount).toLocaleString()} 已收款？`)) return;
+    setPayingAR(ar.id);
+    try {
+      await api.addARPayment(ar.id, {
+        amount: Number(ar.remainingAmount),
+        paymentDate: new Date().toISOString(),
+        paymentMethod: "对公转账",
+        reference: "人工录入",
+        notes: `通过财务管理面板录入收款 - ${new Date().toLocaleDateString("zh-CN")}`
+      });
+      ToastManager.success(`✅ ${ar.title} ¥${Number(ar.remainingAmount).toLocaleString()} 已标记为已收`);
+      // 刷新账单列表
+      const r = await api.listAR({ customer_id: arDrill?.customerId, limit: 50 });
+      setArDrillList(r?.data || []);
+      // 刷新 Top10
+      const top = await api.getARTopByCustomer(10);
+      setArTop(top || []);
+    } catch (e: any) {
+      ToastManager.error(`❌ 标记失败：${e?.message ?? "未知错误"}`);
+    } finally {
+      setPayingAR(null);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -661,6 +689,7 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
                       <th>未收</th>
                       <th>到期日</th>
                       <th>状态</th>
+                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -687,6 +716,21 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
                             <span className="status-pill status-overdue">逾期 {ar.overdueDays} 天</span>
                           ) : (
                             <span className="status-pill status-pending">待收</span>
+                          )}
+                        </td>
+                        <td>
+                          {ar.status !== "paid" && Number(ar.remainingAmount) > 0 ? (
+                            <button
+                              className="tiny-button primary"
+                              onClick={() => handleMarkARPaiement(ar)}
+                              disabled={payingAR === ar.id}
+                              title="录入收款"
+                            >
+                              {payingAR === ar.id ? <LoaderCircle className="spin" size={12} /> : <Check size={12} />}
+                              {payingAR === ar.id ? "处理中" : "标记已收"}
+                            </button>
+                          ) : (
+                            <span className="muted small">已结清</span>
                           )}
                         </td>
                       </tr>
