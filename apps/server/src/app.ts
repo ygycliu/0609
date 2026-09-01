@@ -5696,7 +5696,7 @@ export async function createApp() {
     if (error instanceof multer.MulterError) {
       response.status(413).json({
         code: "UPLOAD_ERROR",
-        message: error.code === "LIMIT_FILE_SIZE" ? "文件不能超过 15MB" : error.message,
+        message: error.code === "LIMIT_FILE_SIZE" ? "文件不能超过 200MB" : error.message,
         requestId: request.id
       });
       return;

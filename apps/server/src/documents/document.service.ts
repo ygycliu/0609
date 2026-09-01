@@ -32,14 +32,31 @@ function extractPptx(buffer: Buffer) {
 export async function extractDocumentText(file: Express.Multer.File) {
   const extension = path.extname(file.originalname).toLowerCase();
 
-  if (textExtensions.has(extension)) return file.buffer.toString("utf8");
-  if (extension === ".pdf") return (await pdf(file.buffer)).text;
-  if (extension === ".docx") {
-    return (await mammoth.extractRawText({ buffer: file.buffer })).value;
-  }
-  if (extension === ".pptx") return extractPptx(file.buffer);
+  let text = "";
 
-  throw new ValidationError(
-    "暂不支持该文件类型，请上传 TXT、Markdown、CSV、JSON、PDF、DOCX 或 PPTX"
-  );
+  if (textExtensions.has(extension)) {
+    text = file.buffer.toString("utf8");
+  } else if (extension === ".pdf") {
+    const result = await pdf(file.buffer);
+    text = result.text;
+  } else if (extension === ".docx") {
+    text = (await mammoth.extractRawText({ buffer: file.buffer })).value;
+  } else if (extension === ".pptx") {
+    text = extractPptx(file.buffer);
+  } else {
+    throw new ValidationError(
+      "暂不支持该文件类型，请上传 TXT、Markdown、CSV、JSON、PDF、DOCX 或 PPTX"
+    );
+  }
+
+  text = (text || "").trim();
+
+  // V2.1：检查提取结果
+  if (!text || text.length < 50) {
+    throw new ValidationError(
+      "文件中没有提取到可用文本。可能原因：1) 文件是扫描版 PDF（需要 OCR）；2) 文件被加密；3) 文件实际为空。请尝试重新导出为文字版 PDF。"
+    );
+  }
+
+  return text;
 }
