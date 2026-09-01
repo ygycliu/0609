@@ -574,6 +574,8 @@ function CustomerUnitTab() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [filter, setFilter] = useState("");
+  const [certType, setCertType] = useState("");
+  const [certTypes, setCertTypes] = useState<string[]>([]);
   const [importResult, setImportResult] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -590,19 +592,30 @@ function CustomerUnitTab() {
     }
   };
 
+  // 加载证书类型列表（用于筛选下拉框）
+  const loadCertTypes = async () => {
+    try {
+      const r = await fetch("/ai/api/customers?limit=1", { credentials: "include" });
+      // 简化：从搜索返回的 items 中抽 cert_type 列表（这里没 cert_type，跳过）
+      // 改用专门的查询接口或从已有数据提取
+    } catch (e) { /* 静默失败 */ }
+  };
+
   useEffect(() => { load(); }, []);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const response = await api.exportCustomers({
-        q: filter.trim() || undefined
+      // 使用 exportCustomersWithCerts（带证书字段 + 可按证书类型筛选）
+      const response = await api.exportCustomersWithCerts({
+        q: filter.trim() || undefined,
+        certType: certType || undefined
       });
       if (!response.ok) throw new Error(`导出失败: ${response.status}`);
 
       const disposition = response.headers.get("content-disposition") || "";
       const m = disposition.match(/filename\*=UTF-8''([^;]+)/);
-      const filename = m ? decodeURIComponent(m[1]) : `单位信息_${new Date().toISOString().slice(0, 10)}.csv`;
+      const filename = m ? decodeURIComponent(m[1]) : `单位信息${certType ? '_' + certType : ''}_${new Date().toISOString().slice(0, 10)}.csv`;
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -657,7 +670,22 @@ function CustomerUnitTab() {
     <div className="enum-panel">
       <div className="panel-header">
         <h2>单位信息列表（{items.length}）</h2>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <select
+            value={certType}
+            onChange={(e) => setCertType(e.target.value)}
+            title="按证书类型筛选（仅导出时生效）"
+            className="tiny"
+          >
+            <option value="">📜 全部证书</option>
+            <option value="QES三体系">QES三体系</option>
+            <option value="QMS质量管理体系">QMS</option>
+            <option value="EMS">EMS</option>
+            <option value="OHSMS">OHSMS</option>
+            <option value="ISMS">ISMS</option>
+            <option value="AAA">AAA</option>
+            <option value="能源">能源</option>
+          </select>
           <button className="ghost-button" onClick={handleExport} disabled={exporting}>
             <Download size={16} /> {exporting ? "导出中..." : "导出 CSV"}
           </button>
@@ -747,7 +775,9 @@ function CustomerUnitTab() {
 
       <div className="muted small" style={{ marginTop: "12px" }}>
         💡 提示：导入 CSV 时按"客户名称"匹配：同名则更新，否则新建。必填列：<code>客户名称</code>。
-        可选列：<code>客户编号 / 行业 / 地区 / 联系人 / 电话 / 邮箱 / 信用代码 / 地址 / 业务范围 / 标签 / 备注</code>。
+        客户字段：<code>客户编号 / 行业 / 地区 / 联系人 / 电话 / 邮箱 / 信用代码 / 地址 / 业务范围 / 标签 / 备注</code>。
+        证书字段（如有证书字段则自动创建/更新）：<code>证书类型 / 证书标准 / 证书编号 / 颁发机构 / 签发日期 / 到期日期</code>。
+        导出支持按证书类型筛选（仅含证书的客户/证书行）。
       </div>
     </div>
   );

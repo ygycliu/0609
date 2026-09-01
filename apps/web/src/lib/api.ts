@@ -590,13 +590,34 @@ export const api = {
   },
   // V2.1：导入客户（系统基础数据 → 单位信息）
   importCustomers: (csv: string) =>
-    request<{ data: { total: number; inserted: number; updated: number; failed: number; errors: any[] } }>(
+    request<{
+      data: {
+        total: number;
+        customers: { inserted: number; updated: number };
+        certificates: { inserted: number; updated: number };
+        failed: number;
+        errors: any[];
+      };
+    }>(
       `/customers/import.csv`,
       {
         method: "POST",
         body: JSON.stringify({ csv })
       }
     ),
+  // V2.1：按证书类型筛选导出（只含证书行）
+  exportCustomersWithCerts: (params: { q?: string; certType?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.certType) qs.set("cert_type", params.certType);
+    const path = qs.toString()
+      ? `/customers/export-with-certs.csv?${qs.toString()}`
+      : "/customers/export-with-certs.csv";
+    return fetch(`${API_BASE_URL}${path}`, {
+      credentials: "include",
+      headers: { Accept: "text/csv" }
+    });
+  },
   createCustomer: (input: any) =>
     request<any>("/customers", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
