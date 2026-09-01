@@ -237,7 +237,7 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
   useEffect(() => {
     setArLoading(true);
     api.getARTopByCustomer(10)
-      .then((r) => setArTop(r.data || []))
+      .then((r) => setArTop(r || []))  // request 已自动返回 body.data
       .catch(() => setArTop([]))
       .finally(() => setArLoading(false));
   }, []);
@@ -250,7 +250,7 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
     }
     setArDrillLoading(true);
     api.listAR({ customer_id: arDrill.customerId, limit: 50 })
-      .then((r) => setArDrillList(r.data))
+      .then((r) => setArDrillList(r?.data || []))  // listAR 返回 {data, total}
       .catch(() => setArDrillList([]))
       .finally(() => setArDrillLoading(false));
   }, [arDrill]);
