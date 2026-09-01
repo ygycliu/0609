@@ -5578,9 +5578,22 @@ export async function createApp() {
       let todoId: string | null = null;
 
       if (shouldPushTodo) {
+        // 安全格式化日期为 YYYY-MM-DD
+        function toDateOnly(v: any): string {
+          if (!v) return '';
+          if (typeof v === 'string') return v.split('T')[0].split(' ')[0];
+          if (v instanceof Date) {
+            const y = v.getFullYear();
+            const m = String(v.getMonth() + 1).padStart(2, '0');
+            const d = String(v.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          return String(v).split('T')[0];
+        }
+        const rawDate = toDateOnly(stage.next_stage_date || cert.valid_until);
         const dueDate = (stage.days_until_next && stage.days_until_next < 0)
           ? new Date().toISOString()
-          : (stage.next_stage_date || cert.valid_until) + 'T09:00:00.000Z';
+          : (rawDate ? new Date(rawDate + 'T09:00:00').toISOString() : new Date().toISOString());
         const priority = stage.urgency_level === 'RENEW' ? 'urgent' : 'high';
 
         const todoInsert = await query(
