@@ -2162,12 +2162,46 @@ export async function createApp() {
         limit: 10000
       });
 
-      // 生成 CSV (BOM + UTF-8)
+      // V2.1：加载所有客户的证书（一行一证书，包含证书详情）
+      const customerIds = result.items.map((c: any) => c.id);
+      const certMap = new Map<string, any[]>(); // customerId → certs
+      if (customerIds.length > 0) {
+        const certRes = await query<any>(
+          `SELECT 
+             sc.customer_id,
+             pc.id AS cert_id,
+             pc.cert_type,
+             pc.standard,
+             pc.certificate_no,
+             pc.issue_date::text AS issue_date,
+             pc.valid_until::text AS valid_until,
+             pc.issuing_body,
+             pc.status AS cert_status,
+             pc.acknowledged_at IS NOT NULL AS is_acknowledged,
+             (pc.valid_until - CURRENT_DATE) AS days_until_expiry
+           FROM project_certificate pc
+           JOIN certification_project sc ON sc.id = pc.project_id AND sc.deleted_at IS NULL
+           WHERE pc.deleted_at IS NULL
+             AND sc.customer_id = ANY($1::uuid[])
+           ORDER BY sc.customer_id, pc.issue_date DESC NULLS LAST`,
+          [customerIds]
+        );
+        for (const row of certRes.rows) {
+          const arr = certMap.get(row.customer_id) || [];
+          arr.push(row);
+          certMap.set(row.customer_id, arr);
+        }
+      }
+
+      // 生成 CSV (BOM + UTF-8) — 一行一证书
       const headers = [
         "客户编号", "客户名称", "行业", "规模", "地区", "联系人",
-        "电话", "邮箱", "信用代码", "业务范围", "服务阶段", "状态",
+        "电话", "邮箱", "信用代码", "业务范围", "服务阶段", "客户状态",
         "来源", "来源渠道", "标签", "累计营收", "服务次数",
-        "首次服务", "最近服务", "满意度", "备注", "创建时间"
+        "首次服务", "最近服务", "满意度", "备注",
+        // 证书字段
+        "证书类型", "证书标准", "证书编号", "颁发机构",
+        "签发日期", "到期日期", "证书状态", "距到期天数", "已确认"
       ];
       const esc = (v: any) => {
         if (v === null || v === undefined) return "";
@@ -2178,37 +2212,52 @@ export async function createApp() {
         }
         return s;
       };
-      const rows = result.items.map((c: any) => [
-        c.customer_code,
-        c.name,
-        c.industry,
-        c.scale,
-        c.region,
-        c.contact_person,
-        c.contact_phone,
-        c.contact_email,
-        c.credit_code,
-        c.business_scope,
-        c.service_stage,
-        c.status,
-        c.source,
-        c.source_channel,
-        Array.isArray(c.tags) ? c.tags.join("; ") : "",
-        c.total_revenue ?? "",
-        c.service_count ?? "",
-        c.first_service_at,
-        c.last_service_at,
-        c.satisfaction_score,
-        c.notes,
-        c.created_at
-      ]);
+      // 基础信息行（按客户）- 用 any[] 因为 searchAdvanced 返回 snake_case
+      const customerBase = new Map<string, string[]>();
+      for (const c of result.items as any[]) {
+        customerBase.set(c.id, [
+          c.customer_code, c.name, c.industry, c.scale, c.region,
+          c.contact_person, c.contact_phone, c.contact_email,
+          c.credit_code, c.business_scope, c.service_stage, c.status,
+          c.source, c.source_channel,
+          Array.isArray(c.tags) ? c.tags.join("; ") : "",
+          c.total_revenue ?? "", c.service_count ?? "",
+          c.first_service_at, c.last_service_at,
+          c.satisfaction_score, c.notes
+        ]);
+      }
+      // 展开：一客户多证书 → 多行；无证书 → 一行（证书字段为空）
+      const rows: string[][] = [];
+      for (const c of result.items) {
+        const base = customerBase.get(c.id) || [];
+        const certs = certMap.get(c.id) || [];
+        if (certs.length === 0) {
+          // 无证书：客户基础 + 21 个空证书字段
+          rows.push([...base, "", "", "", "", "", "", "", "", ""]);
+        } else {
+          for (const cert of certs) {
+            rows.push([
+              ...base,
+              cert.cert_type || "",
+              cert.standard || "",
+              cert.certificate_no || "",
+              cert.issuing_body || "",
+              cert.issue_date || "",
+              cert.valid_until || "",
+              cert.cert_status || "",
+              cert.days_until_expiry ?? "",
+              cert.is_acknowledged ? "是" : "否"
+            ]);
+          }
+        }
+      }
       const csv = [
         "\uFEFF" + headers.map(esc).join(","),
         ...rows.map(row => row.map(esc).join(","))
       ].join("\r\n");
 
-      const filename = `客户列表_${new Date().toISOString().slice(0, 10)}.csv`;
-      const safeAscii = `customers_${new Date().toISOString().slice(0, 10)}.csv`;
+      const filename = `单位信息（含证书）_${new Date().toISOString().slice(0, 10)}.csv`;
+      const safeAscii = `customers_with_certs_${new Date().toISOString().slice(0, 10)}.csv`;
       response.setHeader("Content-Type", "text/csv; charset=utf-8");
       response.setHeader("Content-Disposition", `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
       response.send(csv);
