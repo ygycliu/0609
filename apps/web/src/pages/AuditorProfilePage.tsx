@@ -28,6 +28,15 @@ interface Auditor {
   position: string | null;
   level: string;
   specialties: string[];
+  certificates?: Array<{
+    code?: string;
+    name?: string;
+    source_name?: string;
+    file?: string;
+    note?: string;
+    status?: string;
+  }>;
+  attachments?: Array<{ name?: string; path?: string }>;
   certNo: string | null;
   certIssueDate: string | null;
   certExpiry: string | null;
@@ -322,6 +331,7 @@ export function AuditorProfilePage({ currentUser }: { currentUser?: any }) {
                 <th>级别</th>
                 <th>类型</th>
                 <th>专业</th>
+                <th>证书</th>
                 <th>电话</th>
                 <th>状态</th>
                 <th>操作</th>
@@ -349,6 +359,13 @@ export function AuditorProfilePage({ currentUser }: { currentUser?: any }) {
                         <span key={i} className="spec-pill">{s}</span>
                       ))}
                       {a.specialties.length > 3 && <span className="spec-more">+{a.specialties.length - 3}</span>}
+                    </td>
+                    <td>
+                      {(a.certificates && a.certificates.length > 0) ? (
+                        <span className="cert-badge" title={a.certificates.map(c => c.code).join(", ")}>
+                          🏅 {a.certificates.length} 张
+                        </span>
+                      ) : <span className="muted small">无</span>}
                     </td>
                     <td>{a.phone || "—"}</td>
                     <td>
@@ -568,6 +585,47 @@ function AuditorEditDrawer({
               <option value="retired">退休</option>
             </select>
           </label>
+
+          {/* 证书列表（非结构化数据）*/}
+          {auditor.certificates && auditor.certificates.length > 0 && (
+            <div className="field">
+              <span>🏅 证书档案（{auditor.certificates.length} 张）</span>
+              <table className="cert-table">
+                <thead>
+                  <tr>
+                    <th>体系代码</th>
+                    <th>证书名称</th>
+                    <th>原文件</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditor.certificates.map((c, i) => (
+                    <tr key={i}>
+                      <td><span className="cert-code-pill">{c.code}</span></td>
+                      <td>{c.name || "—"}</td>
+                      <td className="muted small">{c.source_name || "—"}</td>
+                      <td><span className="status-pill status-completed">{c.status || "active"}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 附件列表 */}
+          {auditor.attachments && auditor.attachments.length > 0 && (
+            <div className="field">
+              <span>📎 附件（{auditor.attachments.length} 个）</span>
+              <ul className="attachment-list">
+                {auditor.attachments.map((a, i) => (
+                  <li key={i} className="muted small">
+                    {a.name} <span style={{ color: "#94a3b8" }}>({a.path})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <footer className="drawer-footer">
           <button className="ghost-button" onClick={onClose}>取消</button>

@@ -10434,3 +10434,63 @@ textarea:focus {
   border-top: 1px solid #e5e7eb;
   background: #f8fafc;
 }
+
+
+/* V2.0 证书徽章 + 证书表 */
+.cert-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: help;
+}
+
+.cert-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.cert-table thead {
+  background: #f8fafc;
+}
+
+.cert-table th {
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: #475569;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cert-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cert-code-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #ede9fe;
+  color: #6d28d9;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+}
+
+.attachment-list li {
+  padding: 4px 0;
+  border-bottom: 1px dashed #e5e7eb;
+}

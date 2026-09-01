@@ -32,6 +32,25 @@ export interface AuditorProfileRecord {
   tags: string[];
   source: string;
   sourcePath: string | null;
+  /** V2.0：证书列表（JSON 存储）*/
+  certificates: Array<{
+    code?: string;
+    name?: string;
+    type?: string;
+    file?: string;
+    source_name?: string;
+    status?: string;
+    note?: string;
+    importedAt?: string;
+  }>;
+  /** V2.0：附件列表（JSON 存储）*/
+  attachments: Array<{
+    name?: string;
+    path?: string;
+    type?: string;
+    size?: number;
+    uploadedAt?: string;
+  }>;
   createdAt: string;
   updatedAt: string | null;
 }
@@ -65,6 +84,8 @@ function rowToAuditor(r: any): AuditorProfileRecord {
     tags: r.tags || [],
     source: r.source || "manual",
     sourcePath: r.source_path,
+    certificates: typeof r.certificates === "string" ? JSON.parse(r.certificates) : (r.certificates || []),
+    attachments: typeof r.attachments === "string" ? JSON.parse(r.attachments) : (r.attachments || []),
     createdAt: r.created_at,
     updatedAt: r.updated_at
   };
