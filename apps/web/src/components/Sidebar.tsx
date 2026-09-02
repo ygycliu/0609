@@ -67,6 +67,7 @@ const navigation: NavGroup[] = [
     items: [
       { id: "customer-list", label: "客户管理", icon: Users, color: "#ec4899" },
       { id: "contracts", label: "合同管理", icon: FileText, color: "#8b5cf6" },
+      { id: "template-engine", label: "模板引擎", icon: FileText, color: "#06b6d4" },
       { id: "project-workspace", label: "项目工作台", icon: Briefcase, color: "#64748b" },
       { id: "follow-up", label: "客户跟进", icon: Activity, color: "#ec4899" },
       { id: "cert-expiry", label: "认证预警", icon: Bell, color: "#f59e0b" }

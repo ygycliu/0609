@@ -1022,6 +1022,50 @@ export const api = {
 
   enrichCustomerFromContracts: (customerId: string) =>
     request<any>(`/customers/${customerId}/enrich-from-contracts`),
+
+  // ===== V2.3 Contract Template Engine =====
+  listContractTemplates: async (params: {
+    signing_entity_id?: string;
+    contract_type?: string;
+    template_category?: string;
+    status?: string;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v != null && v !== "") qs.set(k, String(v));
+    });
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    const response = await fetch(`${API_BASE_URL}/template-engine?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`templates list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number };
+  },
+
+  listContractFields: () => request<any>("/template-engine/fields/all"),
+
+  generateContract: (input: {
+    templateId: string;
+    customerId: string;
+    certificationProjectId?: string | null;
+    fieldValues: Record<string, any>;
+    outputFormat?: string;
+  }) =>
+    request<any>(`/template-engine/${input.templateId}/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+
+  listTemplateGenerations: () => request<any>("/template-engine/generations/list"),
+
+  downloadTemplateGeneration: (id: string) =>
+    `${API_BASE_URL}/template-engine/generations/${id}/download`,
 };
 
 export { API_BASE_URL };
@@ -1128,7 +1172,6 @@ export function assistantConfirm(payload: { toolName: string; args: any }) {
 }
 
 
-// ===== V2.2 PDF Import Helper =====
 export async function importContractFromPdf(file: File) {
   const fd = new FormData();
   fd.append("file", file);
