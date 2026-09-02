@@ -5688,6 +5688,33 @@ export async function createApp() {
   app.post("/feishu/events", handleEvent);
   app.post("/api/feishu/push", pushMessage);
 
+  // V2.1：主动推送到指定群聊（您提供的 chat_id）
+  app.post("/api/feishu/notify", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "❌ 仅管理员可推送飞书消息" });
+        return;
+      }
+      const body = request.body as {
+        chatId?: string;
+        chatIds?: string[];
+        content?: any;
+      };
+      const { chatId, chatIds, content } = body;
+      const { notifyGroup, notifyGroups } = await import("./integrations/feishu/client.js");
+      if (chatIds && Array.isArray(chatIds)) {
+        const results = await notifyGroups(chatIds, content || {});
+        response.json({ data: { total: chatIds.length, results } });
+      } else if (chatId) {
+        const result = await notifyGroup(chatId, content || {});
+        response.json({ data: result });
+      } else {
+        response.status(400).json({ code: "BAD_REQUEST", message: "请提供 chatId 或 chatIds" });
+      }
+    } catch (err) { next(err); }
+  });
+
   if (fsSync.existsSync(config.webDist)) {
     app.use(express.static(config.webDist));
   }
