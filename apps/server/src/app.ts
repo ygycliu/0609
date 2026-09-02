@@ -6459,5 +6459,9 @@ export async function createApp() {
   const { contractRouter } = await import("./contracts/contract.routes.js");
   app.use("/api/contracts", contractRouter);
 
+  // V2.2：客户反向补全路由（4 个端点）
+  const { customerEnrichRouter } = await import("./contracts/customer-enrich.routes.js");
+  app.use("/api/customers", customerEnrichRouter);
+
   return app;
 }
