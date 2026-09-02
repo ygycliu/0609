@@ -125,11 +125,11 @@ export class ContractRepository {
       conditions.push(`c.signed_at <= $${idx++}`);
       params.push(options.endDate);
     }
-    if (options.minAmount != null) {
+    if (options.minAmount != null && !Number.isNaN(options.minAmount)) {
       conditions.push(`c.contract_amount >= $${idx++}`);
       params.push(options.minAmount);
     }
-    if (options.maxAmount != null) {
+    if (options.maxAmount != null && !Number.isNaN(options.maxAmount)) {
       conditions.push(`c.contract_amount <= $${idx++}`);
       params.push(options.maxAmount);
     }

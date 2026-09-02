@@ -6453,5 +6453,11 @@ export async function createApp() {
     } catch (error) { next(error); }
   });
 
+  // ============================================================
+  // V2.2：合同管理路由（15 个端点）
+  // ============================================================
+  const { contractRouter } = await import("./contracts/contract.routes.js");
+  app.use("/api/contracts", contractRouter);
+
   return app;
 }
