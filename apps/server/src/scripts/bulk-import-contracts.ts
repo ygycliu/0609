@@ -152,7 +152,12 @@ async function processFile(
     // 2. 计算 hash
     const hash = await fileHash(filepath);
 
-    // 3. 检查是否已存在（按 hash）
+    // 2.5 预解析 companyId（重复检测也要用）
+    const companyId = (await queryOne<any>(
+      `SELECT id FROM company WHERE name = '华中国际认证检验集团有限公司' OR name LIKE '%华中%' LIMIT 1`
+    ))?.id || (await queryOne<any>(`SELECT id FROM company LIMIT 1`))?.id || "00000000-0000-0000-0000-000000000001";
+
+    // 3. 检查是否已存在（按 hash 或 contract_no）
     const existing = await queryOne<any>(
       `SELECT cf.contract_id, c.id, c.contract_no FROM contract_file cf
        JOIN contract c ON cf.contract_id = c.id
@@ -171,13 +176,28 @@ async function processFile(
       };
     }
 
+    // 3.5 检查合同号 + 客户是否已存在（防止重复）
+    if (parsed.number && parsed.year) {
+      const dupContract = await queryOne<any>(
+        `SELECT id, created_at FROM contract
+         WHERE company_id = $1 AND contract_no = $2 AND deleted_at IS NULL
+         ORDER BY created_at DESC LIMIT 1`,
+        [companyId, `${parsed.year}-${parsed.number}`]
+      );
+      if (dupContract) {
+        // 按"最后时间为准"保留最新 - 软删旧的
+        await query(
+          `UPDATE contract SET deleted_at = NOW(),
+             notes = COALESCE(notes,'') || E'\n[自动清理 ' || NOW()::text || '] 重复合同号被新版本替代'
+           WHERE contract_no = $1 AND company_id = $2 AND deleted_at IS NULL
+             AND id != $3`,
+          [`${parsed.year}-${parsed.number}`, companyId, dupContract.id]
+        );
+      }
+    }
+
     // 4. OCR 提取文本（仅前 2 页）
     const text = await extractText(filepath, 2);
-
-    // 5. 预解析 companyId（所有匹配都要用）
-    const companyId = (await queryOne<any>(
-      `SELECT id FROM company WHERE name = '华中国际认证检验集团有限公司' OR name LIKE '%华中%' LIMIT 1`
-    ))?.id || (await queryOne<any>(`SELECT id FROM company LIMIT 1`))?.id || "00000000-0000-0000-0000-000000000001";
 
     // 6. 客户匹配（先用文件名猜，再 AI）
     let customerMatched = null;
