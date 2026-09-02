@@ -6463,5 +6463,9 @@ export async function createApp() {
   const { customerEnrichRouter } = await import("./contracts/customer-enrich.routes.js");
   app.use("/api/customers", customerEnrichRouter);
 
+  // V2.3：合同模板引擎（16 个端点）
+  const { templateRouter } = await import("./templates/template.routes.js");
+  app.use("/api/template-engine", templateRouter);
+
   return app;
 }
