@@ -4603,6 +4603,18 @@ select:focus-visible {
   position: relative;
   overflow: hidden;
 }
+.finance-metric-grid .metric.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.finance-metric-grid .metric.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+}
+.finance-metric-grid .metric.clickable:active {
+  transform: translateY(0);
+}
 
 .finance-metric-grid .metric-icon {
   position: absolute;

@@ -129,6 +129,26 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
   const [arDrillLoading, setArDrillLoading] = useState(false);
   const [payingAR, setPayingAR] = useState<string | null>(null);  // V2.0：标记已收 loading 状态
 
+  // V2.1：metric 点击穿透 helper
+  function filterByTypeAndOpen(t: "income" | "expense" | "net") {
+    if (t === "net") {
+      setTypeFilter("all"); // 净收益看全部
+    } else {
+      setTypeFilter(t);
+    }
+    setPage(0);
+    setTimeout(() => {
+      document.querySelector(".transactions-table")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
+
+  function filterByARAndOpen(_mode: "all" | "remaining" | "overdue") {
+    // AR 已有 drawer 模式：滚动到 AR 区域
+    setTimeout(() => {
+      document.querySelector(".ar-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
+
   // V2.0：标记 AR 为已收
   async function handleMarkARPaiement(ar: any) {
     if (!window.confirm(`确认标记「${ar.title}」¥${Number(ar.remainingAmount).toLocaleString()} 已收款？`)) return;
@@ -343,34 +363,54 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
         </div>
       </section>
 
-      {/* 统计区 */}
+      {/* 统计区（V2.1：可点击穿透到交易明细） */}
       <section className="finance-metric-grid">
-        <div className="metric metric-income">
+        <div
+          className="metric metric-income clickable"
+          onClick={() => filterByTypeAndOpen("income")}
+          title="点击查看所有收入交易"
+        >
           <span>总收入</span>
           <strong>¥{summary?.totalIncome?.toLocaleString() ?? "0"}</strong>
           <small>本期间所有收入分类</small>
           <TrendingUp size={32} className="metric-icon" />
         </div>
-        <div className="metric metric-expense">
+        <div
+          className="metric metric-expense clickable"
+          onClick={() => filterByTypeAndOpen("expense")}
+          title="点击查看所有支出交易"
+        >
           <span>总支出</span>
           <strong>¥{summary?.totalExpense?.toLocaleString() ?? "0"}</strong>
           <small>本期间所有支出分类</small>
           <TrendingDown size={32} className="metric-icon" />
         </div>
-        <div className="metric metric-profit">
+        <div
+          className="metric metric-profit clickable"
+          onClick={() => filterByTypeAndOpen("net")}
+          title="点击查看净收益构成"
+        >
           <span>净利润</span>
           <strong>¥{summary?.netProfit?.toLocaleString() ?? "0"}</strong>
           <small>收入 - 支出</small>
           <CircleDollarSign size={32} className="metric-icon" />
         </div>
         {/* V2.0：应收总额 / 未收总额 / 逾期客户数 */}
-        <div className="metric metric-ar">
+        <div
+          className="metric metric-ar clickable"
+          onClick={() => filterByARAndOpen("all")}
+          title="点击查看所有应收"
+        >
           <span>应收总额</span>
           <strong>¥{arSummary.totalAmount.toLocaleString()}</strong>
           <small>已签合同未收齐</small>
           <Banknote size={32} className="metric-icon" />
         </div>
-        <div className="metric metric-ar-remaining">
+        <div
+          className="metric metric-ar-remaining clickable"
+          onClick={() => filterByARAndOpen("remaining")}
+          title="点击查看所有未收应收"
+        >
           <span>未收总额</span>
           <strong style={{ color: arSummary.remainingAmount > 0 ? "#dc2626" : "#059669" }}>
             ¥{arSummary.remainingAmount.toLocaleString()}
@@ -378,7 +418,11 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
           <small>未收回金额</small>
           <Receipt size={32} className="metric-icon" />
         </div>
-        <div className="metric metric-overdue">
+        <div
+          className="metric metric-overdue clickable"
+          onClick={() => filterByARAndOpen("overdue")}
+          title="点击查看所有逾期应收"
+        >
           <span>逾期客户</span>
           <strong style={{ color: arSummary.overdueCount > 0 ? "#dc2626" : "#059669" }}>
             {arSummary.overdueCount} 个
@@ -533,8 +577,8 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
         </div>
       </section>
 
-      {/* 应收账款 Top 10 */}
-      <section className="finance-grid">
+      {/* 应收账款 Top 10（V2.1：穿透目标区域） */}
+      <section className="finance-grid ar-section">
         <div className="card ar-card">
           <div className="card-header">
             <h3>
@@ -759,7 +803,7 @@ export function FinanceDashboard({ onOpenTransaction, currentUser }: FinanceDash
         ) : transactions.length === 0 ? (
           <div className="empty-row">没有匹配的交易</div>
         ) : (
-          <table className="customer-table">
+          <table className="customer-table transactions-table">
             <thead>
               <tr>
                 <th>日期</th>
