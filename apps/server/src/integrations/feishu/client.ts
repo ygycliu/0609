@@ -3,6 +3,7 @@
  * 用于发送消息、读表格
  */
 import crypto from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 const APP_ID = process.env.FEISHU_APP_ID ?? "";
 const APP_SECRET = process.env.FEISHU_APP_SECRET ?? "";
@@ -37,17 +38,38 @@ export interface FeishuMessage {
   content: string;             // JSON 字符串
 }
 
-export async function sendMessage(receive_id_type: "open_id" | "chat_id", message: FeishuMessage) {
+export interface SendOptions {
+  atUserIds?: string[];        // @ 提醒的 user_id（open_id）
+  atAll?: boolean;             // @所有人
+}
+
+export async function sendMessage(
+  receive_id_type: "open_id" | "chat_id",
+  message: FeishuMessage,
+  options: SendOptions = {}
+) {
   const token = await getTenantToken();
+  const body: any = { ...message, uuid: randomUUID() };
+
+  // V2.1: @ 提醒支持
+  if (options.atUserIds && options.atUserIds.length > 0) {
+    body.at = {
+      at_user_ids: options.atUserIds,
+      at_all: false
+    };
+  } else if (options.atAll) {
+    body.at = { at_all: true };
+  }
+
   const resp = await fetch(
     `https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=${receive_id_type}`,
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify(message)
+      body: JSON.stringify(body)
     }
   );
   return await resp.json() as { code?: number; msg?: string; data?: any };
@@ -65,19 +87,24 @@ export async function sendWebhookMessage(webhookUrl: string, content: object) {
 /**
  * V2.1：主动推送到指定群聊（chat_id）
  * 用于定时任务 + 系统预警推送
+ * 支持 @ 提醒（atUserIds / atAll）
  */
 export async function notifyGroup(chatId: string, content: {
   text?: string;
   title?: string;
   fields?: Array<{ key: string; value: string }>;
   link?: string;
+  atUserIds?: string[];   // @ 提醒特定用户
+  atAll?: boolean;        // @所有人
 }) {
   if (!chatId) {
     console.warn("[Feishu] notifyGroup: chatId 为空");
     return { code: -1, msg: "chatId 为空" };
   }
+
+  // V2.1: 优先用 Open API（支持 @ + 卡片 + 更丰富）
   if (!APP_ID || !APP_SECRET) {
-    // V2.1: 优先用 webhook（更简单 + 含关键词防护）
+    // 回退到 webhook（只支持文本，不支持 @）
     const webhookUrl = process.env.FEISHU_WEBHOOK_URL ?? "";
     if (!webhookUrl) {
       return { code: -2, msg: "飞书未配置：既无 APP_ID/SECRET 也无 FEISHU_WEBHOOK_URL" };
@@ -90,23 +117,22 @@ export async function notifyGroup(chatId: string, content: {
     });
   }
 
-  // 构造 text 消息（最兼容，含关键词防 19024）
-  // V2.1: 飞书群机器人可能设关键词防护，自动添加"合同"关键词以保证通过
+  // text 消息（含关键词防 19024）
   const baseText = content.text || "";
   const safeText = baseText + (baseText.includes("合同") ? "" : "\n\n（含合同关键词）");
 
-  // text 消息格式（webhook 和 im/v1/messages 都接受）
-  const card = {
-    msg_type: "text",
-    content: { text: safeText }
-  };
-
-  // sendMessage 内部会再次 stringify content，所以这里传 plain text object
-  return await sendMessage("chat_id", {
-    receive_id: chatId,
-    msg_type: "text",
-    content: JSON.stringify(card.content)
-  });
+  return await sendMessage(
+    "chat_id",
+    {
+      receive_id: chatId,
+      msg_type: "text",
+      content: JSON.stringify({ text: safeText })
+    },
+    {
+      atUserIds: content.atUserIds,
+      atAll: content.atAll
+    }
+  );
 }
 
 /**
