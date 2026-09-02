@@ -64,6 +64,9 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
   const [documents, setDocuments] = useState<any[]>([]);
   const [corrections, setCorrections] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
+  // V2.1：来自 finance 系统的财务记录（finance_project/finance_transaction）
+  const [financeProjects, setFinanceProjects] = useState<any[]>([]);
+  const [financeTransactions, setFinanceTransactions] = useState<any[]>([]);
 
   // Modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -82,14 +85,17 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
   const load = async () => {
     setLoading(true);
     try {
-      const [p, t, pay, inv, doc, cor, rev] = await Promise.all([
+      const [p, t, pay, inv, doc, cor, rev, finProj, finTx] = await Promise.all([
         api.getCertificationProject(projectId),
         api.getCertificationProjectTimeline(projectId),
         api.listProjectPayments(projectId).catch(() => ({ data: [] })),
         api.listProjectInvoices(projectId).catch(() => ({ data: [] })),
         api.listProjectDocuments(projectId).catch(() => ({ data: [] })),
         api.listProjectCorrections(projectId).catch(() => ({ data: [] })),
-        api.listProjectReviews(projectId).catch(() => ({ data: [] }))
+        api.listProjectReviews(projectId).catch(() => ({ data: [] })),
+        // V2.1：从 finance 系统拉关联记录
+        api.listProjects({ certification_project_id: projectId, limit: 50 }).then((r: any) => r?.data || []).catch(() => []),
+        api.listTransactions({ certification_project_id: projectId, limit: 50 }).then((r: any) => r?.data || []).catch(() => [])
       ]);
       setProject((p as any).data || p);
       setTimeline((t as any).data || t || []);
@@ -98,6 +104,8 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
       setDocuments(((doc as any).data || doc) || []);
       setCorrections(((cor as any).data || cor) || []);
       setReviews(((rev as any).data || rev) || []);
+      setFinanceProjects(finProj || []);
+      setFinanceTransactions(finTx || []);
     } catch (e) {
       console.error(e);
     } finally { setLoading(false); }
@@ -449,6 +457,67 @@ export function ProjectDetailPage({ projectId, onBack }: ProjectDetailPageProps)
                 ))}
               </tbody>
             </table>
+          )}
+
+          {/* V2.1：来自 finance 系统的财务记录（自动按 certification_project_id 关联） */}
+          <h4 style={{ marginTop: 20 }}>💼 Finance 财务记录（{financeProjects.length} 个项目 / {financeTransactions.length} 笔交易）</h4>
+          {financeProjects.length === 0 && financeTransactions.length === 0 ? (
+            <p className="muted">暂无 finance 系统关联记录（可能是老数据或独立 AR/账单）。</p>
+          ) : (
+            <>
+              {financeProjects.length > 0 && (
+                <table className="data-table" style={{ marginBottom: 16 }}>
+                  <thead>
+                    <tr><th>项目编号</th><th>名称</th><th>合同金额</th><th>已收</th><th>已付</th><th>状态</th><th>更新时间</th></tr>
+                  </thead>
+                  <tbody>
+                    {financeProjects.map((fp: any) => (
+                      <tr key={fp.id}>
+                        <td><code>{fp.projectCode || "—"}</code></td>
+                        <td>{fp.name}</td>
+                        <td>¥{Number(fp.contractAmount || 0).toLocaleString()}</td>
+                        <td><strong style={{ color: "#059669" }}>¥{Number(fp.receivedAmount || 0).toLocaleString()}</strong></td>
+                        <td>¥{Number(fp.paidAmount || 0).toLocaleString()}</td>
+                        <td>
+                          <span className={`status-pill status-${fp.status || 'draft'}`}>
+                            {fp.status === "in_progress" ? "进行中" : fp.status === "completed" ? "已完成" : fp.status || "—"}
+                          </span>
+                        </td>
+                        <td className="muted small">{fp.updatedAt ? new Date(fp.updatedAt).toLocaleDateString() : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {financeTransactions.length > 0 && (
+                <details>
+                  <summary style={{ cursor: "pointer", padding: "8px 0", color: "#475569" }}>
+                    📊 查看交易流水（{financeTransactions.length} 笔）
+                  </summary>
+                  <table className="data-table">
+                    <thead>
+                      <tr><th>类型</th><th>分类</th><th>金额</th><th>发生日</th><th>归属月</th><th>描述</th></tr>
+                    </thead>
+                    <tbody>
+                      {financeTransactions.map((ft: any) => (
+                        <tr key={ft.id}>
+                          <td>
+                            <span className={`status-pill status-${ft.type === "income" ? "completed" : "suspended"}`}>
+                              {ft.type === "income" ? "收入" : "支出"}
+                            </span>
+                          </td>
+                          <td>{ft.category || "—"}</td>
+                          <td><strong>¥{Number(ft.amount || 0).toLocaleString()}</strong></td>
+                          <td className="muted small">{ft.transDate ? new Date(ft.transDate).toLocaleDateString() : "—"}</td>
+                          <td className="muted small">{ft.transMonth || "—"}</td>
+                          <td className="muted small">{ft.description || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </details>
+              )}
+            </>
           )}
 
           {/* 评审记录 */}

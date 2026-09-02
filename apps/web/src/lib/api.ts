@@ -323,6 +323,7 @@ export const api = {
     q?: string;
     status?: string;
     customer_id?: string;
+    certification_project_id?: string;  // V2.1
     limit?: number;
     offset?: number;
   } = {}) => {
@@ -330,6 +331,7 @@ export const api = {
     if (params.q) qs.set("q", params.q);
     if (params.status) qs.set("status", params.status);
     if (params.customer_id) qs.set("customer_id", params.customer_id);
+    if (params.certification_project_id) qs.set("certification_project_id", params.certification_project_id);  // V2.1
     qs.set("limit", String(params.limit ?? 50));
     qs.set("offset", String(params.offset ?? 0));
     const response = await fetch(`${API_BASE_URL}/finance/projects?${qs.toString()}`, {
@@ -358,6 +360,7 @@ export const api = {
     category?: string;
     project_id?: string;
     customer_id?: string;
+    certification_project_id?: string;  // V2.1
     start_date?: string;
     end_date?: string;
     limit?: number;
@@ -368,6 +371,7 @@ export const api = {
     if (params.category) qs.set("category", params.category);
     if (params.project_id) qs.set("project_id", params.project_id);
     if (params.customer_id) qs.set("customer_id", params.customer_id);
+    if (params.certification_project_id) qs.set("certification_project_id", params.certification_project_id);  // V2.1
     if (params.start_date) qs.set("start_date", params.start_date);
     if (params.end_date) qs.set("end_date", params.end_date);
     qs.set("limit", String(params.limit ?? 50));

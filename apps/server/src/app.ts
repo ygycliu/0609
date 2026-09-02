@@ -3618,6 +3618,7 @@ export async function createApp() {
         q: (request.query.q as string) || "",
         status: (request.query.status as string) || "",
         customerId: (request.query.customer_id as string) || "",
+        certificationProjectId: (request.query.certification_project_id as string) || "",  // V2.1
         offset,
         limit
       });
@@ -3706,6 +3707,7 @@ export async function createApp() {
         category: (request.query.category as string) || "",
         projectId: (request.query.project_id as string) || "",
         customerId: (request.query.customer_id as string) || "",
+        certificationProjectId: (request.query.certification_project_id as string) || "",  // V2.1
         startDate: (request.query.start_date as string) || "",
         endDate: (request.query.end_date as string) || "",
         offset,

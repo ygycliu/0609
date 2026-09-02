@@ -150,10 +150,11 @@ export class FinanceRepository {
     q?: string;
     status?: string;
     customerId?: string;
+    certificationProjectId?: string;  // V2.1
     offset?: number;
     limit?: number;
   } = {}): Promise<{ items: ProjectRecord[]; total: number }> {
-    const { q, status, customerId, offset = 0, limit = 50 } = options;
+    const { q, status, customerId, certificationProjectId, offset = 0, limit = 50 } = options;
     const conditions: string[] = ["p.company_id = $1", "p.deleted_at IS NULL"];
     const params: any[] = [companyId];
     let paramIdx = 2;
@@ -171,6 +172,11 @@ export class FinanceRepository {
     if (customerId && customerId.trim()) {
       conditions.push(`p.customer_id = $${paramIdx}`);
       params.push(customerId);
+      paramIdx++;
+    }
+    if (certificationProjectId && certificationProjectId.trim()) {  // V2.1
+      conditions.push(`p.certification_project_id = $${paramIdx}`);
+      params.push(certificationProjectId);
       paramIdx++;
     }
 
@@ -314,6 +320,7 @@ export class FinanceRepository {
     category?: string;
     projectId?: string;
     customerId?: string;
+    certificationProjectId?: string;  // V2.1
     startDate?: string;
     endDate?: string;
     /** V2.0：日期字段模式 'trans_date' | 'trans_month'，默认 trans_month */
@@ -321,7 +328,7 @@ export class FinanceRepository {
     offset?: number;
     limit?: number;
   } = {}): Promise<{ items: TransactionRecord[]; total: number }> {
-    const { type, category, projectId, customerId, startDate, endDate, dateField = "trans_month", offset = 0, limit = 50 } = options;
+    const { type, category, projectId, customerId, certificationProjectId, startDate, endDate, dateField = "trans_month", offset = 0, limit = 50 } = options;
     const conditions: string[] = ["t.company_id = $1", "t.deleted_at IS NULL"];
     const params: any[] = [companyId];
     let paramIdx = 2;
@@ -344,6 +351,11 @@ export class FinanceRepository {
     if (customerId && customerId.trim()) {
       conditions.push(`t.customer_id = $${paramIdx}`);
       params.push(customerId);
+      paramIdx++;
+    }
+    if (certificationProjectId && certificationProjectId.trim()) {  // V2.1
+      conditions.push(`t.certification_project_id = $${paramIdx}`);
+      params.push(certificationProjectId);
       paramIdx++;
     }
     if (startDate) {
