@@ -8,6 +8,8 @@ import multer from "multer";
 import { ContractRepository } from "./contract.repository.js";
 import {
   extractFromFile,
+  extractText,
+  extractContractFields,
   getFileType,
   saveUploadedFile
 } from "./contract.extractor.js";
@@ -486,16 +488,67 @@ async function processBatch(batchId: string, sourcePath: string, u: { id: string
     const { promisify } = await import("node:util");
     const execAsync = promisify(execFile);
 
-    // 找所有 PDF/DOC
-    const r = await execAsync(`find "${sourcePath}" -type f \\( -name "*.pdf" -o -name "*.doc" -o -name "*.docx" \\)`, { timeout: 60000 });
-    const files = r.stdout.trim().split("\n").filter(Boolean);
+    // 找所有 PDF/DOC（用 cd + ls 避免中文路径 ENOENT）
+    const r = await execAsync("bash", ["-c", `cd "${sourcePath}" && find . -maxdepth 2 -type f \\( -name "*.pdf" -o -name "*.doc" -o -name "*.docx" \\) -printf "%p\n"`], { timeout: 60000, maxBuffer: 10 * 1024 * 1024 });
+    const files = r.stdout.trim().split("\n").filter(Boolean).map(f => `${sourcePath}/${f.startsWith("./") ? f.slice(2) : f}`);
     const total = files.length;
 
     let success = 0, failed = 0, pending = 0;
     for (const file of files) {
       try {
         const buffer = await fs.readFile(file);
-        const result = await extractFromFile(buffer, path.basename(file));
+        const ext = path.extname(file).toLowerCase();
+        const fileType = (ext === ".pdf" ? "pdf" : ext === ".doc" ? "doc" : ext === ".docx" ? "docx" : "image") as "pdf" | "doc" | "docx" | "image";
+        let textResult: { text: string; usedOcr: boolean; errors: string[] };
+        if (ext === ".pdf" && buffer.length > 500 * 1024) {
+          // 大文件只 OCR 前 2 页
+          const { execFile } = await import("node:child_process");
+          const { promisify } = await import("node:util");
+          const execAsync = promisify(execFile);
+          const tmpPrefix = `/tmp/contract_batch_${Date.now()}`;
+          try {
+            await execAsync("pdftoppm", ["-png", "-r", "150", "-f", "1", "-l", "2", file, tmpPrefix], { timeout: 30000 });
+            const { readdir, unlink } = await import("node:fs/promises");
+            const tmpFiles = await readdir("/tmp");
+            const pngs = tmpFiles.filter(f => f.startsWith(path.basename(tmpPrefix)) && f.endsWith(".png")).sort();
+            let text = "";
+            for (const png of pngs.slice(0, 2)) {
+              const r = await execAsync("tesseract", [`/tmp/${png}`, "stdout", "-l", "chi_sim+eng", "--psm", "6"], { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
+              text += r.stdout + "\n";
+              await unlink(`/tmp/${png}`).catch(() => {});
+            }
+            textResult = { text: text.trim(), usedOcr: true, errors: [] };
+          } catch (e: any) {
+            textResult = await extractText(file, fileType).catch(() => ({ text: "", usedOcr: false, errors: [e.message] }));
+          }
+        } else {
+          textResult = await extractText(file, fileType);
+        }
+        const result = {
+          file: { path: file, sha256: "", size: buffer.length },
+          text: textResult.text,
+          usedOcr: textResult.usedOcr,
+          extracted: null as any,
+          confidence: 0,
+          errors: textResult.errors
+        };
+
+        if (result.text.length < 30) {
+          failed++;
+          continue;
+        }
+
+        // AI 抽取
+        let aiResult;
+        try {
+          aiResult = await extractContractFields(result.text);
+        } catch (e: any) {
+          result.errors.push(`AI failed: ${e.message}`);
+          failed++;
+          continue;
+        }
+        result.extracted = aiResult.extracted;
+        result.confidence = aiResult.confidence;
 
         // 自动匹配客户
         let customerId: string | null = null;
