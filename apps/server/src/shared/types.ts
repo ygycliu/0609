@@ -3,7 +3,7 @@ export type EmployeeRole =
   | "knowledge-assistant"
   | "certification-expert";
 
-export type ModelProvider = "demo" | "openai" | "ollama";
+export type ModelProvider = string;  // V2.1：支持动态 provider（如 "ollama:qwen2.5:7b"）
 
 export interface KnowledgeItem {
   id: string;

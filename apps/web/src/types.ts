@@ -122,6 +122,9 @@ export interface ModelOption {
   name: string;
   available: boolean;
   description: string;
+  category?: "demo" | "openai" | "ollama";  // V2.1：分组标识
+  model?: string;  // V2.1：实际模型名（用于 ollama:xxx）
+  size?: number;   // V2.1：模型大小 bytes
 }
 
 export interface KnowledgeItem {

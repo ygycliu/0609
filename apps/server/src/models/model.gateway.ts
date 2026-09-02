@@ -99,12 +99,12 @@ async function callOpenAi(prompt: string) {
   return sanitizeModelOutput(content);
 }
 
-async function callOllama(prompt: string) {
+async function callOllama(prompt: string, modelName?: string) {
   const response = await fetch(`${config.ollama.baseUrl.replace(/\/$/, "")}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: config.ollama.model,
+      model: modelName || config.ollama.model,
       prompt,
       stream: false
     })
@@ -120,28 +120,108 @@ async function callOllama(prompt: string) {
 export async function generateWithModel(provider: ModelProvider, request: ModelRequest) {
   if (provider === "demo") return sanitizeModelOutput(demoResponse(request));
   const prompt = buildPrompt(request);
-  return provider === "openai" ? callOpenAi(prompt) : callOllama(prompt);
+  // V2.1：支持 "ollama:modelname" 格式动态选择模型
+  if (provider === "openai") return callOpenAi(prompt);
+  if (provider.startsWith("ollama:")) {
+    const modelName = provider.substring("ollama:".length);
+    return callOllama(prompt, modelName);
+  }
+  return callOllama(prompt);
 }
 
-export function getAvailableModels() {
-  return [
+/**
+ * V2.1：动态列出 Ollama 本地部署的所有模型
+ * 调用 /api/tags，返回 [{name, size, ...}]
+ * 自动过滤掉非文本生成模型（flux 等图像生成）
+ */
+export async function listOllamaModels(): Promise<Array<{
+  name: string;
+  size: number;  // bytes
+  family?: string;
+  parameter_size?: string;
+  quantization_level?: string;
+}>> {
+  try {
+    const baseUrl = config.ollama.baseUrl.replace(/\/$/, "");
+    const r = await fetch(`${baseUrl}/api/tags`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!r.ok) return [];
+    const data = await r.json() as { models?: any[] };
+    return (data.models || []).filter((m: any) => {
+      const name = (m.name || "").toLowerCase();
+      const family = (m.details?.family || "").toLowerCase();
+
+      // V2.1：仅保留本地模型
+      // 过滤 1：图像生成模型（flux/sdxl/image/diffusion）
+      if (family.includes("image") || family.includes("diffusion")) return false;
+      if (name.includes("flux") || name.includes("sdxl") || name.includes("image")) return false;
+
+      // 过滤 2：远程 cloud 模型（kimi/glm/deepseek:cloud 等）- 用户要求只保留本地
+      if (name.includes(":cloud")) return false;
+      // size == 0 通常表示 cloud 模型（不占本地存储）
+      if (m.size === 0 || m.size === undefined) return false;
+
+      return true;
+    }).map((m: any) => ({
+      name: m.name || "unknown",
+      size: m.size || 0,
+      family: m.details?.family,
+      parameter_size: m.details?.parameter_size,
+      quantization_level: m.details?.quantization_level
+    }));
+  } catch (err) {
+    console.warn("[Ollama] 列出模型失败:", (err as Error).message);
+    return [];
+  }
+}
+
+export async function getAvailableModels() {
+  const ollamaModels = await listOllamaModels();
+
+  const baseProviders = [
     {
       id: "demo",
       name: "内置演示模型",
       available: true,
-      description: "无需配置，用于流程演示与结构化内容生成"
+      description: "无需配置，用于流程演示与结构化内容生成",
+      category: "demo"
     },
     {
       id: "openai",
       name: `OpenAI 兼容 · ${config.openai.model}`,
       available: Boolean(config.openai.apiKey),
-      description: "支持 OpenAI 及兼容 Chat Completions 的 API"
-    },
-    {
+      description: "支持 OpenAI 及兼容 Chat Completions 的 API",
+      category: "openai"
+    }
+  ];
+
+  // V2.1：每个 Ollama 本地模型作为独立 provider
+  const ollamaProviders = ollamaModels.map((m) => {
+    const sizeGB = (m.size / 1024 / 1024 / 1024).toFixed(2);
+    return {
+      id: `ollama:${m.name}`,  // 用 namespace 区分 provider 和 model
+      name: `🐑 Ollama · ${m.name}`,
+      available: true,
+      description: `${m.parameter_size || "?"} ${m.quantization_level ? `(${m.quantization_level})` : ""} · ${sizeGB} GB`,
+      category: "ollama",
+      model: m.name,
+      size: m.size
+    };
+  });
+
+  // 如果 Ollama 调用失败，至少显示默认模型
+  if (ollamaProviders.length === 0) {
+    ollamaProviders.push({
       id: "ollama",
       name: `本地 Ollama · ${config.ollama.model}`,
       available: true,
-      description: "调用本机或局域网 Ollama 服务"
-    }
-  ];
+      description: "调用本机或局域网 Ollama 服务（默认模型）",
+      category: "ollama",
+      model: config.ollama.model,
+      size: 0
+    });
+  }
+
+  return [...baseProviders, ...ollamaProviders];
 }

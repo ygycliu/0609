@@ -636,8 +636,8 @@ export async function createApp() {
   });
 
   app.get("/api/employees", (_request, response) => response.json({ data: employees }));
-  app.get("/api/models", (_request, response) =>
-    response.json({ data: getAvailableModels() })
+  app.get("/api/models", async (_request, response) =>
+    response.json({ data: await getAvailableModels() })
   );
 
   // 根据用户 company_id 过滤（多租户隔离）
