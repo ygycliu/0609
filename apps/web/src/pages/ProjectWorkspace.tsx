@@ -317,20 +317,28 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
           </div>
         </div>
         <div className="status-distribution">
-          {Object.entries(stats).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
-            <div key={k} className="status-bar">
-              <span className="status-label">
-                {PROJECT_STATUS_LABEL[k as ProjectStatus] || k}
-              </span>
-              <div className="status-bar-track">
-                <div
-                  className={`status-bar-fill bar-${k}`}
-                  style={{ width: `${sum.total ? (v / sum.total) * 100 : 0}%` }}
-                />
+          {Object.entries(stats).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+            const isActive = stageFilter && stageFilter.length === 1 && stageFilter[0] === k;
+            return (
+              <div
+                key={k}
+                className={`status-bar clickable ${isActive ? "active" : ""}`}
+                onClick={() => setStageFilter(isActive ? null : [k])}
+                title={`点击筛选状态：${PROJECT_STATUS_LABEL[k as ProjectStatus] || k}`}
+              >
+                <span className="status-label">
+                  {PROJECT_STATUS_LABEL[k as ProjectStatus] || k}
+                </span>
+                <div className="status-bar-track">
+                  <div
+                    className={`status-bar-fill bar-${k}`}
+                    style={{ width: `${sum.total ? (v / sum.total) * 100 : 0}%` }}
+                  />
+                </div>
+                <strong>{v}</strong>
               </div>
-              <strong>{v}</strong>
-            </div>
-          ))}
+            );
+          })}
           {Object.keys(stats).length === 0 && (
             <p className="muted">暂无项目数据</p>
           )}
