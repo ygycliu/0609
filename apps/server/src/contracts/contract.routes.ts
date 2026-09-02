@@ -106,9 +106,97 @@ contractRouter.get("/:id", async (req: AuthedRequest, res: ExResponse, next) => 
     const files = await repo.listFiles(u.companyId, c.id);
     const projects = await repo.listLinkedProjects(c.id);
     const events = await repo.listEvents(c.id);
+
+    // V2.3.2：结构化详情 — 增加 AI 抽取字段、原始数据、关联信息
+    const ai = c.rawExtracted?.extracted || c.rawExtracted || {};
+
+    // 规范化结构化字段（AI 抽取的是中文 key → 标准化 camelCase）
+    const structured = {
+      // 主体信息
+      customer: c.customerId ? {
+        id: c.customerId,
+        name: c.customerName,
+        code: null  // 可后续补充
+      } : null,
+      signingEntity: c.signingEntityId ? {
+        id: c.signingEntityId,
+        name: c.signingEntityName,
+        aiExtractedName: ai['乙方主体'] || null
+      } : null,
+
+      // 认证信息（来自 AI 或手工）
+      certification: {
+        category: ai['合同类型'] || null,
+        systems: ai['认证体系'] || ai.cert_systems || ai.certification_types || c.certificationTypes || [],
+        scope: ai['认证范围'] || ai.cert_scope || null,
+        auditRegion: ai['审核区域'] || ai.audit_region || null,
+        employeeCount: ai['员工人数'] || ai.employee_count || null,
+        siteCount: ai['分公司/分厂数'] || ai.site_count || null,
+        tempSiteCount: ai['临时现场数'] || ai.temp_site_count || null,
+        accreditationMark: ai['认可标志'] || ai.accreditation_mark || null,
+        certificateValidity: ai['证书有效期'] || ai.certificate_validity || null,
+        multiSiteRequired: ai['多场所要求'] || ai.multi_site_required || false,
+        specialRequirements: ai['其他特殊要求'] || ai.special_requirements || null,
+        originalContractNo: ai['原合同编号'] || null
+      },
+
+      // 财务信息
+      financial: {
+        totalAmount: Number(ai['合同金额'] || c.contractAmount || 0),
+        firstAuditFee: ai['初次认证费'] || ai.first_audit_fee || null,
+        firstYearSupervisionFee: ai['第一年监督审核费'] || ai.first_year_supervision_fee || null,
+        secondYearSupervisionFee: ai['第二年监督审核费'] || ai.second_year_supervision_fee || null,
+        recertFee: ai['再认证费'] || ai.recert_fee || null,
+        paymentTerms: ai['付款条款'] || ai.payment_terms || null,
+        bankName: ai['开户行'] || c.bankName || ai.bank_name || null,
+        bankHolder: ai['户名'] || c.bankHolder || ai.bank_holder || null,
+        bankAccount: ai['账号'] || c.bankAccount || ai.bank_account || null
+      },
+
+      // 联系人
+      contact: {
+        person: ai['联系人'] || c.contactPerson || ai.contact_person || null,
+        phone: ai['联系电话'] || c.contactPhone || ai.contact_phone || null,
+        email: ai['电子邮箱'] || ai.contact_email || null,
+        position: ai['联系人职务'] || ai.contact_position || null
+      },
+
+      // 时间
+      timeline: {
+        signedAt: ai['签订日期'] || c.signedAt,
+        effectiveAt: ai['生效日期'] || c.effectiveAt,
+        expireAt: ai['到期日期'] || c.expireAt
+      },
+
+      // AI 元数据
+      aiMeta: {
+        confidence: c.extractionConfidence,
+        source: ai.source || c.source,
+        extractedAt: c.createdAt,
+        aiModel: ai.ai_model || null,
+        serviceType: ai['服务类型'] || null
+      }
+    };
+
+    // 第一个文件的 OCR 文本（前 5000 字符）
+    const ocrText = files && files.length > 0 ? files[0].ocrText : null;
+    const primaryFile = files && files.length > 0 ? files[0] : null;
+
     res.json({
       data: {
         ...c,
+        structured,
+        primaryFile: primaryFile ? {
+          id: primaryFile.id,
+          fileName: primaryFile.fileName,
+          fileType: primaryFile.fileType,
+          fileSize: primaryFile.fileSize,
+          sha256: primaryFile.sha256,
+          uploadedAt: primaryFile.uploadedAt,
+          downloadUrl: `/ai/api/contracts/files/${primaryFile.id}/download`,
+          ocrStatus: primaryFile.ocrStatus,
+          ocrText  // 前 5000 字符
+        } : null,
         files,
         projects,
         events

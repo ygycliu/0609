@@ -27,6 +27,55 @@ interface Contract {
   createdAt: string;
 }
 
+// V2.3.2 结构化合同详情
+interface ContractStructured {
+  customer: { id: string; name: string; code: string | null } | null;
+  signingEntity: { id: string; name: string; aiExtractedName: string | null } | null;
+  certification: {
+    category: string | null;
+    systems: string[];
+    scope: string | null;
+    auditRegion: string | null;
+    employeeCount: string | null;
+    siteCount: string | null;
+    tempSiteCount: string | null;
+    accreditationMark: string | null;
+    certificateValidity: string | null;
+    multiSiteRequired: boolean;
+    specialRequirements: string | null;
+    originalContractNo: string | null;
+  };
+  financial: {
+    totalAmount: number;
+    firstAuditFee: string | null;
+    firstYearSupervisionFee: string | null;
+    secondYearSupervisionFee: string | null;
+    recertFee: string | null;
+    paymentTerms: string | null;
+    bankName: string | null;
+    bankHolder: string | null;
+    bankAccount: string | null;
+  };
+  contact: {
+    person: string | null;
+    phone: string | null;
+    email: string | null;
+    position: string | null;
+  };
+  timeline: {
+    signedAt: string | null;
+    effectiveAt: string | null;
+    expireAt: string | null;
+  };
+  aiMeta: {
+    confidence: number | null;
+    source: string;
+    extractedAt: string;
+    aiModel: string | null;
+    serviceType: string | null;
+  };
+}
+
 interface ImportResult {
   file: { originalName: string; size: number; storagePath: string; sha256: string; usedOcr: boolean };
   text: string;
@@ -56,6 +105,31 @@ export default function ContractsPage() {
 
   // 批次
   const [batches, setBatches] = useState<any[]>([]);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [contractDetail, setContractDetail] = useState<any | null>(null);
+  const [detailTab, setDetailTab] = useState<"basic" | "financial" | "files" | "ai" | "ocr" | "related">("basic");
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openContractDetail = async (c: Contract) => {
+    setSelectedContract(c);
+    setContractDetail(null);
+    setDetailTab("basic");
+    setDetailLoading(true);
+    try {
+      const r: any = await api.getContract(c.id);
+      setContractDetail(r.data || r);
+    } catch (e: any) {
+      ToastManager.error("加载详情失败：" + e.message);
+      setSelectedContract(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeContractDetail = () => {
+    setSelectedContract(null);
+    setContractDetail(null);
+  };
 
   const loadContracts = async () => {
     setLoading(true);
@@ -253,19 +327,17 @@ export default function ContractsPage() {
                 {contracts.map(c => (
                   <tr key={c.id}>
                     <td>
-                      {c.fileId ? (
-                        <a
-                          href={`/ai/api/contracts/files/${c.fileId}/download`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contract-no-link"
-                          title="点击在新窗口预览/下载"
-                        >
-                          <code>{c.contractNo}</code> 👁️
-                        </a>
-                      ) : (
-                        <code>{c.contractNo}</code>
-                      )}
+                      <a
+                        onClick={(e) => {
+                          e.preventDefault();
+                          openContractDetail(c);
+                        }}
+                        className="contract-no-link"
+                        title="点击查看结构化详情"
+                        style={{cursor:"pointer"}}
+                      >
+                        <code>{c.contractNo}</code> 🔍
+                      </a>
                     </td>
                     <td>{c.contractType === "main" ? "主合同" : c.contractType === "supplement" ? "补充协议" : c.contractType}</td>
                     <td>{c.customerName || "—"}</td>
@@ -423,6 +495,285 @@ export default function ContractsPage() {
           )}
         </section>
       )}
+
+      {/* ============ V2.3.2 结构化合同详情 Modal ============ */}
+      {selectedContract && (
+        <div className="contract-detail-overlay" onClick={closeContractDetail}>
+          <div className="contract-detail-panel" onClick={(e) => e.stopPropagation()}>
+            {detailLoading ? (
+              <div className="contract-detail-loading">
+                <div className="spinner" />
+                <p>正在加载合同详情...</p>
+              </div>
+            ) : contractDetail ? (
+              <>
+                {/* 顶部 */}
+                <header className="contract-detail-header">
+                  <div>
+                    <h2>📋 {contractDetail.contractNo}</h2>
+                    <div className="contract-detail-subtitle">
+                      <span className={`status-pill status-${contractDetail.status}`}>
+                        {contractDetail.status === "draft" ? "草稿" : contractDetail.status === "signed" ? "已签" : contractDetail.status === "effective" ? "生效中" : contractDetail.status === "completed" ? "已完成" : contractDetail.status === "terminated" ? "已终止" : contractDetail.status}
+                      </span>
+                      <span className="muted">
+                        {contractDetail.contractType === "main" ? "主合同" : contractDetail.contractType === "supplement" ? "补充协议" : contractDetail.contractType}
+                      </span>
+                      <span className="muted">
+                        {contractDetail.source === "bulk_import" ? "📂 批量导入" : contractDetail.source === "pdf_import" ? "📥 PDF 导入" : contractDetail.source}
+                      </span>
+                      {contractDetail.extractionConfidence != null && (
+                        <span className="muted">
+                          🎯 AI 置信度: {(contractDetail.extractionConfidence * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button className="ghost-button" onClick={closeContractDetail}>✕ 关闭</button>
+                </header>
+
+                {/* 主体信息卡片 */}
+                {contractDetail.structured && (
+                  <div className="contract-parties">
+                    <div className="party-card">
+                      <div className="party-label">👤 客户（甲方）</div>
+                      <div className="party-name">{contractDetail.customerName || "—"}</div>
+                    </div>
+                    <div className="party-card">
+                      <div className="party-label">🏢 乙方主体</div>
+                      <div className="party-name">{contractDetail.signingEntityName || "—"}</div>
+                      {contractDetail.structured.signingEntity?.aiExtractedName && contractDetail.structured.signingEntity.aiExtractedName !== contractDetail.signingEntityName && (
+                        <div className="party-ai">AI抽取: {contractDetail.structured.signingEntity.aiExtractedName}</div>
+                      )}
+                    </div>
+                    <div className="party-card highlight">
+                      <div className="party-label">💰 合同总金额</div>
+                      <div className="party-name">¥{(contractDetail.contractAmount || 0).toLocaleString()}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 导航 */}
+                <nav className="contract-detail-tabs">
+                  {[
+                    { id: "basic", label: "📄 基本信息" },
+                    { id: "financial", label: "💳 财务" },
+                    { id: "files", label: `📁 文件 (${(contractDetail.files || []).length})` },
+                    { id: "ai", label: "🤖 AI抽取" },
+                    { id: "ocr", label: "📝 OCR" },
+                    { id: "related", label: `🔗 关联 (${(contractDetail.projects || []).length})` }
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      className={`contract-detail-tab ${detailTab === t.id ? "active" : ""}`}
+                      onClick={() => setDetailTab(t.id as any)}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </nav>
+
+                {/* Tab 内容 */}
+                <div className="contract-detail-content">
+                  {/* 基本信息 */}
+                  {detailTab === "basic" && contractDetail.structured && (
+                    <div className="info-grid">
+                      <InfoRow label="合同编号" value={contractDetail.contractNo} />
+                      <InfoRow label="合同类型" value={contractDetail.structured.certification.category || contractDetail.contractType} />
+                      <InfoRow label="签订日期" value={formatDate(contractDetail.signedAt || contractDetail.structured.timeline.signedAt)} />
+                      <InfoRow label="生效日期" value={formatDate(contractDetail.structured.timeline.effectiveAt)} />
+                      <InfoRow label="到期日期" value={formatDate(contractDetail.structured.timeline.expireAt)} />
+                      <InfoRow label="服务类型" value={contractDetail.structured.aiMeta.serviceType} />
+                      <InfoRow label="认证体系" value={contractDetail.structured.certification.systems.join(", ")} />
+                      <InfoRow label="认证范围" value={contractDetail.structured.certification.scope} />
+                      <InfoRow label="审核区域" value={contractDetail.structured.certification.auditRegion} />
+                      <InfoRow label="员工人数" value={contractDetail.structured.certification.employeeCount} />
+                      <InfoRow label="分场所数" value={contractDetail.structured.certification.siteCount} />
+                      <InfoRow label="临时现场数" value={contractDetail.structured.certification.tempSiteCount} />
+                      <InfoRow label="认可标志" value={contractDetail.structured.certification.accreditationMark} />
+                      <InfoRow label="证书有效期" value={contractDetail.structured.certification.certificateValidity} />
+                      <InfoRow label="特殊要求" value={contractDetail.structured.certification.specialRequirements} />
+                    </div>
+                  )}
+
+                  {/* 财务 */}
+                  {detailTab === "financial" && contractDetail.structured && (
+                    <div>
+                      <div className="info-section">
+                        <h3>💰 费用明细</h3>
+                        <div className="info-grid">
+                          <InfoRow label="合同总金额" value={`¥${(contractDetail.structured.financial.totalAmount || 0).toLocaleString()}`} highlight />
+                          <InfoRow label="初次认证费" value={formatAmount(contractDetail.structured.financial.firstAuditFee)} />
+                          <InfoRow label="第一年监督费" value={formatAmount(contractDetail.structured.financial.firstYearSupervisionFee)} />
+                          <InfoRow label="第二年监督费" value={formatAmount(contractDetail.structured.financial.secondYearSupervisionFee)} />
+                          <InfoRow label="再认证费" value={formatAmount(contractDetail.structured.financial.recertFee)} />
+                          <InfoRow label="付款条款" value={contractDetail.structured.financial.paymentTerms} />
+                        </div>
+                      </div>
+                      <div className="info-section">
+                        <h3>🏦 收款银行</h3>
+                        <div className="info-grid">
+                          <InfoRow label="开户行" value={contractDetail.structured.financial.bankName} />
+                          <InfoRow label="户名" value={contractDetail.structured.financial.bankHolder} />
+                          <InfoRow label="账号" value={contractDetail.structured.financial.bankAccount} mono />
+                        </div>
+                      </div>
+                      <div className="info-section">
+                        <h3>📞 联系人</h3>
+                        <div className="info-grid">
+                          <InfoRow label="联系人" value={contractDetail.structured.contact.person} />
+                          <InfoRow label="电话" value={contractDetail.structured.contact.phone} mono />
+                          <InfoRow label="邮箱" value={contractDetail.structured.contact.email} />
+                          <InfoRow label="职务" value={contractDetail.structured.contact.position} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 文件 */}
+                  {detailTab === "files" && (
+                    <div>
+                      {(contractDetail.files || []).length === 0 ? (
+                        <p className="muted">📭 暂无关联文件</p>
+                      ) : (
+                        <table className="data-table">
+                          <thead>
+                            <tr><th>文件名</th><th>类型</th><th>大小</th><th>SHA256</th><th>上传时间</th><th>操作</th></tr>
+                          </thead>
+                          <tbody>
+                            {contractDetail.files.map((f: any) => (
+                              <tr key={f.id}>
+                                <td><code>{f.fileName}</code></td>
+                                <td>{f.fileType}</td>
+                                <td>{(f.fileSize / 1024).toFixed(1)} KB</td>
+                                <td className="mono small">{f.sha256?.slice(0, 16)}...</td>
+                                <td>{formatDate(f.uploadedAt)}</td>
+                                <td>
+                                  <a
+                                    href={`/ai/api/contracts/files/${f.id}/download`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="link-button"
+                                  >📥 下载</a>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI抽取 */}
+                  {detailTab === "ai" && (
+                    <div>
+                      <div className="info-section">
+                        <h3>🤖 AI 抽取元数据</h3>
+                        <div className="info-grid">
+                          <InfoRow label="抽取置信度" value={contractDetail.extractionConfidence != null ? `${(contractDetail.extractionConfidence * 100).toFixed(0)}%` : "—"} />
+                          <InfoRow label="AI 模型" value={contractDetail.structured?.aiMeta?.aiModel || "本地 qwen2.5:7b"} />
+                          <InfoRow label="抽取时间" value={formatDate(contractDetail.structured?.aiMeta?.extractedAt)} />
+                          <InfoRow label="数据来源" value={contractDetail.structured?.aiMeta?.source} />
+                        </div>
+                      </div>
+                      <div className="info-section">
+                        <h3>📋 AI 原始返回 JSON</h3>
+                        <pre className="ocr-text-viewer">
+                          {JSON.stringify(contractDetail.rawExtracted, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OCR */}
+                  {detailTab === "ocr" && (
+                    <div>
+                      {contractDetail.primaryFile?.ocrText ? (
+                        <>
+                          <div className="info-section">
+                            <h3>📝 OCR 提取文本（前 5000 字符）</h3>
+                            <p className="muted small">共 {contractDetail.primaryFile.ocrText.length} 字符</p>
+                          </div>
+                          <pre className="ocr-text-viewer">{contractDetail.primaryFile.ocrText}</pre>
+                        </>
+                      ) : (
+                        <p className="muted">📭 暂无 OCR 文本</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 关联 */}
+                  {detailTab === "related" && (
+                    <div>
+                      <div className="info-section">
+                        <h3>🔗 关联项目</h3>
+                        {(contractDetail.projects || []).length === 0 ? (
+                          <p className="muted">暂无关联项目</p>
+                        ) : (
+                          <ul>{contractDetail.projects.map((p: any) => <li key={p.id}>{p.name || p.id}</li>)}</ul>
+                        )}
+                      </div>
+                      <div className="info-section">
+                        <h3>📜 状态变更历史</h3>
+                        {(contractDetail.events || []).length === 0 ? (
+                          <p className="muted">暂无变更记录</p>
+                        ) : (
+                          <ul>{contractDetail.events.map((e: any) => (
+                            <li key={e.id}>
+                              <code>{e.event_type}</code> - {formatDate(e.created_at)}
+                            </li>
+                          ))}</ul>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 底部操作 */}
+                <footer className="contract-detail-footer">
+                  {contractDetail.fileId && (
+                    <a
+                      href={`/ai/api/contracts/files/${contractDetail.fileId}/download`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="primary-button"
+                    >📄 预览 PDF</a>
+                  )}
+                  <button className="ghost-button" onClick={closeContractDetail}>关闭</button>
+                </footer>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// V2.3.2 辅助组件：信息行
+function InfoRow({ label, value, mono, highlight }: { label: string; value: any; mono?: boolean; highlight?: boolean }) {
+  const display = value === null || value === undefined || value === "" ? <span className="muted">—</span> : value;
+  return (
+    <div className={`info-row ${highlight ? "highlight" : ""}`}>
+      <span className="info-label">{label}</span>
+      <span className={`info-value ${mono ? "mono" : ""}`}>{display}</span>
+    </div>
+  );
+}
+
+function formatDate(d: string | null | undefined): string {
+  if (!d) return "—";
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return d;
+    return date.toLocaleDateString("zh-CN") + " " + date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return d;
+  }
+}
+
+function formatAmount(v: any): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = Number(v);
+  if (isNaN(n)) return String(v);
+  return `¥${n.toLocaleString()}`;
 }

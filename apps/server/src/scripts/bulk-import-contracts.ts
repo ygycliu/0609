@@ -352,6 +352,14 @@ async function processFile(
       );
     }
 
+    // 10.6 把 AI 抽取结果也存到 contract.raw_extracted（统一来源）
+    if (aiResult && typeof aiResult === "object") {
+      await query(
+        `UPDATE contract SET raw_extracted = $1, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify(aiResult), newContractId.id]
+      );
+    }
+
     // 11. 记录别名
     if (matchedCustomerId && aiResult?.customer_name && aiResult.customer_name !== customerMatched) {
       try {
