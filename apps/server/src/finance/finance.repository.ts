@@ -9,6 +9,7 @@ const customerRepository = new CustomerRepository();
 export interface ProjectRecord {
   id: string;
   customerId: string | null;
+  certificationProjectId: string | null;  // V2.1：关联到具体认证项目
   projectCode: string;
   name: string;
   certificationType: string | null;
@@ -33,6 +34,7 @@ export interface TransactionRecord {
   id: string;
   projectId: string | null;
   customerId: string | null;
+  certificationProjectId: string | null;  // V2.1：冗余字段
   type: "income" | "expense";
   category: string;
   amount: number;
@@ -54,6 +56,7 @@ function rowToProject(r: any): ProjectRecord {
   return {
     id: r.id,
     customerId: r.customer_id,
+    certificationProjectId: r.certification_project_id,  // V2.1
     projectCode: r.project_code,
     name: r.name,
     certificationType: r.certification_type,
@@ -80,6 +83,7 @@ function rowToTransaction(r: any): TransactionRecord {
     id: r.id,
     projectId: r.project_id,
     customerId: r.customer_id,
+    certificationProjectId: r.certification_project_id,  // V2.1
     type: r.type,
     category: r.category,
     amount: Number(r.amount ?? 0),
@@ -199,14 +203,15 @@ export class FinanceRepository {
   async createProject(companyId: string, input: Partial<ProjectRecord>): Promise<ProjectRecord | null> {
     const r = await query<any>(
       `INSERT INTO finance_project
-        (company_id, customer_id, project_code, name, certification_type, service_type,
+        (company_id, customer_id, certification_project_id, project_code, name, certification_type, service_type,
          contract_amount, status, signed_at, started_at, completed_at, deadline_at,
          notes, owner_user_id, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         companyId,
         input.customerId || null,
+        input.certificationProjectId || null,  // V2.1
         input.projectCode || "",
         input.name || "",
         input.certificationType || null,
@@ -426,14 +431,15 @@ export class FinanceRepository {
 
     const r = await query<any>(
       `INSERT INTO finance_transaction
-        (company_id, project_id, customer_id, type, category, amount,
+        (company_id, project_id, customer_id, certification_project_id, type, category, amount,
          trans_date, trans_month, description, payment_method, reference, ps, invoice_no)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         companyId,
         resolvedProjectId,
         input.customerId || null,
+        input.certificationProjectId || null,  // V2.1
         input.type || "income",
         input.category || "",
         input.amount ?? 0,
