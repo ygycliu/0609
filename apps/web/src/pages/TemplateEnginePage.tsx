@@ -197,14 +197,41 @@ export default function TemplateEnginePage() {
                   <strong>{selectedTemplate.code} - {selectedTemplate.name}</strong>
                 </div>
                 <div className="form-row">
-                  <label>客户 ID</label>
-                  <input
-                    type="text"
-                    value={customerId}
-                    onChange={e => setCustomerId(e.target.value)}
-                    placeholder="UUID"
-                  />
-                  <small>从客户管理复制</small>
+                  <label>客户 ID（或 customer_code）</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      value={customerId}
+                      onChange={e => setCustomerId(e.target.value)}
+                      placeholder="UUID 或 CUST-AR-21877"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={async () => {
+                        const q = window.prompt("客户名（模糊搜索）:");
+                        if (!q) return;
+                        try {
+                          const res = await fetch(`/ai/api/customers?q=${encodeURIComponent(q)}&limit=5`, { credentials: "include" });
+                          const data = await res.json();
+                          const list = data.data || [];
+                          if (list.length === 0) {
+                            ToastManager.error("未找到匹配客户");
+                            return;
+                          }
+                          const text = list.map((c: any) => `${c.customer_code} - ${c.name} (${c.id.slice(0, 8)}...)`).join("\n");
+                          const picked = window.prompt(`找到 ${list.length} 个匹配客户，请复制 ID：\n\n${text}\n\n请输入 customer_code 或 ID:`);
+                          if (picked) setCustomerId(picked.trim());
+                        } catch (e: any) {
+                          ToastManager.error("搜索失败：" + e.message);
+                        }
+                      }}
+                    >
+                      🔍 搜索
+                    </button>
+                  </div>
+                  <small>支持 UUID 或 customer_code（如 CUST-AR-21877）</small>
                 </div>
 
                 <div className="form-row">

@@ -207,9 +207,24 @@ templateRouter.post("/:id/generate", async (req: Request, res: ExResponse, next)
     if (!body.customerId) return res.status(400).json({ error: "缺少 customerId" });
     if (!body.fieldValues) return res.status(400).json({ error: "缺少 fieldValues" });
 
+    // V2.3.1：支持 customer_code（如 CUST-AR-21877）自动转换为 UUID
+    let customerIdResolved = body.customerId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.customerId);
+    if (!isUuid) {
+      const c = await query(
+        `SELECT id FROM customer WHERE company_id = $1 AND customer_code = $2 AND deleted_at IS NULL LIMIT 1`,
+        [u.companyId, body.customerId]
+      );
+      if (c.rows.length === 0) {
+        return res.status(404).json({ error: `未找到客户：${body.customerId}（既不是 UUID，也不是 customer_code）` });
+      }
+      customerIdResolved = c.rows[0].id;
+      console.log(`[generate] customer_code "${body.customerId}" → UUID ${customerIdResolved}`);
+    }
+
     // 自动从 customer 填充
     if (body.autoFillFromProject !== false) {
-      const customer = await query(`SELECT * FROM customer WHERE id = $1`, [body.customerId]);
+      const customer = await query(`SELECT * FROM customer WHERE id = $1`, [customerIdResolved]);
       if (customer.rows[0]) {
         const c = customer.rows[0];
         body.fieldValues.customer_name = body.fieldValues.customer_name || c.name;
@@ -233,9 +248,9 @@ templateRouter.post("/:id/generate", async (req: Request, res: ExResponse, next)
 
     // 生成 PDF
     const outputDir = path.join(config.uploadsDir, "contracts", "generated");
-    const baseName = `${t.code}-${body.customerId.slice(0, 8)}-${Date.now()}`;
+    const baseName = `${t.code}-${customerIdResolved.slice(0, 8)}-${Date.now()}`;
 
-    console.log(`[generate] ${t.code} for customer ${body.customerId}`);
+    console.log(`[generate] ${t.code} for customer ${customerIdResolved}`);
     const result = await generateContract(
       t.templatePath,
       body.fieldValues,
@@ -249,7 +264,7 @@ templateRouter.post("/:id/generate", async (req: Request, res: ExResponse, next)
     const generationId = await repo.recordGeneration(u.companyId, {
       templateId: t.id,
       templateVersion: t.version,
-      customerId: body.customerId,
+      customerId: customerIdResolved,
       certificationProjectId: body.certificationProjectId || null,
       fieldValues: body.fieldValues,
       outputFormat: body.outputFormat || "pdf",
