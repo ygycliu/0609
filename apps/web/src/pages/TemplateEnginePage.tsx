@@ -65,7 +65,20 @@ export default function TemplateEnginePage() {
     setLoading(true);
     try {
       const r = await api.listContractTemplates({});
-      setTemplates(r.data || []);
+      const rawList = Array.isArray(r) ? r : (r.data || []);
+      // 标准化字段名（API 返回 snake_case，前端用 camelCase）
+      const list = rawList.map((t: any) => ({
+        ...t,
+        signingEntityId: t.signingEntityId || t.signing_entity_id,
+        signingEntityName: t.signingEntityName || t.signing_entity_name,
+        templateCategory: t.templateCategory || t.template_category,
+        contractType: t.contractType || t.contract_type,
+        chapterCount: t.chapterCount ?? t.chapter_count ?? 0,
+        fieldSchema: t.fieldSchema || t.field_schema,
+        chapterSchema: t.chapterSchema || t.chapter_schema,
+        customerName: t.customerName || t.customer_name
+      }));
+      setTemplates(list);
     } catch (e: any) {
       ToastManager.error("加载模板失败：" + e.message);
     } finally { setLoading(false); }
@@ -74,14 +87,38 @@ export default function TemplateEnginePage() {
   const loadFields = async () => {
     try {
       const r = await api.listContractFields();
-      setFields(r.data || []);
+      // request() 已解包 data；listContractFields 用 fetch 直接拿 {data, total}
+      const rawList = Array.isArray(r) ? r : (r?.data || []);
+      // 标准化字段名
+      const list = rawList.map((f: any) => ({
+        ...f,
+        fieldCode: f.fieldCode || f.field_code,
+        fieldLabel: f.fieldLabel || f.field_label,
+        fieldCategory: f.fieldCategory || f.field_category,
+        dataType: f.dataType || f.data_type,
+        enumOptions: f.enumOptions || f.enum_options,
+        appliesTo: f.appliesTo || f.applies_to,
+        exampleValue: f.exampleValue || f.example_value
+      }));
+      setFields(list);
     } catch (e) { /* */ }
   };
 
   const loadHistory = async () => {
     try {
       const r = await api.listTemplateGenerations();
-      setHistory(r.data || []);
+      // request() 已解包 data
+      const rawList = Array.isArray(r) ? r : (r.data || []);
+      // 标准化字段名（API 返回 snake_case，前端用 camelCase）
+      const list = rawList.map((g: any) => ({
+        ...g,
+        createdAt: g.createdAt || g.created_at,
+        templateName: g.templateName || g.template_name,
+        customerName: g.customerName || g.customer_name,
+        fileSize: g.fileSize ?? g.file_size ?? 0,
+        generationTimeMs: g.generationTimeMs ?? g.generation_time_ms ?? 0
+      }));
+      setHistory(list);
     } catch (e) { /* */ }
   };
 
