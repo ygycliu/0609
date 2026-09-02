@@ -18,13 +18,36 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
   const [stats, setStats] = useState<Record<string, number>>({});
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  // V2.0：项目列表分页（默认 10，可选 50/全部）
+  const [pageSize, setPageSize] = useState<10 | 50 | 0>(10);  // 0 = 全部
+  const [totalProjects, setTotalProjects] = useState(0);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [stageFilter, setStageFilter] = useState<string[] | null>(null);
 
-  // 根据 stageFilter 过滤项目
-  const filteredProjects = stageFilter
-    ? projects.filter((p) => stageFilter.includes((p as any).status))
-    : projects;
+  // 根据 stageFilter 过滤项目（V2.1：支持虚拟状态 in_progress / completed / anomaly）
+  // 实际 DB 状态值：lead, communicating, quoted, contract_signed, contract_pending,
+  //                 project_archived, cert_pending, completed, cancelled 等
+  const IN_PROGRESS_STATUSES = [
+    "lead", "communicating", "quoted", "contract_pending",
+    "contract_signed", "delivery_ready",
+    "collecting_documents", "contract_review", "expert_pending",
+    "reviewing", "rectifying", "awaiting_balance", "invoicing",
+    "cert_pending"
+  ];
+  // 已出证 = completed（已发证）
+  const COMPLETED_STATUSES = ["completed"];
+  // 异常 = 已取消 + 暂停/风险（如有）
+  const ANOMALY_STATUSES = ["cancelled", "suspended", "paused", "at_risk", "risk"];
+
+  const filteredProjects = !stageFilter
+    ? projects
+    : projects.filter((p) => {
+        const status = (p as any).status;
+        if (stageFilter.includes("in_progress")) return IN_PROGRESS_STATUSES.includes(status);
+        if (stageFilter.includes("completed")) return COMPLETED_STATUSES.includes(status);
+        if (stageFilter.includes("anomaly")) return ANOMALY_STATUSES.includes(status);
+        return stageFilter.includes(status);
+      });
 
   interface Reminder {
     id: string;
@@ -39,21 +62,58 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
   const load = async () => {
     setLoading(true);
     try {
+      // V2.0：根据 pageSize 加载项目（10/50/全部）
+      const listOptions: any = {};
+      if (pageSize > 0) {
+        listOptions.limit = pageSize;
+      }
+      // V2.1：穿透查询时，传 status 数组（or 用 in_xxx 虚拟 status）
+      // 后端 status 只支持单值，但前端有"in_progress/completed/anomaly"虚拟分组
+      // 解决方案：拉所有数据（limit=0），前端 client-side 过滤（已有 stageFilter 机制）
+      if (stageFilter && stageFilter.length === 1 && !["in_progress", "completed", "anomaly"].includes(stageFilter[0])) {
+        listOptions.status = stageFilter[0];
+      }
+      // V2.1：穿透时强制分页拉全部（否则只拉前 200 条无法穿透筛选）
+      const useAllProjects = stageFilter !== null;
+      const fetchAll = async () => {
+        const all: any[] = [];
+        let offset = 0;
+        while (true) {
+          const r: any = await api.listCertificationProjects({ limit: 200, offset });
+          // request() 已经解包 { data, total }，所以 r.data 就是数组
+          // 后端真实响应：{ data: Project[], total: N } → request 返回 { total: N }
+          // 但后端 implementation 里 listProjects 返回 { data: [], total: N }
+          // request 解包后，r 应该 = data 字段的内容（= { total: N }）
+          // 数组需要从原始 response 拿
+          const rawResp = await fetch(`/ai/api/projects?limit=200&offset=${offset}`, { credentials: "include" });
+          const rawBody = await rawResp.json();
+          const items = Array.isArray(rawBody.data) ? rawBody.data : [];
+          all.push(...items);
+          if (items.length < 200 || all.length >= (rawBody.total ?? all.length)) break;
+          offset += 200;
+          if (offset > 10000) break;
+        }
+        return all;
+      };
       const [a, b, c, s, p] = await Promise.all([
         api.listOverdueCertificationProjects(),
         api.listPendingPaymentCertificationProjects(),
         api.listPendingCertCertificationProjects(),
         api.getCertificationProjectStats(),
-        api.listCertificationProjects({ limit: 50 }),
+        useAllProjects
+          ? fetchAll()
+          : api.listCertificationProjects(listOptions).then((r: any) => (r as any).data || r),
       ]);
+      // 统一处理 p：fetchAll 返回数组，普通 API 返回 {data, total}
+      const projectList = useAllProjects
+        ? (Array.isArray(p) ? p : [])
+        : ((p as any).data?.items || (p as any).data || (Array.isArray(p) ? p : []));
       setOverdue((a as any).data || a || []);
       setPendingPay((b as any).data || b || []);
       setPendingCert((c as any).data || c || []);
       setStats((s as any).data || s || {});
-      const list = (p as any).data?.items || (p as any).data || (Array.isArray(p) ? p : []);
-      const projectList = Array.isArray(list) ? list : [];
       setProjects(projectList);
-      // 计算自动提醒
+      setTotalProjects((p as any).total ?? projectList.length);
       loadReminders(projectList);
     } catch (e) {
       console.error("load workspace failed", e);
@@ -145,7 +205,9 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
     setReminders(r);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [pageSize]);
+  // V2.1：穿透查询触发重新加载
+  useEffect(() => { load(); }, [stageFilter]);
 
   const summary = (s: Record<string, number>) => {
     const total = Object.values(s).reduce((sum, v) => sum + v, 0);
@@ -173,24 +235,40 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
         </div>
       </header>
 
-      {/* 三大数字卡 */}
+      {/* 三大数字卡（V2.1：可点击穿透查询） */}
       <section className="metric-grid">
-        <div className="metric">
+        <div
+          className={`metric ${stageFilter === null ? "active" : ""}`}
+          onClick={() => setStageFilter(null)}
+          title="点击查看全部项目"
+        >
           <span>项目总数</span>
           <strong>{sum.total}</strong>
           <small>全部状态</small>
         </div>
-        <div className="metric">
+        <div
+          className={`metric ${stageFilter && stageFilter.includes("in_progress") ? "active" : ""}`}
+          onClick={() => setStageFilter(["in_progress"])}
+          title="点击筛选进行中项目"
+        >
           <span>进行中</span>
           <strong style={{ color: "#2563eb" }}>{sum.inProgress}</strong>
           <small>含已签订未完成</small>
         </div>
-        <div className="metric">
+        <div
+          className={`metric ${stageFilter && stageFilter.includes("completed") ? "active" : ""}`}
+          onClick={() => setStageFilter(["completed"])}
+          title="点击筛选已出证项目"
+        >
           <span>已出证</span>
           <strong style={{ color: "#059669" }}>{sum.completed}</strong>
           <small>已完成 + 已出证</small>
         </div>
-        <div className="metric">
+        <div
+          className={`metric ${stageFilter && stageFilter.includes("anomaly") ? "active" : ""}`}
+          onClick={() => setStageFilter(["anomaly"])}
+          title="点击筛选异常项目"
+        >
           <span>异常项目</span>
           <strong style={{ color: "#dc2626" }}>
             {(stats.suspended || 0) + (stats.at_risk || 0) + (stats.cancelled || 0)}
@@ -267,8 +345,35 @@ export function ProjectWorkspace({ onNavigate, onOpenProject }: ProjectWorkspace
             <span className="muted">
               {stageFilter
                 ? `已筛选 ${filteredProjects.length} / ${projects.length} 个（按漏斗阶段）`
-                : `共 ${projects.length} 个`}
+                : `共 ${projects.length}${pageSize > 0 ? ` / ${totalProjects}` : ""} 个`}
             </span>
+            {/* V2.1：清除筛选按钮 */}
+            {stageFilter && (
+              <button
+                className="tiny ghost-button"
+                onClick={() => setStageFilter(null)}
+                style={{ marginLeft: "12px" }}
+              >
+                ✕ 清除筛选
+              </button>
+            )}
+            {/* V2.0：分页切换按钮 */}
+            <div className="page-size-selector">
+              <span className="page-size-label">显示：</span>
+              {[
+                { value: 10 as const, label: "10 条" },
+                { value: 50 as const, label: "50 条" },
+                { value: 0 as const, label: "全部" }
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  className={pageSize === opt.value ? "page-size-btn active" : "page-size-btn"}
+                  onClick={() => setPageSize(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             {stageFilter && (
               <button className="ghost-button small" onClick={() => setStageFilter(null)}>
                 清除筛选

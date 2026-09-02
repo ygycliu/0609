@@ -610,11 +610,19 @@ select:focus-visible {
   min-width: 0;
   padding: 22px 24px;
   border-right: 1px solid var(--line);
-  transition: background 160ms ease;
+  transition: background 160ms ease, transform 160ms ease;
+  cursor: pointer;
+  user-select: none;
 }
 
 .metric:hover {
   background: var(--primary-bg);
+  transform: translateY(-2px);
+}
+
+.metric.active {
+  background: var(--primary-bg);
+  border-left: 3px solid var(--primary);
 }
 
 .metric:last-child {
