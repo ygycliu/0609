@@ -138,15 +138,16 @@ export default function TemplateEnginePage() {
     }
     setGenerating(true);
     try {
-      const r = await api.generateContract({
+      const r: any = await api.generateContract({
         templateId: selectedTemplate.id,
         customerId,
         fieldValues,
         outputFormat: "pdf"
       });
-      ToastManager.success(`✅ 合同生成成功！${r.data.fileSize} 字节（${r.data.generationTimeMs} ms）`);
-      // 触发下载
-      window.open(`/ai${r.data.downloadUrl}`, "_blank");
+      // api.generateContract 用 request() 已解包 data，r 就是生成结果
+      ToastManager.success(`✅ 合同生成成功！${r.fileSize} 字节（${r.generationTimeMs} ms）`);
+      // 触发下载（downloadUrl 已经含 /ai 前缀，直接用）
+      window.open(r.downloadUrl, "_blank");
       setFieldValues({});
       loadHistory();
     } catch (e: any) {
