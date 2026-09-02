@@ -34,6 +34,8 @@ export interface ContractRecord {
   source: "pdf_import" | "manual" | "api";
   notes: string | null;
   fileId: string | null;
+  customerName: string | null;
+  signingEntityName: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string | null;
@@ -67,6 +69,8 @@ function rowToContract(r: any): ContractRecord {
     source: r.source,
     notes: r.notes,
     fileId: r.file_id,
+    customerName: r.customer_name ?? null,
+    signingEntityName: r.signing_entity_name ?? null,
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,

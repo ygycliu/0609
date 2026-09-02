@@ -11357,3 +11357,22 @@ textarea:focus {
 .cert-expiry-table code.small {
   font-size: 11px;
 }
+
+.contract-no-link {
+  color: #2563eb;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.contract-no-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+  background: #eff6ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.contract-no-link code {
+  color: inherit;
+  background: transparent;
+  padding: 0;
+}

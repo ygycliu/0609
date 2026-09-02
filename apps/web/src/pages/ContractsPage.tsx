@@ -252,7 +252,21 @@ export default function ContractsPage() {
               <tbody>
                 {contracts.map(c => (
                   <tr key={c.id}>
-                    <td><code>{c.contractNo}</code></td>
+                    <td>
+                      {c.fileId ? (
+                        <a
+                          href={`/ai/api/contracts/files/${c.fileId}/download`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="contract-no-link"
+                          title="点击在新窗口预览/下载"
+                        >
+                          <code>{c.contractNo}</code> 👁️
+                        </a>
+                      ) : (
+                        <code>{c.contractNo}</code>
+                      )}
+                    </td>
                     <td>{c.contractType === "main" ? "主合同" : c.contractType === "supplement" ? "补充协议" : c.contractType}</td>
                     <td>{c.customerName || "—"}</td>
                     <td>{c.signingEntityName || "—"}</td>
