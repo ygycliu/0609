@@ -925,6 +925,103 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input)
     }),
+
+  // ===== V2.2 Contracts =====
+  listContracts: async (params: {
+    signing_entity_id?: string;
+    customer_id?: string;
+    status?: string;
+    contract_type?: string;
+    q?: string;
+    start_date?: string;
+    end_date?: string;
+    certification_type?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v != null && v !== "") qs.set(k, String(v));
+    });
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    const response = await fetch(`${API_BASE_URL}/contracts?${qs.toString()}`, {
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) throw new ApiError(`contracts list failed: ${response.status}`, response.status);
+    return (await response.json()) as { data: any[]; total: number };
+  },
+
+  getContract: (id: string) => request<any>(`/contracts/${id}`),
+
+  importContractPdf: async (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const response = await fetch(`${API_BASE_URL}/contracts/import/pdf`, {
+      method: "POST",
+      credentials: "include",
+      body: fd
+    });
+    if (!response.ok) {
+      const t = await response.text();
+      throw new Error(t || `HTTP ${response.status}`);
+    }
+    return (await response.json()) as { data: any };
+  },
+
+  confirmImportContract: (input: any) =>
+    request<any>("/contracts/import/confirm", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+
+  createContract: (input: any) =>
+    request<any>("/contracts", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+
+  updateContract: (id: string, input: any) =>
+    request<any>(`/contracts/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input)
+    }),
+
+  deleteContract: (id: string) =>
+    request<{ data: { deleted: boolean } }>(`/contracts/${id}`, { method: "DELETE" }),
+
+  getContractStats: () => request<any>("/contracts/stats/summary"),
+
+  downloadContractFile: (fileId: string) =>
+    `${API_BASE_URL}/contracts/files/${fileId}/download`,
+
+  batchImportContracts: (sourcePath: string, batchName?: string) =>
+    request<any>("/contracts/import/batch", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_path: sourcePath, batch_name: batchName })
+    }),
+
+  listImportBatches: () => request<any>("/contracts/import/batches"),
+
+  // ===== V2.2 Customer Enrich =====
+  matchCustomerFromText: (name: string) =>
+    request<any>("/customers/match-from-text", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    }),
+
+  autoCreateCustomer: (input: any) =>
+    request<any>("/customers/auto-create", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input)
+    }),
+
+  batchMatchCustomers: (names: string[]) =>
+    request<any>("/customers/batch-match", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names })
+    }),
+
+  enrichCustomerFromContracts: (customerId: string) =>
+    request<any>(`/customers/${customerId}/enrich-from-contracts`),
 };
 
 export { API_BASE_URL };
@@ -1028,4 +1125,21 @@ export function assistantConfirm(payload: { toolName: string; args: any }) {
     if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
     return json;
   });
+}
+
+
+// ===== V2.2 PDF Import Helper =====
+export async function importContractFromPdf(file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/contracts/import/pdf`, {
+    method: "POST",
+    credentials: "include",
+    body: fd
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(t || `HTTP ${response.status}`);
+  }
+  return (await response.json()) as { data: any };
 }

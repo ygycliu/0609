@@ -20,6 +20,7 @@ export type Page =
   | "base-data"
   | "system-enum"
   | "auditor-profile"
+  | "contracts"
   | "cert-expiry"
   | "data-exchange";
 

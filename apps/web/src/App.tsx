@@ -20,6 +20,7 @@ import { AuditorPage } from "./pages/AuditorPage";
 import { FilesPage } from "./pages/FilesPage";
 import { PdfToWordPage } from "./pages/PdfToWordPage";
 import { CustomerListPage } from "./pages/CustomerListPage";
+import ContractsPage from "./pages/ContractsPage";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { FinanceDashboard } from "./pages/FinanceDashboard";
 import { FollowUpPage } from "./pages/FollowUpPage";
@@ -241,6 +242,7 @@ export default function App() {
             }}
           />
         )}
+        {page === "contracts" && <ContractsPage />}
         {page === "finance-dashboard" && (
           permissions.modules.FINANCE_DASHBOARD
             ? <FinanceDashboard
