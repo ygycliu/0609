@@ -302,6 +302,14 @@ async function processFile(
       signingDate = `${parsed.year}-01-01`;
     }
 
+    // 推断合同金额（优先 AI 抽取，否则 0）
+    let totalAmount = 0;
+    if (aiResult?.total_amount) {
+      totalAmount = Number(aiResult.total_amount);
+    } else if (aiResult?.['合同金额']) {
+      totalAmount = Number(aiResult['合同金额']);
+    }
+
     const newContractId = await queryOne<any>(
       `INSERT INTO contract (
         company_id, contract_no, contract_type, status,
@@ -317,7 +325,7 @@ async function processFile(
         contractType,
         finalCustomerId,
         signingEntityId,
-        aiResult?.total_amount || 0,
+        totalAmount,
         signingDate,
         `从 /mnt/renz/19.认证合同/ 批量导入\n原文件名: ${filename}\n年份: ${parsed.year || "?"}\n编号: ${parsed.number || "?"}\nAI 抽取客户: ${aiResult?.customer_name || "无"}`
       ]
