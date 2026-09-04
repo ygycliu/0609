@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS customer_follow_up (
   customer_id         UUID NOT NULL,                       -- 关联客户
   project_id          UUID,                                -- 关联项目（可选）
   certification_type  VARCHAR(50),                        -- QES / Q / 27001 等
+  issuing_body        VARCHAR(50) DEFAULT 'zhongren',     -- zhongren=中认 / huazhong=华中 / other=其他
 
   -- 当前阶段（7 阶段）
   -- expired（到期）→ quoted（已报价）→ contract_review（合同评审）→ contract_signed（合同签订）→ implementing（项目实施）→ certified（出证）→ completed（完成）

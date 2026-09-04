@@ -7,6 +7,7 @@ import type {
   KnowledgeItem,
   ModelProvider
 } from "../shared/types.js";
+import { getResolvedConfig } from "./llm-config.service.js";
 
 interface ModelRequest {
   input: ConsultationInput;
@@ -72,49 +73,84 @@ ${references}
 > 当前使用内置演示模型生成。接入 OpenAI 兼容 API 或本地 Ollama 后，将根据企业资料生成更细化的内容。`;
 }
 
-async function callOpenAi(prompt: string) {
-  if (!config.openai.apiKey) {
-    throw new IntegrationError("未配置 OPENAI_API_KEY");
+async function callOpenAi(
+  prompt: string,
+  override?: { baseUrl?: string; apiKey?: string; model?: string; temperature?: number; timeoutMs?: number; maxTokens?: number }
+) {
+  const baseUrl = (override?.baseUrl || config.openai.baseUrl).replace(/\/$/, "");
+  const apiKey = override?.apiKey ?? config.openai.apiKey;
+  const model = override?.model ?? config.openai.model;
+  const temperature = override?.temperature ?? 0.3;
+  const timeoutMs = override?.timeoutMs ?? 60000;
+  if (!apiKey) {
+    throw new IntegrationError("OPENAI_API_KEY missing - fill in LLM Config page or set OPENAI_API_KEY in .env");
   }
-  const response = await fetch(`${config.openai.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.openai.apiKey}`
-    },
-    body: JSON.stringify({
-      model: config.openai.model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3
-    })
-  });
-  if (!response.ok) {
-    throw new IntegrationError(`OpenAI 兼容接口调用失败：${response.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + apiKey
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        temperature,
+        max_tokens: override?.maxTokens ?? 4096
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new IntegrationError(`OpenAI compat API failed: ${response.status} ${errText.slice(0, 200)}`);
+    }
+    const body = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = body.choices?.[0]?.message?.content;
+    if (!content) throw new IntegrationError("Model returned no content");
+    return sanitizeModelOutput(content);
+  } finally {
+    clearTimeout(timer);
   }
-  const body = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = body.choices?.[0]?.message?.content;
-  if (!content) throw new IntegrationError("模型未返回有效内容");
-  return sanitizeModelOutput(content);
 }
 
-async function callOllama(prompt: string, modelName?: string) {
-  const response = await fetch(`${config.ollama.baseUrl.replace(/\/$/, "")}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: modelName || config.ollama.model,
-      prompt,
-      stream: false
-    })
-  });
-  if (!response.ok) {
-    throw new IntegrationError(`Ollama 调用失败：${response.status}`);
+async function callOllama(
+  prompt: string,
+  modelName?: string,
+  override?: { baseUrl?: string; numCtx?: number; temperature?: number; timeoutMs?: number }
+) {
+  const baseUrl = (override?.baseUrl || config.ollama.baseUrl).replace(/\/$/, "");
+  const timeoutMs = override?.timeoutMs ?? 60000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelName || config.ollama.model,
+        prompt,
+        stream: false,
+        options: {
+          num_ctx: override?.numCtx ?? 4096,
+          temperature: override?.temperature ?? 0.3
+        }
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new IntegrationError(`Ollama call failed: ${response.status} ${errText.slice(0, 200)}`);
+    }
+    const body = (await response.json()) as { response?: string };
+    if (!body.response) throw new IntegrationError("Ollama returned no content");
+    return sanitizeModelOutput(body.response);
+  } finally {
+    clearTimeout(timer);
   }
-  const body = (await response.json()) as { response?: string };
-  if (!body.response) throw new IntegrationError("Ollama 未返回有效内容");
-  return sanitizeModelOutput(body.response);
 }
 
 export async function generateWithModel(provider: ModelProvider, request: ModelRequest) {
@@ -127,6 +163,67 @@ export async function generateWithModel(provider: ModelProvider, request: ModelR
     return callOllama(prompt, modelName);
   }
   return callOllama(prompt);
+}
+
+
+/**
+ * V2.3.3：从 app_llm_config 读全局默认配置并调用
+ * 业务调用点（合同 AI 抽取、模板生成、咨询、OCR 后结构化等）应优先使用本函数。
+ *
+ * 行为：
+ *   - DB 有启用配置 → 优先用 DB 配置（provider/base_url/api_key/model/num_ctx/temperature...）
+ *   - DB 未配置 / 未启用 / 解密失败 → 回退到 .env 默认值（不报错，向后兼容）
+ */
+export async function generateWithDefaultModel(request: ModelRequest): Promise<string> {
+  const cfg = await getResolvedConfig().catch((e) => {
+    console.warn("[gateway] 读取 DB 配置失败，回退 .env:", (e as Error).message);
+    return null;
+  });
+
+  // DB 没配好 → 走 demo（避免无配置时业务挂掉）
+  if (!cfg) {
+    return sanitizeModelOutput(demoResponse(request));
+  }
+
+  const prompt = buildPrompt(request);
+
+  if (cfg.provider === "demo") {
+    return sanitizeModelOutput(demoResponse(request));
+  }
+
+  const override = {
+    baseUrl: cfg.baseUrl,
+    apiKey: cfg.apiKey || undefined,
+    model: cfg.modelName,
+    temperature: cfg.temperature,
+    timeoutMs: cfg.timeoutMs,
+    maxTokens: cfg.maxTokens
+  };
+
+  if (cfg.provider === "openai") {
+    return callOpenAi(prompt, override);
+  }
+  if (cfg.provider.startsWith("ollama:")) {
+    const modelName = cfg.provider.substring("ollama:".length);
+    return callOllama(prompt, modelName, {
+      baseUrl: cfg.baseUrl,
+      numCtx: cfg.numCtx,
+      temperature: cfg.temperature,
+      timeoutMs: cfg.timeoutMs
+    });
+  }
+  if (cfg.provider === "ollama") {
+    return callOllama(prompt, undefined, {
+      baseUrl: cfg.baseUrl,
+      numCtx: cfg.numCtx,
+      temperature: cfg.temperature,
+      timeoutMs: cfg.timeoutMs
+    });
+  }
+
+  // 未知 provider → demo 兜底
+  console.warn(`[gateway] 未知 provider=${cfg.provider}，回退 demo`);
+  return sanitizeModelOutput(demoResponse(request));
 }
 
 /**

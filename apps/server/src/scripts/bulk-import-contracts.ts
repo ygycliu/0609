@@ -92,7 +92,7 @@ async function fileHash(filepath: string): Promise<string> {
 }
 
 /** OCR/DOC 提取文本（限制页数，节省时间） */
-async function extractText(filepath: string, maxPages = 2): Promise<string> {
+async function extractText(filepath: string, maxPages = 9999): Promise<string> {  // V2.3.5: 全文抽取（之前 maxPages=2 导致联系人/电话/合同编号在末页的全部漏掉）
   const ext = path.extname(filepath).toLowerCase();
   try {
     if (ext === ".pdf") {
@@ -374,7 +374,7 @@ async function processFile(
         await query(
           `INSERT INTO customer_alias (company_id, customer_id, alias_name, source, match_count)
            VALUES ($1, $2, $3, 'bulk_import', 1)
-           ON CONFLICT (customer_id, alias_name) DO NOTHING`,
+           ON CONFLICT (company_id, alias_name) DO NOTHING`,
           [companyId, matchedCustomerId, aiResult.customer_name]
         );
       } catch (e) {/* 重复也没关系 */}

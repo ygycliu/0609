@@ -44,7 +44,7 @@ export interface ReportAttachmentSummary {
 }
 
 const AUTO_BASE =
-  typeof window !== "undefined" && window.location.pathname.startsWith("/ai/")
+  typeof window !== "undefined" && window.location.pathname.startsWith("/ai/") && import.meta.env.PROD
     ? "/ai/api"
     : "/api";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? AUTO_BASE;

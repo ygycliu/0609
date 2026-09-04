@@ -197,27 +197,28 @@ async function ocrFile(filePath: string): Promise<{ text: string; usedOcr: boole
 }
 
 /**
- * 4. AI 结构化抽取（用本地 qwen2.5:7b）
+ * V2.3 AI 结构化抽取（用云端 MiniMax-M3）
  */
 export async function extractContractFields(
   text: string,
-  preferredModel: string = "ollama:qwen2.5:7b"
+  preferredModel: string = "openai"
 ): Promise<{ extracted: ExtractedContract; confidence: number }> {
   const { generateWithModel } = await import("../models/model.gateway.js");
 
-  const prompt = `你是一个合同信息抽取助手。请从以下合同文本中提取结构化字段。
+  const prompt = `你是一个认证服务行业的合同信息抽取助手。
 
-合同文本：
+合同全文：
 """
-${text.slice(0, 8000)}
+${text.slice(0, 16000)}
 """
 
-按 JSON 格式输出（必须是合法 JSON）：
+请严格按 JSON 格式输出（必须是合法 JSON，禁止任何其他文字）：
+
 {
   "甲方客户名": "完整公司名（含'有限公司'等）",
-  "乙方主体": "中认认证有限公司" 或 "中认认证有限公司宁夏分公司" 或 "华中国际认证检验集团有限公司" 或 "其他",
-  "合同编号": "完整编号（如 FS/CA-SC24-342/1，多个用 | 分隔）",
-  "合同类型": "main 主合同" / "supplement 补充协议" / "change 合同变更",
+  "乙方主体": "中认认证有限公司" / "中认认证有限公司宁夏分公司" / "华中国际认证检验集团有限公司" / "银川博文荣达咨询服务有限公司" / "其他",
+  "合同编号": "如 FS/CA-SC24-342/1、HT-2024-001、2026-008 等，多个用 | 分隔",
+  "合同类型": "main" / "supplement" / "change" / null,
   "合同金额": 数字（元，无千分位，无单位）,
   "签订日期": "YYYY-MM-DD 或 null",
   "生效日期": "YYYY-MM-DD 或 null",
@@ -227,17 +228,19 @@ ${text.slice(0, 8000)}
   "户名": "完整户名 或 null",
   "联系人": "联系人姓名 或 null",
   "联系电话": "11位手机号 或 null",
-  "认证体系": ["QMS", "EMS", "OHSMS"]  // 从括号里勾选的
-  "服务类型": "认证服务 或 null",
-  "原合同编号": "如果是补充协议，引用主合同号 或 null"
+  "认证体系": ["QMS","EMS","OHSMS"] 或 [],
+  "服务类型": "认证服务" / "咨询" / "培训" / null,
+  "原合同编号": "补充协议引用主合同号 或 null"
 }
 
-注意：
-- 找不到的字段填 null
-- 数字金额是阿拉伯数字（如 15000.00）
-- 日期用 YYYY-MM-DD 格式（如果只有 YYYY-MM 或 YYYY 也保留原样）
-- 认证体系只在勾选时填
-- 只输出 JSON，不要任何其他文字`;
+强规则（必须遵守）：
+1. **找不到的字段填 null**，绝不要瞎猜
+2. **日期严格 YYYY-MM-DD**：不完整日期（如 2024-05）填 null，绝不要带 -MM 截断
+3. **金额纯数字**：15000.00 不要 15,000 或 1.5万
+4. **合同编号在第一页右上/左上角**、也可能在末页签字栏
+5. **联系人/电话在最后一页"经办人/委托代理人/联系人"栏**
+6. **认证体系勾选才填**：质量管理体系=QMS，环境=EMS，职业健康=OHSMS
+7. **只输出 JSON**，禁止 3反引号 + json + 3反引号 标记，禁止解释文字`;
 
   const result = await generateWithModel(preferredModel as any, {
     input: {

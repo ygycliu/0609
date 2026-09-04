@@ -42,6 +42,14 @@ interface CertificateItem {
   issuing_body: string | null;
 }
 
+// 客户→最新有效主合同（带 fileId）的缓存
+interface ContractLink {
+  contract_id: string;
+  contract_no: string;
+  file_id: string;
+  signed_at: string | null;
+}
+
 interface Stats {
   total: number;
   expired: number;
@@ -61,6 +69,8 @@ export function CertificateExpiryPage() {
   const [filterCertType, setFilterCertType] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  // 客户→最新有效合同（带 PDF 文件）
+  const [contractMap, setContractMap] = useState<Map<string, ContractLink>>(new Map());
 
   const load = async () => {
     setLoading(true);
@@ -69,10 +79,66 @@ export function CertificateExpiryPage() {
       const d = (r as any)?.data || r;
       setStats(d.stats);
       setItems(d.certificates || []);
+      // 异步加载合同（不阻塞证书渲染）
+      loadContractsForCustomers(d.certificates || []);
     } catch (e: any) {
       ToastManager.error(`加载失败：${e?.message ?? "未知错误"}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 批量拉取证书列表里所有客户的"最新有效合同（带 PDF）"
+  // 用 SQL 直接查：SELECT DISTINCT ON (customer_id) ...
+  // 这里走现有 listContracts 接口，按 customer_id 一个个查（带并发限制 + 缓存）
+  const loadContractsForCustomers = async (certs: CertificateItem[]) => {
+    const customerIds = Array.from(new Set(certs.map(c => c.customer_id).filter(Boolean)));
+    if (customerIds.length === 0) return;
+
+    // 并发请求，但上限 6 路（避免后端过载）
+    const newMap = new Map<string, ContractLink>();
+    const chunks: string[][] = [];
+    for (let i = 0; i < customerIds.length; i += 6) {
+      chunks.push(customerIds.slice(i, i + 6));
+    }
+    for (const chunk of chunks) {
+      const results = await Promise.all(
+        chunk.map(async (cid) => {
+          try {
+            const r = await api.listContracts({
+              customer_id: cid,
+              status: "active",
+              contract_type: "main",
+              limit: 5,
+            } as any);
+            const items = (r as any)?.data || [];
+            // 找带 fileId 且签约日最新的主合同
+            const candidates = items
+              .filter((c: any) => c.fileId)
+              .sort((a: any, b: any) => {
+                const ad = a.signedAt ? new Date(a.signedAt).getTime() : 0;
+                const bd = b.signedAt ? new Date(b.signedAt).getTime() : 0;
+                return bd - ad;
+              });
+            const picked = candidates[0];
+            return picked
+              ? { cid, link: { contract_id: picked.id, contract_no: picked.contractNo, file_id: picked.fileId, signed_at: picked.signedAt } as ContractLink }
+              : { cid, link: null };
+          } catch {
+            return { cid, link: null };
+          }
+        })
+      );
+      for (const { cid, link } of results) {
+        if (link) newMap.set(cid, link);
+      }
+    }
+    if (newMap.size > 0) {
+      setContractMap(prev => {
+        const next = new Map(prev);
+        newMap.forEach((v, k) => next.set(k, v));
+        return next;
+      });
     }
   };
 

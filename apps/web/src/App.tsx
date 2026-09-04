@@ -25,6 +25,7 @@ import TemplateEnginePage from "./pages/TemplateEnginePage";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { FinanceDashboard } from "./pages/FinanceDashboard";
 import { FollowUpPage } from "./pages/FollowUpPage";
+import { LlmConfigPage } from "./pages/LlmConfigPage";
 import { TodoPage } from "./pages/TodoPage";
 import { ProjectWorkspace } from "./pages/ProjectWorkspace";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
@@ -40,6 +41,22 @@ import type {
 import { usePermissions } from "./lib/usePermissions";
 import { PermissionDenied } from "./components/PermissionDenied";
 import { ToastContainer, useToasts } from "./components/Toast";
+
+/** 行业网站链接 — 用于页脚上方的"行业网站链接"板块
+ * 优先尝试 logoUrl；加载失败自动回退到首字母圆形（截图样式）
+ */
+const INDUSTRY_LINKS: { name: string; url: string; logoUrl?: string; fallback: string }[] = [
+  { name: "认证认可协会", url: "https://www.ccaa.cn", logoUrl: "https://www.ccaa.cn/favicon.ico", fallback: "认" },
+  { name: "CCAA综合服务平台", url: "https://service.ccaa.cn", logoUrl: "https://service.ccaa.cn/favicon.ico", fallback: "C" },
+  { name: "CCAA从业人员", url: "https://www.ccaa.cn/person/", logoUrl: "https://www.ccaa.cn/favicon.ico", fallback: "C" },
+  { name: "全国认证认可信息公共服务平台", url: "https://cx.cnca.cn", logoUrl: "https://cx.cnca.cn/favicon.ico", fallback: "全" },
+  { name: "国家企业信用信息公示系统", url: "https://www.gsxt.gov.cn", logoUrl: "https://www.gsxt.gov.cn/favicon.ico", fallback: "国" },
+  { name: "全国特种设备公示信息查询", url: "https://cnse.samr.gov.cn", logoUrl: "https://cnse.samr.gov.cn/favicon.ico", fallback: "特" },
+  { name: "特种作业操作证查询", url: "https://www.mem.gov.cn", logoUrl: "https://www.mem.gov.cn/favicon.ico", fallback: "作" },
+  { name: "排污许可证管理信息平台", url: "https://permit.mee.gov.cn", logoUrl: "https://permit.mee.gov.cn/favicon.ico", fallback: "排" },
+  { name: "职业病危害项目申报", url: "https://www.chinacdc.cn", logoUrl: "https://www.chinacdc.cn/favicon.ico", fallback: "职" },
+  { name: "全国建筑市场监管公共服务平台", url: "http://jzsc.mohurd.gov.cn", logoUrl: "http://jzsc.mohurd.gov.cn/favicon.ico", fallback: "建" },
+];
 
 export default function App() {
   const [auth, setAuth] = useState<{ user: any } | null>(null);
@@ -148,6 +165,24 @@ export default function App() {
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <main className="main-content">
+        <div className="global-topbar">
+          <div className="topbar-spacer" />
+          {auth.user && (
+            <div className="user-pill">
+              <div className="user-meta">
+                <strong>{auth.user.displayName || auth.user.username || "管理员"}</strong>
+                <span className="user-role-pill">{(auth.user as any).role === "admin" ? "系统管理员" : "用户"}</span>
+              </div>
+              <button
+                className="logout-pill-btn"
+                onClick={() => void handleLogout()}
+                title="登出"
+              >
+                登出
+              </button>
+            </div>
+          )}
+        </div>
         {page === "overview" && (
           <OverviewPage
             employees={employees}
@@ -195,6 +230,11 @@ export default function App() {
           permissions.isAdmin
             ? <DataExchangePage />
             : <PermissionDenied permission="SYSTEM_BASIC_DATA" hint="数据导入导出涉及全量数据操作，仅管理员可访问。" />
+        )}
+        {page === "llm-config" && (
+          permissions.modules.SYSTEM_BASIC_DATA
+            ? <LlmConfigPage currentUser={auth.user} onLogout={handleLogout} />
+            : <PermissionDenied permission="SYSTEM_BASIC_DATA" hint="大模型配置涉及全平台 AI 调用入口，仅管理员可访问。" />
         )}
         {page === "follow-up" && (
           <FollowUpPage
@@ -258,6 +298,47 @@ export default function App() {
 
         {/* V2.0：全局 toast 容器 */}
         <ToastContainer toasts={toasts} onClose={dismiss} />
+
+        {/* 行业网站链接 */}
+        <section className="industry-links" aria-label="行业网站链接">
+          <h2 className="industry-links__title">行业网站链接</h2>
+          <div className="industry-links__grid">
+            {INDUSTRY_LINKS.map((item) => (
+              <a
+                key={item.name}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="industry-link"
+                title={item.name}
+              >
+                {item.logoUrl ? (
+                  <img
+                    src={item.logoUrl}
+                    alt={item.name}
+                    className="industry-link__logo"
+                    loading="lazy"
+                    onError={(e) => {
+                      // favicon 加载失败回退到首字母
+                      const target = e.currentTarget as HTMLImageElement;
+                      const parent = target.parentElement;
+                      if (parent && !parent.querySelector('.industry-link__fallback')) {
+                        const fb = document.createElement('span');
+                        fb.className = 'industry-link__fallback';
+                        fb.textContent = item.fallback;
+                        parent.appendChild(fb);
+                        target.style.display = 'none';
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="industry-link__fallback">{item.fallback}</span>
+                )}
+                <span className="industry-link__name">{item.name}</span>
+              </a>
+            ))}
+          </div>
+        </section>
 
         <footer className="app-copyright" aria-label="版权信息">
           版权所有上海缘起卢卡智能科技有限公司

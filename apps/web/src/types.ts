@@ -23,7 +23,8 @@ export type Page =
   | "contracts"
   | "template-engine"
   | "cert-expiry"
-  | "data-exchange";
+  | "data-exchange"
+  | "llm-config";
 
 export interface ReviewItem {
   id: string;

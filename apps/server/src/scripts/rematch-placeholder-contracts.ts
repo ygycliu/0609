@@ -75,7 +75,7 @@ async function rematchPlaceholderContracts() {
             await query(
               `INSERT INTO customer_alias (company_id, customer_id, alias_name, source, match_count)
                VALUES ($1, $2, $3, 'rematch', 1)
-               ON CONFLICT (customer_id, alias_name) DO NOTHING`,
+               ON CONFLICT (company_id, alias_name) DO NOTHING`,
               [COMPANY_ID, m.customer.id, aiName]
             );
           } catch (e) {/* ignore */}

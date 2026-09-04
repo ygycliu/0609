@@ -44,7 +44,7 @@ import {
 import { employees } from "./employees/employee.service.js";
 import { KnowledgeRepository } from "./knowledge/knowledge.repository.js";
 import { searchKnowledge } from "./knowledge/retrieval.service.js";
-import { generateWithModel, getAvailableModels } from "./models/model.gateway.js";
+import { generateWithModel, getAvailableModels, generateWithDefaultModel } from "./models/model.gateway.js";
 import { handleEvent, pushMessage } from "./integrations/feishu/index.js";
 import { AppError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "./shared/errors.js";
 import { createLogger } from "./shared/logger.js";
@@ -6466,6 +6466,116 @@ export async function createApp() {
   // V2.3：合同模板引擎（16 个端点）
   const { templateRouter } = await import("./templates/template.routes.js");
   app.use("/api/template-engine", templateRouter);
+
+  // ============================================================
+  // V2.3.3：AI 中心大模型全局配置（AI 应用中心 → 工具 → 大模型配置）
+  // ============================================================
+  // 仅管理员可写；GET 任意登录用户可读（用于前端导航显示）
+  const {
+    getPublicConfig: getPublicLlmConfig,
+    upsertConfig: upsertLlmConfig,
+    deleteConfig: deleteLlmConfig,
+    listConfigLog: listLlmConfigLog
+  } = await import("./models/llm-config.service.js");
+
+  app.get("/api/admin/llm-config", async (request, response, next) => {
+    try {
+      const cfg = await getPublicLlmConfig();
+      response.json({ data: cfg, has_config: !!cfg });
+    } catch (e) { next(e); }
+  });
+
+  app.put("/api/admin/llm-config", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "需要管理员权限" });
+        return;
+      }
+      const body = request.body as any;
+      const result = await upsertLlmConfig({
+        provider: body.provider,
+        model_name: body.model_name,
+        base_url: body.base_url,
+        api_key: body.api_key,           // 可选：不传则保持原值
+        num_ctx: Number(body.num_ctx) || 4096,
+        temperature: Number(body.temperature) || 0.3,
+        timeout_ms: Number(body.timeout_ms) || 60000,
+        max_tokens: Number(body.max_tokens) || 4096,
+        is_enabled: body.is_enabled !== false,
+        note: body.note || null,
+        operator: u.id,
+        reason: body.reason || null
+      });
+      response.json({ data: result, message: "大模型配置已保存并热生效" });
+    } catch (e: any) {
+      response.status(400).json({ code: "BAD_REQUEST", message: e?.message || "保存失败" });
+    }
+  });
+
+  app.delete("/api/admin/llm-config", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "需要管理员权限" });
+        return;
+      }
+      const reason = (request.query.reason as string) || undefined;
+      await deleteLlmConfig(u.id, reason);
+      response.json({ data: null, message: "已删除大模型配置，业务调用将回退到 .env 默认" });
+    } catch (e) { next(e); }
+  });
+
+  app.get("/api/admin/llm-config/log", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "需要管理员权限" });
+        return;
+      }
+      const limit = Math.min(Number(request.query.limit) || 20, 100);
+      const rows = await listLlmConfigLog(limit);
+      response.json({ data: rows });
+    } catch (e) { next(e); }
+  });
+
+  // V2.3.3：连通性测试（用保存的配置真实调用一次模型）
+  app.post("/api/admin/llm-config/test", async (request, response, next) => {
+    try {
+      const u = getUserFromReq(request);
+      if (u.role !== "admin") {
+        response.status(403).json({ code: "FORBIDDEN", message: "需要管理员权限" });
+        return;
+      }
+      const { generateWithDefaultModel } = await import("./models/model.gateway.js");
+      const start = Date.now();
+      const text = await generateWithDefaultModel({
+        input: {
+          role: "knowledge-assistant",
+          industry: "认证检测",
+          companyContext: "连通性测试",
+          request: "回复一句话确认你在线即可",
+          deliverable: "连通性测试",
+          model: "openai"
+        },
+        knowledge: []
+      });
+      const latencyMs = Date.now() - start;
+      response.json({
+        data: {
+          ok: true,
+          latency_ms: latencyMs,
+          preview: text.slice(0, 200),
+          length: text.length
+        }
+      });
+    } catch (e: any) {
+      response.status(500).json({
+        data: { ok: false, error: e?.message || "调用失败" }
+      });
+    }
+  });
+
 
   return app;
 }

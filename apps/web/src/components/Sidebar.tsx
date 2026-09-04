@@ -116,7 +116,8 @@ const navigation: NavGroup[] = [
       { id: "pdf-to-word", label: "PDF 转 Word", icon: FileType, color: "#64748b" },
       { id: "system-enum", label: "系统基础数据", icon: ListChecks, color: "#3b82f6", requireModule: "SYSTEM_BASIC_DATA" },
       { id: "auditor-profile", label: "审核员档案", icon: UserCheck, color: "#8b5cf6", requireModule: "AUDITOR_PROFILE" },
-      { id: "data-exchange", label: "数据导入导出", icon: ArrowLeftRight, color: "#10b981", requireModule: "SYSTEM_BASIC_DATA" }
+      { id: "data-exchange", label: "数据导入导出", icon: ArrowLeftRight, color: "#10b981", requireModule: "SYSTEM_BASIC_DATA" },
+      { id: "llm-config", label: "🧠 大模型配置", icon: BrainCircuit, color: "#a855f7", requireModule: "SYSTEM_BASIC_DATA" }
     ]
   },
   // 历史成果（所有人可见）
@@ -327,19 +328,6 @@ export function Sidebar({
             {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
             {theme === "dark" ? "浅色" : "深色"}
           </button>
-          {currentUser && (
-            <div className="sidebar-user">
-              <div className="user-info">
-                <strong>{currentUser.displayName || currentUser.username}</strong>
-                <span className={`user-role role-${currentUser.role}`}>{currentUser.role === "admin" ? "管理员" : "用户"}</span>
-              </div>
-              {onLogout && (
-                <button className="logout-btn" onClick={() => void onLogout()} title="登出">
-                  登出
-                </button>
-              )}
-            </div>
-          )}
           <div className="status-line">
             <span className="status-dot" />
             MVP V1.0

@@ -23,3 +23,25 @@ releases/local-pre-takeover-*.zip
 # Knowledge base runtime data (not in git)
 apps/server/data/audit_kb/
 apps/server/data/cnca-rules/
+
+# Temporary/exploratory dev artifacts (not part of product)
+semantica-venv/
+semantica/
+debug_*.txt
+preview*.txt
+verify_*.txt
+verify_*.py
+inspect_*.json
+inspect_*.py
+preview_*.py
+merge_*.py
+data_说明.md
+inpect_result.json
+
+# Docker backup archives (large, redundant copies)
+releases/docker-backup-*/
+releases/*-docker-backup-*.tar.gz
+releases/*-docker-backup-*.zip
+
+# Local cache dirs
+.dsh/

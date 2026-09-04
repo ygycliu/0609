@@ -185,6 +185,86 @@ export class ARRepository {
     }));
   }
 
+  /**
+   * V2.0：智能应收账款 Top N（从 finance_transaction 收入聚合）
+   *
+   * 适用场景：未建立正式 finance_ar 档案，但想看客户应收估算
+   * 算法：
+   *   - 总应收 = SUM(income.amount) by customer
+   *   - 已收 = SUM(income.amount)（所有 income 视为已收）
+   *   - 未收 = 总应收 - 已收 = 0（保留字段，未来扩展）
+   *   - 逾期天数 = trans_date 到今天（用作"未确认应收"指标）
+   *
+   * 注意：此为估算值，仅供参考。正式场景请用 finance_ar 表。
+   */
+  async getARTopByCustomerSmart(companyId: string, options: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  } = {}): Promise<Array<{
+    customerId: string;
+    customerName: string;
+    arCount: number;
+    totalAmount: number;
+    paidAmount: number;
+    remainingAmount: number;
+    maxOverdueDays: number;
+    source: "smart";
+  }>> {
+    const { startDate, endDate, limit = 10 } = options;
+    const conditions: string[] = [
+      "t.company_id = $1",
+      "t.deleted_at IS NULL",
+      "t.type = 'income'"
+    ];
+    const params: any[] = [companyId];
+    let paramIdx = 2;
+
+    if (startDate) {
+      conditions.push(`t.trans_month >= $${paramIdx}`);
+      params.push(startDate);
+      paramIdx++;
+    }
+    if (endDate) {
+      conditions.push(`t.trans_month <= $${paramIdx}`);
+      params.push(endDate);
+      paramIdx++;
+    }
+
+    const where = conditions.join(" AND ");
+
+    // 智能聚合：每个客户的收入总额 + 交易笔数 + 最近一次交易距今天数
+    const r = await query<any>(
+      `SELECT
+         t.customer_id,
+         c.name AS customer_name,
+         COUNT(*) AS ar_count,
+         COALESCE(SUM(t.amount), 0) AS total_amount,
+         COALESCE(SUM(t.amount), 0) AS paid_amount,
+         0 AS remaining_amount,
+         COALESCE(MAX(
+           EXTRACT(DAY FROM NOW() - t.trans_date)::INT
+         ), 0) AS max_overdue
+       FROM finance_transaction t
+       LEFT JOIN customer c ON c.id = t.customer_id
+       WHERE ${where} AND t.customer_id IS NOT NULL
+       GROUP BY t.customer_id, c.name
+       ORDER BY total_amount DESC
+       LIMIT $${paramIdx}`,
+      [...params, limit]
+    );
+    return r.rows.map((row: any) => ({
+      customerId: row.customer_id,
+      customerName: row.customer_name ?? "未关联客户",
+      arCount: parseInt(row.ar_count, 10),
+      totalAmount: Number(row.total_amount),
+      paidAmount: Number(row.paid_amount),
+      remainingAmount: Number(row.remaining_amount),
+      maxOverdueDays: parseInt(row.max_overdue, 10),
+      source: "smart" as const
+    }));
+  }
+
   // 取得 AR 详情
   async getAR(companyId: string, id: string): Promise<ARRecord | null> {
     const r = await query<any>(`${AR_SELECT} WHERE ar.company_id = $1 AND ar.id = $2 AND ar.deleted_at IS NULL`, [companyId, id]);
