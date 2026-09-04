@@ -95,6 +95,7 @@ export default function ContractsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<{ status?: string; q?: string }>({});
+  const [showAll, setShowAll] = useState(false);  // V2.3.4：是否显示全部合同（默认 50 条）
   const [stats, setStats] = useState<any>(null);
 
   // PDF 导入
@@ -134,7 +135,9 @@ export default function ContractsPage() {
   const loadContracts = async () => {
     setLoading(true);
     try {
-      const r = await api.listContracts({ ...filter, limit: 50 });
+      // V2.3.4：showAll=true 时拉全量（后端 limit 上限 10000），否则 50 条
+      const limit = showAll ? 10000 : 50;
+      const r = await api.listContracts({ ...filter, limit });
       setContracts(r.data || []);
       setTotal(r.total);
     } catch (e: any) {
@@ -159,7 +162,7 @@ export default function ContractsPage() {
   useEffect(() => {
     loadContracts();
     loadStats();
-  }, [filter]);
+  }, [filter, showAll]);
 
   useEffect(() => {
     if (tab === "batches") loadBatches();
@@ -299,6 +302,14 @@ export default function ContractsPage() {
               <option value="archived">归档</option>
             </select>
             <span className="muted">共 {total} 条</span>
+            {/* V2.3.4：显示全部按钮 — 取消 50 条限制，一次性看 962 条 */}
+            <button
+              className={showAll ? "page-size-btn active" : "page-size-btn"}
+              onClick={() => setShowAll(s => !s)}
+              title={showAll ? "已显示全部合同，点击切换为前 50 条" : `点击一次性显示全部 ${total} 条合同`}
+            >
+              {showAll ? "✓ 全部 962 条" : "显示全部"}
+            </button>
           </div>
 
           {loading ? (
@@ -731,12 +742,49 @@ export default function ContractsPage() {
                 {/* 底部操作 */}
                 <footer className="contract-detail-footer">
                   {contractDetail.fileId && (
-                    <a
-                      href={`/ai/api/contracts/files/${contractDetail.fileId}/download`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    // V2.3.4：fetch + blob 下载（带 Authorization header）
+                    // - 解决 `<a target=_blank>` / `<a download>` 路径下：vite dev SPA fallback 把 /ai/api/* 当 index.html
+                    //   返回，导致浏览器下载了 "download.htm" 而不是 PDF
+                    // - 走 fetch 走 vite 代理 /api/* → 后端 → 拿到真实 PDF blob → 触发下载
+                    <button
+                      type="button"
                       className="primary-button"
-                    >📄 预览 PDF</a>
+                      title="点击下载到本地（合同原件可能是 PDF/DOC/DOCX）"
+                      onClick={async () => {
+                        try {
+                          // V2.3.4：fetch + cookie + blob 下载
+                          // 解决 `<a target=_blank>` 路径下 vite dev SPA fallback 把 /ai/api/* 当 index.html
+                          //   返回，导致浏览器下载了 "download.htm" 而不是 PDF
+                          // 后端 auth 支持 cookie 认证（不只是 Bearer），所以 fetch + credentials:"include" 即可
+                          const resp = await fetch(`/api/contracts/files/${contractDetail.fileId}/download`, {
+                            credentials: "include",
+                          });
+                          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                          const blob = await resp.blob();
+                          // 防御：vite dev SPA fallback 时返回 text/html，那不是合同文件
+                          if (blob.type && blob.type.includes("text/html")) {
+                            throw new Error("后端返回 HTML（可能 vite dev 把请求当 SPA 路由了），请重试或检查登录状态");
+                          }
+                          // V2.3.4：取第一个原文件的真名 + 扩展名（合同可能是 PDF/DOC/DOCX，不写死）
+                          // - contractDetail.primaryFile 是后端挂在合同详情上的第一个文件对象
+                          // - 之前用 contractDetail.fileName 是合同主表字段（合同号），fallback 到 "contract.pdf" 把 doc 文件存成了 .pdf
+                          const fileName = contractDetail.primaryFile?.fileName
+                            || contractDetail.files?.[0]?.fileName
+                            || `contract-${contractDetail.contractNo || contractDetail.id}.bin`;
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = fileName;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          ToastManager.success("已下载：" + a.download);
+                        } catch (e: any) {
+                          ToastManager.error("下载失败：" + (e?.message || "未知"));
+                        }
+                      }}
+                    >📄 下载原件</button>
                   )}
                   <button className="ghost-button" onClick={closeContractDetail}>关闭</button>
                 </footer>
