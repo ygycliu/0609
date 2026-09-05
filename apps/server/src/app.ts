@@ -20,6 +20,7 @@ import { createCertificationRouter } from "./routes/certification.routes.js";
 import { createCertificatesRouter } from "./routes/certificates.routes.js";
 import { createAuditorRouter } from "./routes/auditor.routes.js";
 import { createAuditorsRouter } from "./routes/auditors.routes.js";
+import { createConsultationsRouter } from "./routes/consultations.routes.js";
 import { ConsultationService } from "./consultations/consultation.service.js";
 import { extractDocumentText } from "./documents/document.service.js";
 import { ofdBufferToDocxBuffer } from "./docx/ofd-to-docx.js";
@@ -69,40 +70,7 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 }  // 200MB（V2.1 提升）
 });
 
-const consultationSchema = z.object({
-  role: z.enum(["trainer", "knowledge-assistant", "certification-expert"]),
-  industry: z.string().trim().min(1, "请选择或填写行业"),
-  companyContext: z.string().trim().max(5000).default(""),
-  request: z.string().trim().min(10, "请至少输入 10 个字的需求描述").max(10000),
-  deliverable: z.string().trim().min(1, "请选择交付物"),
-  model: z.enum(["demo", "openai", "ollama"]).default("demo")
-});
-
-const docxExportSchema = z.object({
-  companyName: z.string().trim().min(1, "请填写编制单位").max(100),
-  clientName: z.string().trim().min(1, "请填写客户单位").max(100),
-  projectName: z.string().trim().min(1, "请填写项目名称").max(150),
-  documentTitle: z.string().trim().min(1, "请填写文档标题").max(150),
-  version: z.string().trim().min(1, "请填写文档版本").max(30),
-  preparedBy: z.string().trim().min(1, "请填写编制人员").max(100),
-  confidentiality: z.string().trim().min(1, "请填写密级或使用范围").max(50),
-  includeToc: z.boolean().default(true),
-  includeReferences: z.boolean().default(true)
-});
-
-const pptxExportSchema = z.object({
-  companyName: z.string().trim().min(1, "请填写编制单位").max(100),
-  clientName: z.string().trim().min(1, "请填写客户单位").max(100),
-  projectName: z.string().trim().min(1, "请填写项目名称").max(150),
-  presentationTitle: z.string().trim().min(1, "请填写演示标题").max(150),
-  version: z.string().trim().min(1, "请填写演示版本").max(30),
-  presenter: z.string().trim().min(1, "请填写汇报人员").max(100),
-  confidentiality: z.string().trim().min(1, "请填写密级或使用范围").max(50),
-  includeReferences: z.boolean().default(true)
-});
-
-// quoteExportPayloadSchema moved to ./certification/quote-export.schema.js (used by routes/certification.routes.ts)
-
+// consultations 端点用的 export 文件名 UTF-8 编码函数（保留供 templates 端点复用）
 function encodedFileName(value: string, extension: "docx" | "pptx") {
   const safeName = value.replace(/[\\/:*?"<>|]/g, "-").slice(0, 100) || "咨询报告";
   return `UTF-8''${encodeURIComponent(`${safeName}.${extension}`)}`;
@@ -536,27 +504,7 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
     }
   });
 
-  app.get("/api/consultations", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      response.json({ data: await consultationService.list(u.companyId) });
-    } catch (error) {
-      next(error);
-    }
-  });
 
-  app.post("/api/consultations", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const parsed = consultationSchema.safeParse(request.body);
-      if (!parsed.success) {
-        throw new ValidationError(parsed.error.issues[0]?.message ?? "请求参数无效");
-      }
-      response.status(201).json({ data: await consultationService.create(u.companyId, u.id, parsed.data) });
-    } catch (error) {
-      next(error);
-    }
-  });
 
   // ====== 认证专家：报价 API ======
 
@@ -670,6 +618,15 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   // 必须在全局错误处理之前注册，否则 NotFoundError 走不到错误中间件
   app.use("/api/auditor", createAuditorRouter({ upload, getUserFromReq }));
   app.use("/api/auditors", createAuditorsRouter({ upload, getUserFromReq, auditorRepo, ocrModule }));
+
+  // V2.x：认证专家 consultations（5 端点：list/create/feedback/export-docx/export-pptx）
+  app.use("/api/consultations", createConsultationsRouter({
+    consultationService,
+    generateConsultationDocx,
+    generateConsultationPptx,
+    query,
+    getUserFromReq
+  }));
 
   // ============== 财务管理 ==============
 
@@ -2033,29 +1990,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   // ===== 知识运营：反馈 + 质量监控 =====
 
   // 咨询反馈（点赞/点踩）
-  app.post("/api/consultations/:id/feedback", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const consultationId = request.params.id;
-      const parsed = z.object({
-        rating: z.enum(["up", "down", "neutral"]),
-        comment: z.string().max(1000).optional(),
-        issueType: z.enum(["wrong", "incomplete", "irrelevant", "outdated", "good"]).optional()
-      }).safeParse(request.body);
-      if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? "参数无效");
-
-      const rating = parsed.data.rating === "up" ? 1 : parsed.data.rating === "down" ? -1 : 0;
-
-      await query(
-        `INSERT INTO consultation_feedback
-         (company_id, consultation_id, user_id, rating, comment, issue_type)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [u.companyId, consultationId, u.id, rating,
-         parsed.data.comment ?? null, parsed.data.issueType ?? null]
-      );
-      response.status(201).json({ data: { ok: true, rating } });
-    } catch (error) { next(error); }
-  });
 
   // 知识条目反馈（用 doc_code 不用 UUID）
   app.post("/api/knowledge/:docCode/feedback", async (request, response, next) => {
@@ -2545,31 +2479,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
 
   // ====== 认证报价导出 DOCX ======
 
-  app.post("/api/consultations/:id/export/docx", async (request, response, next) => {
-    try {
-      const parsed = docxExportSchema.safeParse(request.body);
-      if (!parsed.success) {
-        throw new ValidationError(parsed.error.issues[0]?.message ?? "导出参数无效");
-      }
-      const record = await consultationService.getById(
-        getUserFromReq(request).companyId,
-        request.params.id
-      );
-      const buffer = await generateConsultationDocx(record, parsed.data);
-      response.setHeader(
-        "Content-Type",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      );
-      response.setHeader(
-        "Content-Disposition",
-        `attachment; filename*=${encodedFileName(parsed.data.documentTitle, "docx")}`
-      );
-      response.setHeader("Content-Length", String(buffer.length));
-      response.send(buffer);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   app.get("/api/templates/enterprise-solution.docx", async (_request, response, next) => {
     try {
@@ -2590,31 +2499,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
     }
   });
 
-  app.post("/api/consultations/:id/export/pptx", async (request, response, next) => {
-    try {
-      const parsed = pptxExportSchema.safeParse(request.body);
-      if (!parsed.success) {
-        throw new ValidationError(parsed.error.issues[0]?.message ?? "导出参数无效");
-      }
-      const record = await consultationService.getById(
-        getUserFromReq(request).companyId,
-        request.params.id
-      );
-      const buffer = await generateConsultationPptx(record, parsed.data);
-      response.setHeader(
-        "Content-Type",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-      );
-      response.setHeader(
-        "Content-Disposition",
-        `attachment; filename*=${encodedFileName(parsed.data.presentationTitle, "pptx")}`
-      );
-      response.setHeader("Content-Length", String(buffer.length));
-      response.send(buffer);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   app.get("/api/templates/digital-transformation-solution.pptx", async (_request, response, next) => {
     try {
