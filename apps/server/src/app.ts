@@ -21,6 +21,7 @@ import { createCertificatesRouter } from "./routes/certificates.routes.js";
 import { createAuditorRouter } from "./routes/auditor.routes.js";
 import { createAuditorsRouter } from "./routes/auditors.routes.js";
 import { createConsultationsRouter } from "./routes/consultations.routes.js";
+import { createFollowUpRouter, createAuditTemplatesRouter } from "./routes/follow_up.routes.js";
 import { ConsultationService } from "./consultations/consultation.service.js";
 import { extractDocumentText } from "./documents/document.service.js";
 import { ofdBufferToDocxBuffer } from "./docx/ofd-to-docx.js";
@@ -292,8 +293,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
     return r.rows;
   };
 
-
-
   // V2.0：OFD 转 Word（直接上传 OFD → 返回 docx 文件 + 提取的文本 + 标题）
   app.post("/api/document/ofd-to-docx", upload.single("file"), async (request, response, next) => {
     try {
@@ -504,10 +503,7 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
     }
   });
 
-
-
   // ====== 认证专家：报价 API ======
-
 
   // 知识库向量检索（基于分块的 embedding 相似度）
   app.post("/api/knowledge/search", async (request, response, next) => {
@@ -627,6 +623,19 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
     query,
     getUserFromReq
   }));
+
+  // V2.x：客户跟进 follow-up（17 端点：stages/issuing-bodies/stats/list/get/audit-plan/customer-types/create/update/advance/close/delete/archive-year/ensure-for-customer/batch-ensure/import-from-notifications/auto-from-history）
+  app.use("/api/follow-up", createFollowUpRouter({
+    followUpRepository,
+    query: query as any,
+    syncFollowUpToProject,
+    autoGenerateAuditPlan,
+    listAuditTemplates,
+    getUserFromReq
+  }));
+
+  // V2.x：审核模板 audit-templates（独立 basepath，1 端点）
+  app.use("/api/audit-templates", createAuditTemplatesRouter({ listAuditTemplates, getUserFromReq }));
 
   // ============== 财务管理 ==============
 
@@ -843,525 +852,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   });
 
   // ============== 客户跟进 (Follow-up) ==============
-
-  // 阶段字典
-  app.get("/api/follow-up/stages", async (_request, response, next) => {
-    try {
-      response.json({ data: FOLLOW_UP_STAGES });
-    } catch (error) { next(error); }
-  });
-
-  // 出证机构字典
-  app.get("/api/follow-up/issuing-bodies", async (_request, response, next) => {
-    try {
-      response.json({ data: ISSUING_BODIES });
-    } catch (error) { next(error); }
-  });
-
-  // 按出证机构聚合统计
-  app.get("/api/follow-up/stats/by-issuing-body", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const year = request.query.year ? parseInt(request.query.year as string, 10) : undefined;
-      const result = await followUpRepository.getStatsByIssuingBody(u.companyId, year);
-      response.json({ data: result });
-    } catch (error) { next(error); }
-  });
-
-  // 列表
-  app.get("/api/follow-up", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const offset = Math.max(parseInt((request.query.offset as string) || "0"), 0);
-      const limit = Math.min(Math.max(parseInt((request.query.limit as string) || "50"), 1), 200);
-      const result = await followUpRepository.listFollowUps(u.companyId, {
-        customerId: (request.query.customer_id as string) || "",
-        stage: (request.query.stage as string) || "",
-        year: request.query.year ? parseInt(request.query.year as string, 10) : undefined,
-        isArchived: request.query.archived === "1" || request.query.archived === "true"
-                       ? true : (request.query.archived === "0" ? false : undefined),
-        issuingBody: (request.query.issuing_body as string) || undefined,
-        offset,
-        limit
-      });
-      response.json({ data: result.items, total: result.total, totalAll: result.totalAll });
-    } catch (error) { next(error); }
-  });
-
-  // 详情
-  app.get("/api/follow-up/:id", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const fu = await followUpRepository.getFollowUp(u.companyId, request.params.id);
-      if (!fu) throw new NotFoundError("跟进记录");
-      const logs = await followUpRepository.getFollowUpLogs(u.companyId, request.params.id);
-      response.json({ data: { ...fu, logs } });
-    } catch (error) { next(error); }
-  });
-
-  // 获取客户历史认证类型（自动建议）
-  // 返回：
-  // - 从 finance_project.name 解析的认证项目（如 "QES监督一"）
-  // - 从 customer_follow_up.certification_type 字段
-  // - 系统常用类型
-  app.get("/api/follow-up/customer-types/:customerId", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-
-      // 1. 从 finance_project.name 解析（"客户名 | 描述"）
-      const projectNames = await query<{ name: string }>(
-        `SELECT name FROM finance_project
-         WHERE company_id = $1 AND customer_id = $2 AND deleted_at IS NULL`,
-        [u.companyId, request.params.customerId]
-      );
-
-      // 2. 从 customer_follow_up.certification_type
-      const fuTypes = await query<{ certification_type: string }>(
-        `SELECT DISTINCT certification_type FROM customer_follow_up
-         WHERE company_id = $1 AND customer_id = $2
-           AND deleted_at IS NULL AND certification_type IS NOT NULL`,
-        [u.companyId, request.params.customerId]
-      );
-
-      // 解析：取 "|" 后部分，去重
-      const suggestions = new Set<string>();
-      // 系统常用
-      const commonTypes = ["QES", "Q", "E", "S", "27001", "14001", "45001", "HACCP", "50430"];
-      commonTypes.forEach(t => suggestions.add(t));
-      // 跟进表的认证类型
-      fuTypes.rows.forEach(r => {
-        if (r.certification_type) suggestions.add(r.certification_type.trim());
-      });
-      // 项目名称解析
-      projectNames.rows.forEach(r => {
-        const name = r.name;
-        if (!name) return;
-        // "客户名 | 描述" 格式
-        const parts = name.split("|");
-        if (parts.length > 1) {
-          const desc = parts[1].trim();
-          // 提取"QES监督一" → 加 "QES监督一" + "QES"
-          if (desc) suggestions.add(desc);
-          // 提取开头的字母 + 数字组合
-          const prefixMatch = desc.match(/^([A-Z]+)/);
-          if (prefixMatch) suggestions.add(prefixMatch[1]);
-        }
-      });
-
-      response.json({
-        data: Array.from(suggestions).sort()
-      });
-    } catch (error) { next(error); }
-  });
-
-  // 列出审核计划模板
-  app.get("/api/audit-templates", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const templates = await listAuditTemplates(u.companyId);
-      response.json({ data: templates });
-    } catch (error) { next(error); }
-  });
-
-  // 根据跟进 ID 找审核计划
-  app.get("/api/follow-up/:id/audit-plan", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const r = await query<any>(
-        `SELECT s.*, count(i.id) AS item_count
-         FROM audit_session s
-         LEFT JOIN audit_checklist_item i ON i.session_id = s.id
-         WHERE s.follow_up_id = $1 AND s.company_id = $2
-         GROUP BY s.id`,
-        [request.params.id, u.companyId]
-      );
-      response.json({ data: r.rows });
-    } catch (error) { next(error); }
-  });
-
-  // 创建
-  app.post("/api/follow-up", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      if (!body.customerId) throw new ValidationError("客户必填");
-      const created = await followUpRepository.createFollowUp(u.companyId, {
-        customerId: body.customerId as string,
-        projectId: (body.projectId as string) || null,
-        certificationType: (body.certificationType as string) || null,
-        stage: (body.stage as string) || "expired",
-        year: body.year ? Number(body.year) : new Date().getFullYear(),
-        expectedDate: (body.expectedDate as string) || null,
-        expectedAmount: body.expectedAmount ? Number(body.expectedAmount) : null,
-        contractAmount: body.contractAmount ? Number(body.contractAmount) : null,
-        notes: (body.notes as string) || null,
-        metadata: body.metadata || null,
-        ownerUserId: (body.ownerUserId as string) || u.id
-      });
-      response.status(201).json({ data: created });
-    } catch (error) { next(error); }
-  });
-
-  // 更新基础信息
-  app.patch("/api/follow-up/:id", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      const allowedKeys = ["projectId", "certificationType", "year", "expectedDate", "expectedAmount", "contractAmount", "notes", "metadata", "ownerUserId"];
-      const update: Record<string, unknown> = {};
-      for (const k of allowedKeys) {
-        if (k in body) update[k] = body[k];
-      }
-      const updated = await followUpRepository.updateFollowUp(u.companyId, request.params.id, update);
-      if (!updated) throw new NotFoundError("跟进记录");
-      response.json({ data: updated });
-    } catch (error) { next(error); }
-  });
-
-  // 推进阶段
-  app.post("/api/follow-up/:id/advance", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      if (!body.stage) throw new ValidationError("目标阶段必填");
-      const updated = await followUpRepository.advanceStage(
-        u.companyId,
-        request.params.id,
-        body.stage as string,
-        (body.notes as string) || null,
-        u.id
-      );
-      if (!updated) throw new NotFoundError("跟进记录");
-
-      // 🎯 联动：跟进到关键阶段时自动创建/同步 certification_project
-      // 映射：quoted→lead, contract_review→contract_pending, implementing→contract_signed,
-      //      correcting→correcting, cert_pending→cert_pending, certified→certified, completed→completed
-      let syncedProject = null;
-      const STAGE_TO_PROJECT_STATUS: Record<string, string> = {
-        quoted: "lead",
-        contract_review: "contract_pending",
-        implementing: "contract_signed",
-        correcting: "correcting",
-        cert_pending: "cert_pending",
-        certified: "certified",
-        completed: "completed"
-      };
-      if (STAGE_TO_PROJECT_STATUS[body.stage as string] && updated.customerId) {
-        try {
-          syncedProject = await syncFollowUpToProject({
-            companyId: u.companyId,
-            customerId: updated.customerId,
-            customerName: updated.customerName || "(未知客户)",
-            serviceTypeCode: updated.certificationType === "QES" || updated.certificationType === "QEs" ? "bundle"
-                            : updated.certificationType === "Q" ? "certification"
-                            : "certification",
-            targetStatus: STAGE_TO_PROJECT_STATUS[body.stage as string],
-            expectedAmount: updated.expectedAmount ? Number(updated.expectedAmount) : undefined,
-            contractAmount: updated.contractAmount ? Number(updated.contractAmount) : undefined,
-            notes: `从客户跟进自动创建（跟进 ID: ${request.params.id}, 阶段: ${body.stage}）`,
-            operatorId: u.id,
-            year: updated.year
-          });
-        } catch (e) {
-          console.warn("[sync-followup-project] failed (non-fatal):", e instanceof Error ? e.message : e);
-        }
-      }
-
-      // 🎯 自动生成审核计划：当推进到"项目实施"阶段时
-      let auditPlan = null;
-      if ((body.stage as string) === "implementing") {
-        try {
-          const cert = updated.certificationType || "QES";
-            // 标准映射
-            const stdMap: Record<string, string[]> = {
-              "QES": ["iso9001","iso14001","iso45001"],
-              "Q":   ["iso9001"],
-              "E":   ["iso14001"],
-              "S":   ["iso45001"],
-              "27001": ["iso27001"],
-              "14001": ["iso14001"],
-              "45001": ["iso45001"],
-            };
-            const standards = stdMap[cert] || stdMap["QES"];
-            auditPlan = await autoGenerateAuditPlan({
-              followUpId: request.params.id,
-              companyId: u.companyId,
-              customerName: updated.customerName || "(未知客户)",
-              industry: undefined,
-              employeeCount: undefined,
-              auditType: "initial",
-              standards,
-              certificationType: cert,
-              createdBy: u.id
-            });
-            console.log(
-              `[auto-audit] follow_up=${request.params.id} → session=${auditPlan.sessionId} ` +
-              `(template=${auditPlan.templateCode}, items=${auditPlan.itemCount}, existed=${auditPlan.alreadyExisted})`
-            );
-        } catch (e) {
-          console.warn("[auto-audit] failed (non-fatal):", e instanceof Error ? e.message : e);
-        }
-      }
-
-      response.json({ data: updated, auditPlan, syncedProject });
-    } catch (error) { next(error); }
-  });
-
-  // 关闭跟进（必须填写原因）
-  app.post("/api/follow-up/:id/close", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      const reason = (body.closeReason as string || "").trim();
-      const notes = (body.closeNotes as string || "").trim();
-
-      if (!reason) throw new ValidationError("关闭原因必填");
-      if (!notes) throw new ValidationError("详细说明必填");
-
-      // 有效原因
-      const validReasons = [
-        "certified_and_delivered",
-        "customer_declined",
-        "price_too_high",
-        "unable_to_contact",
-        "customer_lost",
-        "competitor_chosen",
-        "duplicate",
-        "other"
-      ];
-      if (!validReasons.includes(reason)) {
-        throw new ValidationError(`关闭原因必须是以下之一：${validReasons.join(", ")}`);
-      }
-
-      const updated = await query<any>(
-        `UPDATE customer_follow_up
-         SET stage = 'completed',
-             is_archived = true,
-             archived_at = NOW(),
-             close_reason = $1,
-             closed_at = NOW(),
-             closed_by = $2,
-             notes = COALESCE(notes || ' / ', '') || $3,
-             updated_at = NOW()
-         WHERE company_id = $4 AND id = $5 AND deleted_at IS NULL
-         RETURNING *`,
-        [reason, u.id, `关闭原因(${reason}): ${notes}`, u.companyId, request.params.id]
-      );
-      if (updated.rows.length === 0) throw new NotFoundError("跟进记录");
-
-      response.json({ data: updated.rows[0] });
-    } catch (error) { next(error); }
-  });
-
-  // 删除
-  app.delete("/api/follow-up/:id", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const ok = await followUpRepository.deleteFollowUp(u.companyId, request.params.id);
-      if (!ok) throw new NotFoundError("跟进记录");
-      response.json({ data: { id: request.params.id, deleted: true } });
-    } catch (error) { next(error); }
-  });
-
-  // 年度归档
-  app.post("/api/follow-up/archive-year/:year", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const year = parseInt(request.params.year, 10);
-      const count = await followUpRepository.archiveYear(u.companyId, year);
-      response.json({ data: { year, archived_count: count } });
-    } catch (error) { next(error); }
-  });
-
-  // 为客户在某年自动创建跟进
-  app.post("/api/follow-up/ensure-for-customer", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      if (!body.customerId) throw new ValidationError("客户必填");
-      const year = body.year ? Number(body.year) : new Date().getFullYear();
-      const created = await followUpRepository.ensureCustomerForForYear(
-        u.companyId,
-        body.customerId as string,
-        year,
-        {
-          certificationType: (body.certificationType as string) || null,
-          expectedDate: (body.expectedDate as string) || null,
-          issuingBody: (body.issuingBody as string) || "zhongren"
-        }
-      );
-      response.status(201).json({ data: created });
-    } catch (error) { next(error); }
-  });
-
-  // 批量为客户在某年创建跟进（客户 ID 数组）
-  app.post("/api/follow-up/batch-ensure", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      const customerIds = (body.customerIds as string[]) || [];
-      if (customerIds.length === 0) throw new ValidationError("请选择至少一个客户");
-      const year = body.year ? Number(body.year) : new Date().getFullYear();
-      const certificationType = (body.certificationType as string) || null;
-      const issuingBody = (body.issuingBody as string) || "zhongren";
-
-      const created: any[] = [];
-      const skipped: string[] = [];
-
-      for (const cid of customerIds) {
-        try {
-          const fu = await followUpRepository.ensureCustomerForForYear(
-            u.companyId,
-            cid,
-            year,
-            { certificationType, issuingBody }
-          );
-          created.push(fu);
-        } catch (e: any) {
-          if (e.code === "23505" || /duplicate key/i.test(String(e.message))) {
-            skipped.push(cid);
-          } else {
-            throw e;
-          }
-        }
-      }
-      response.status(201).json({ data: { created: created.length, skipped: skipped.length, items: created } });
-    } catch (error) { next(error); }
-  });
-
-  // 从 YoooClaw 通知批量导入跟进
-  // 入参：notifications 数组，每项含 customerName, summary, stage, year, expectedDate, contractAmount, certificationType, issuingBody
-  app.post("/api/follow-up/import-from-notifications", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const body = request.body as Record<string, unknown>;
-      const notifications = (body.notifications as Array<{
-        customerName?: string;
-        customerPhone?: string;
-        stage?: string;
-        year?: number;
-        expectedDate?: string;
-        contractAmount?: number;
-        certificationType?: string;
-        issuingBody?: string;
-        summary?: string;
-        sourceApp?: string;
-        receivedAt?: string;
-      }>) || [];
-
-      if (notifications.length === 0) {
-        throw new ValidationError("通知列表不能为空");
-      }
-
-      const results = {
-        created: [] as any[],
-        updated: [] as any[],
-        skipped: [] as Array<{ customer: string; reason: string }>,
-        newCustomers: 0
-      };
-
-      for (const notif of notifications) {
-        const customerName = (notif.customerName || "").trim();
-        if (!customerName) {
-          results.skipped.push({ customer: "(空)", reason: "客户名为空" });
-          continue;
-        }
-
-        // 1. 找/建客户
-        let customerId: string | null = null;
-        const custRes = await query<{ id: string }>(
-          "SELECT id FROM customer WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1",
-          [u.companyId, customerName]
-        );
-        if (custRes.rows.length > 0) {
-          customerId = custRes.rows[0].id;
-        } else {
-          // 自动建客户
-          const newId = (await query<{ id: string }>(
-            "SELECT uuid_generate_v4() AS id"
-          )).rows[0].id;
-          const codeRes = await query<{ max_code: number }>(
-            "SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code FROM 2) AS INTEGER)), 0) AS max_code FROM customer WHERE company_id = $1 AND customer_code ~ '^C[0-9]+$'",
-            [u.companyId]
-          );
-          const newCode = `C${String((codeRes.rows[0].max_code || 0) + 1).padStart(5, "0")}`;
-          await query(
-            `INSERT INTO customer (id, company_id, customer_code, name, region, status, service_stage, contact_phone, notes, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, '宁夏', 'active', 'potential', $5, $6, NOW(), NOW())`,
-            [
-              newId,
-              u.companyId,
-              newCode,
-              customerName,
-              notif.customerPhone || null,
-              `从 YoooClaw 通知导入${notif.sourceApp ? ` (${notif.sourceApp})` : ""}${notif.summary ? ` - ${notif.summary.slice(0, 200)}` : ""}`
-            ]
-          );
-          customerId = newId;
-          results.newCustomers++;
-        }
-
-        // 2. 找现有跟进（按 customer + year + certType + issuingBody）
-        const year = notif.year || new Date().getFullYear();
-        const certType = notif.certificationType || null;
-        const issuingBody = notif.issuingBody || "zhongren";
-        const existingRes = await query<{ id: string }>(
-          `SELECT id FROM customer_follow_up
-           WHERE company_id = $1 AND customer_id = $2
-             AND year = $3 AND certification_type IS NOT DISTINCT FROM $4
-             AND issuing_body = $5
-             AND deleted_at IS NULL
-           LIMIT 1`,
-          [u.companyId, customerId, year, certType, issuingBody]
-        );
-
-        const stage = notif.stage || "expired";
-
-        if (existingRes.rows.length > 0) {
-          // 更新现有跟进（备注追加）
-          const fuId = existingRes.rows[0].id;
-          await query(
-            `UPDATE customer_follow_up
-             SET notes = COALESCE(notes || ' / ', '') || $1,
-                 expected_date = COALESCE($2, expected_date),
-                 contract_amount = COALESCE($3, contract_amount),
-                 updated_at = NOW()
-             WHERE id = $4`,
-            [
-              `通知(${notif.sourceApp || "?"}): ${(notif.summary || "").slice(0, 200)}`,
-              notif.expectedDate || null,
-              notif.contractAmount ?? null,
-              fuId
-            ]
-          );
-          results.updated.push({ customerId, followUpId: fuId, customerName });
-        } else {
-          // 创建新跟进
-          const fuRes = await query<{ id: string }>(
-            `INSERT INTO customer_follow_up
-              (id, company_id, customer_id, certification_type, issuing_body,
-               stage, year, expected_date, contract_amount, notes, created_at, updated_at)
-             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-             RETURNING id`,
-            [
-              u.companyId,
-              customerId,
-              certType,
-              issuingBody,
-              stage,
-              year,
-              notif.expectedDate || null,
-              notif.contractAmount ?? null,
-              `从 YoooClaw 通知导入${notif.sourceApp ? ` (${notif.sourceApp})` : ""}: ${(notif.summary || "").slice(0, 300)}`
-            ]
-          );
-          results.created.push({ customerId, followUpId: fuRes.rows[0].id, customerName });
-        }
-      }
-
-      response.status(201).json({ data: results });
-    } catch (error) { next(error); }
-  });
 
   // ============================================================
   // Todo (待办) 模块
@@ -1815,52 +1305,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   });
 
   // 从财务历史自动生成跟进（用 last_service_at 推断）
-  app.post("/api/follow-up/auto-from-history", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const year = request.query.year ? parseInt(request.query.year as string, 10) : new Date().getFullYear();
-      const limit = Math.min(parseInt((request.query.limit as string) || "50"), 500);
-
-      // 找所有去年（year-1）有交易的客户
-      const customers = await query<{
-        customer_id: string;
-        customer_name: string;
-        last_service_at: string;
-        service_count: string;
-      }>(
-        `SELECT id AS customer_id, name AS customer_name,
-                last_service_at, service_count
-         FROM customer
-         WHERE company_id = $1
-           AND deleted_at IS NULL
-           AND last_service_at IS NOT NULL
-           AND EXTRACT(YEAR FROM last_service_at) = $2
-         ORDER BY last_service_at DESC
-         LIMIT $3`,
-        [u.companyId, year - 1, limit]
-      );
-
-      let created = 0;
-      const items: any[] = [];
-      for (const c of customers.rows) {
-        try {
-          const fu = await followUpRepository.ensureCustomerForForYear(
-            u.companyId,
-            c.customer_id,
-            year,
-            { certificationType: null, expectedDate: c.last_service_at, issuingBody: "zhongren" }
-          );
-          items.push(fu);
-          created++;
-        } catch (e: any) {
-          if (!/duplicate/i.test(String(e.message))) {
-            // 跳过重复，其他继续
-          }
-        }
-      }
-      response.json({ data: { scanned: customers.rows.length, created, items } });
-    } catch (error) { next(error); }
-  });
 
   // ============== 应收账款 (AR) ==============
 
@@ -2479,7 +1923,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
 
   // ====== 认证报价导出 DOCX ======
 
-
   app.get("/api/templates/enterprise-solution.docx", async (_request, response, next) => {
     try {
       const branding = enterpriseTemplateBranding();
@@ -2498,7 +1941,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
       next(error);
     }
   });
-
 
   app.get("/api/templates/digital-transformation-solution.pptx", async (_request, response, next) => {
     try {
@@ -2835,7 +2277,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
     "auditor_level", "multiplier", "sort_order", "status", "created_by"
   ], "sort_order");
 
-
   // ============================================================
   // V2.2：合同管理路由（15 个端点）
   // ============================================================
@@ -2958,7 +2399,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
       });
     }
   });
-
 
   return app;
 }
