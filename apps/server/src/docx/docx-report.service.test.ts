@@ -7,7 +7,7 @@ import {
   generateQuoteDocx
 } from "./docx-report.service.js";
 import { generateQuote } from "../certification/quote.service.js";
-import { quoteExportPayloadSchema } from "../app.js";
+import { quoteExportPayloadSchema } from "../certification/quote-export.schema.js";
 
 describe("generateConsultationDocx", () => {
   it("生成包含正文、样式、页眉和页脚的原生 Open XML 文档", async () => {

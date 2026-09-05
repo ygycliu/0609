@@ -16,6 +16,8 @@ import { createFilesRouter } from "./routes/files.routes.js";
 import { createAuthRouter } from "./routes/auth.routes.js";
 import { createProjectsRouter } from "./routes/projects.routes.js";
 import { createCustomersRouter } from "./routes/customers.routes.js";
+import { createCertificationRouter } from "./routes/certification.routes.js";
+import { createCertificatesRouter } from "./routes/certificates.routes.js";
 import { ConsultationService } from "./consultations/consultation.service.js";
 import { extractDocumentText } from "./documents/document.service.js";
 import { ofdBufferToDocxBuffer } from "./docx/ofd-to-docx.js";
@@ -56,6 +58,7 @@ import { createLogger } from "./shared/logger.js";
 import { query } from "./db/pool.js";
 import type { EmployeeRole, ModelProvider } from "./shared/types.js";
 import { generateQuote, getAvailableCertifications, INDUSTRY_OPTIONS, RISK_LEVEL_OPTIONS } from "./certification/quote.service.js";
+// V2.0：quote export schema extracted to standalone module (routes/certification.routes.ts uses it)
 import { getVersionInfo } from "./version/version.service.js";
 
 const logger = createLogger();
@@ -96,49 +99,7 @@ const pptxExportSchema = z.object({
   includeReferences: z.boolean().default(true)
 });
 
-export const quoteExportPayloadSchema = z.object({
-  companyName: z.string().trim().min(1).max(100),
-  companyContext: z.string().trim().max(1000).optional().default(""),
-  quote: z.object({
-    companyName: z.string(),
-    industry: z.string(),
-    employeeCount: z.number(),
-    certifications: z.array(z.object({
-      certId: z.string(),
-      certName: z.string(),
-      basePrice: z.number(),
-      industryFactor: z.number(),
-      adjustedBase: z.number(),
-      initialAuditDays: z.number(),
-      supervisionAuditDays: z.number(),
-      recertificationAuditDays: z.number(),
-      auditorLevel: z.enum(["中级", "高级"])
-    })),
-    sizeFactor: z.number(),
-    sizeTier: z.string(),
-    subtotal: z.number(),
-    afterSizeFactor: z.number(),
-    bundleDiscount: z.number(),
-    bundleTier: z.string(),
-    initialPrice: z.number(),
-    supervisionPrice: z.number(),
-    expertReviewFee: z.number(),
-    groupLeaderFee: z.number(),
-    professionalSubsidy: z.number(),
-    expertCount: z.number(),
-    managementAnnualFee: z.number(),
-    basePrice: z.number(),
-    taxFee: z.number(),
-    businessManagementFee: z.number(),
-    finalPrice: z.number(),
-    totalAuditDays: z.number(),
-    standardCount: z.number(),
-    priceIncludes: z.array(z.string()),
-    priceExcludes: z.array(z.string()),
-    estimatedAuditDays: z.number(),
-    generatedAt: z.string()
-  })
-});
+// quoteExportPayloadSchema moved to ./certification/quote-export.schema.js (used by routes/certification.routes.ts)
 
 function encodedFileName(value: string, extension: "docx" | "pptx") {
   const safeName = value.replace(/[\\/:*?"<>|]/g, "-").slice(0, 100) || "咨询报告";
@@ -1315,47 +1276,7 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   });
 
   // ====== 认证专家：报价 API ======
-  app.get("/api/certification/options", (_request, response) => {
-    response.json({
-      data: {
-        industries: INDUSTRY_OPTIONS,
-        riskLevels: RISK_LEVEL_OPTIONS,
-        certifications: getAvailableCertifications()
-      }
-    });
-  });
 
-  app.post("/api/certification/quote", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const parsed = z
-        .object({
-          companyName: z.string().trim().min(1, "请填写企业名称").max(100),
-          industry: z.string().trim().min(1, "请选择企业类型"),
-          employeeCount: z.number().int().min(1, "人数必须 ≥ 1").max(100000),
-          certifications: z.array(z.string().trim().min(1)).min(1, "至少选择一项认证"),
-          riskLevel: z.enum(["medium", "high"]).default("medium"),
-          certificationScope: z.string().trim().max(2000).optional().default(""),
-          expertCount: z.number().int().min(1).max(20).optional().default(1)
-        })
-        .safeParse(request.body);
-      if (!parsed.success) {
-        throw new ValidationError(parsed.error.issues[0]?.message ?? "请求参数无效");
-      }
-      const result = await generateQuote(parsed.data);
-      // 持久化到 DB（DB 不可用时 fallback 到 JSON 文件）
-      let quoteId: string | undefined;
-      try {
-        const rec = await quoteRepository.save(u.companyId, u.id, parsed.data, result);
-        quoteId = rec.id;
-      } catch (err) {
-        console.warn("Quote save failed (non-fatal):", (err as Error).message);
-      }
-      response.json({ data: result, quoteId });
-    } catch (error) {
-      next(error);
-    }
-  });
 
   // 知识库向量检索（基于分块的 embedding 相似度）
   app.post("/api/knowledge/search", async (request, response, next) => {
@@ -1407,14 +1328,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   });
 
   // 历史报价列表
-  app.get("/api/certification/quotes", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      response.json({ data: await quoteRepository.list(u.companyId) });
-    } catch (error) {
-      next(error);
-    }
-  });
 
   app.use("/api/customers", createCustomersRouter({ customerRepository, getUserFromReq }));
 
@@ -1462,6 +1375,13 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
 
   // 【认证项目】
   app.use("/api/projects", createProjectsRouter({ getUserFromReq, projectRepository: projectRepo }));
+
+  // V2.3：认证报价引擎（4 个端点：options/quote/quotes/export-docx）
+  // 必须在全局错误处理（L3458）之前注册，否则 NotFoundError 走不到错误中间件
+  app.use("/api/certification", createCertificationRouter({ getUserFromReq, quoteRepository }));
+
+  // V2.3：证书预警管理（5 个端点：expiring/detail/ack/ack-batch/unack）
+  app.use("/api/certificates", createCertificatesRouter({ getUserFromReq }));
 
   // ============== 财务管理 ==============
 
@@ -3336,40 +3256,6 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   });
 
   // ====== 认证报价导出 DOCX ======
-  app.post("/api/certification/quote/export/docx", async (request, response, next) => {
-    try {
-      const parsed = quoteExportPayloadSchema.safeParse(request.body);
-      if (!parsed.success) {
-        throw new ValidationError(parsed.error.issues[0]?.message ?? "导出参数无效");
-      }
-      const buffer = await generateQuoteDocx(parsed.data.quote, {
-        // 首页显示认证机构信息（固定）
-        companyName: "华中国际认证检验集团有限公司",
-        clientName: parsed.data.companyName,
-        projectName: "认证证书报价",
-        documentTitle: "认证证书报价单",
-        version: "v1.0",
-        preparedBy: "刘军",
-        agencyAddress: "银川国智知识产权服务园201室",
-        agencyContact: "13195086656",
-        confidentiality: "内部",
-        includeToc: false,
-        includeReferences: false
-      });
-      const safeName = `${parsed.data.companyName}-认证报价单.docx`.replace(/[\\/:*?"<>|]/g, "-");
-      response.setHeader(
-        "Content-Type",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      );
-      response.setHeader(
-        "Content-Disposition",
-        `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}`
-      );
-      response.send(buffer);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   app.post("/api/consultations/:id/export/docx", async (request, response, next) => {
     try {
@@ -3815,310 +3701,14 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   });
 
   // V2.0：认证证书预警 API
-  app.get("/api/certificates/expiring", async (request, response, next) => {
-    try {
-      const warningDays = Number((request.query.warning_days as string) || "180");
-      const criticalDays = Number((request.query.critical_days as string) || "60");
-      const includeNormal = (request.query.include_normal as string) !== "0";  // 默认含"正常"
-      
-      // V2.0：通过 vw_certificate_expiry_alerts 视图查询（含 4 阶段信息）
-      // 默认返回全部证书，前端可筛选
-      const whereClause = includeNormal 
-        ? "" 
-        : "WHERE urgency_level != '正常'";
-      
-      const r = await query(
-        `SELECT * FROM vw_certificate_expiry_alerts ${whereClause}`
-      );
-      // 统计（基于全部证书视图，包含正常）
-      const allStats = await query(`SELECT urgency_level, COUNT(*) AS cnt FROM vw_certificate_expiry_alerts GROUP BY urgency_level`);
-      const statsMap: Record<string, number> = {};
-      for (const row of allStats.rows) {
-        statsMap[row.urgency_level] = Number(row.cnt);
-      }
-      
-      const stats = {
-        total: Object.values(statsMap).reduce((a: number, b: number) => a + b, 0),
-        expired: statsMap['已过期'] || 0,
-        recert_critical: statsMap['再认证紧急'] || 0,
-        recert_warning: statsMap['再认证预警'] || 0,
-        expiring_soon: statsMap['即将到期'] || 0,
-        normal: statsMap['正常'] || 0,
-        warning_days: warningDays,
-        critical_days: criticalDays
-      };
-      response.json({ data: { stats, certificates: r.rows } });
-    } catch (error) { next(error); }
-  });
 
   // V2.0：单证书详情
-  app.get("/api/certificates/:id", async (request, response, next) => {
-    try {
-      const r = await query(
-        `SELECT pc.*, cp.customer_name, cp.project_code
-         FROM project_certificate pc
-         JOIN certification_project cp ON cp.id = pc.project_id
-         WHERE pc.id = $1 AND pc.deleted_at IS NULL`,
-        [request.params.id]
-      );
-      if (r.rows.length === 0) throw new NotFoundError("证书");
-      response.json({ data: r.rows[0] });
-    } catch (error) { next(error); }
-  });
 
   // V2.0：标记证书为"已处理"（仅 status 备注，不删除）
-  app.patch("/api/certificates/:id/acknowledge", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const note = ((request.body as any)?.note || "") as string;
-      const userId = (u as any).userId || (u as any).id || null;
-
-      // 1. 查询证书信息（含客户 + 阶段）
-      const certInfo = await query(
-        `SELECT pc.id, pc.cert_type, pc.certificate_no, pc.valid_until,
-                cp.customer_id, cp.customer_name, cp.company_id
-         FROM project_certificate pc
-         JOIN certification_project cp ON cp.id = pc.project_id
-         WHERE pc.id = $1 AND pc.deleted_at IS NULL`,
-        [request.params.id]
-      );
-      if (certInfo.rows.length === 0) throw new NotFoundError("证书");
-      const cert = certInfo.rows[0];
-
-      // 2. 查询阶段信息（决定模式：推送代办 vs 隐藏）
-      const stageInfo = await query(
-        `SELECT current_stage, next_stage, next_stage_date, days_until_next, urgency_level
-         FROM certificate_next_stage($1::date, $2::date, $3)`,
-        [(await query(`SELECT issue_date FROM project_certificate WHERE id = $1`, [request.params.id])).rows[0]?.issue_date,
-         cert.valid_until,
-         cert.cert_type]
-      );
-      const stage = stageInfo.rows[0] || {
-        current_stage: null, next_stage: '再认证', urgency_level: 'NORMAL'
-      };
-
-      // 3. 推送代办（如果是紧急/已过期/再认证紧急 → 创建 todo）
-      //    紧急模式 = RENEW + CRITICAL → 推送代办
-      const shouldPushTodo = ['RENEW', 'CRITICAL'].includes(stage.urgency_level);
-      let todoId: string | null = null;
-
-      if (shouldPushTodo) {
-        // 安全格式化日期为 YYYY-MM-DD
-        function toDateOnly(v: any): string {
-          if (!v) return '';
-          if (typeof v === 'string') return v.split('T')[0].split(' ')[0];
-          if (v instanceof Date) {
-            const y = v.getFullYear();
-            const m = String(v.getMonth() + 1).padStart(2, '0');
-            const d = String(v.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-          }
-          return String(v).split('T')[0];
-        }
-        const rawDate = toDateOnly(stage.next_stage_date || cert.valid_until);
-        const dueDate = (stage.days_until_next && stage.days_until_next < 0)
-          ? new Date().toISOString()
-          : (rawDate ? new Date(rawDate + 'T09:00:00').toISOString() : new Date().toISOString());
-        const priority = stage.urgency_level === 'RENEW' ? 'urgent' : 'high';
-
-        const todoInsert = await query(
-          `INSERT INTO todo (
-            company_id, owner_user_id, title, description,
-            category, source, source_ref, due_at, remind_at,
-            status, priority, customer_id, metadata, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
-          RETURNING id`,
-          [
-            cert.company_id,
-            userId,
-            `🔔 证书${stage.next_stage || '再认证'}：${cert.customer_name} - ${cert.cert_type}`,
-            `客户【${cert.customer_name}】\n` +
-            `当前阶段：${stage.current_stage || '已过期'}\n` +
-            `下一阶段：${stage.next_stage || '再认证'}\n` +
-            `证书号：${cert.certificate_no}\n` +
-            `证书类型：${cert.cert_type}\n` +
-            `有效期至：${cert.valid_until}\n\n` +
-            `已由 ${(u as any).username || 'admin'} 推送处理。${note ? '\n备注：' + note : ''}`,
-            'general',
-            'cert_acknowledge',
-            request.params.id,
-            dueDate,
-            new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-            'pending',
-            priority,
-            cert.customer_id,
-            JSON.stringify({
-              cert_id: cert.id,
-              next_stage: stage.next_stage,
-              valid_until: cert.valid_until,
-              urgency_level: stage.urgency_level,
-              acknowledged_by: userId
-            })
-          ]
-        );
-        todoId = todoInsert.rows[0]?.id || null;
-      }
-
-      // 4. 标记证书为已确认（会被视图过滤掉）
-      await query(
-        `UPDATE project_certificate
-         SET acknowledged_at = NOW(),
-             acknowledged_by = $1,
-             acknowledged_note = $2
-         WHERE id = $3 AND deleted_at IS NULL`,
-        [userId, note || null, request.params.id]
-      );
-
-      response.json({
-        data: {
-          id: request.params.id,
-          acknowledged: true,
-          todo_created: !!todoId,
-          mode: shouldPushTodo ? 'push_todo' : 'hidden',
-          next_stage: stage.next_stage,
-          urgency_level: stage.urgency_level
-        }
-      });
-    } catch (error) { next(error); }
-  });
 
   // V2.0：批量确认证书
-  app.post("/api/certificates/acknowledge-batch", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      const { certificate_ids, note } = (request.body as any) || {};
-      const userId = (u as any).userId || (u as any).id || null;
-      
-      if (!Array.isArray(certificate_ids) || certificate_ids.length === 0) {
-        response.status(400).json({ code: "BAD_REQUEST", message: "❌ certificate_ids 必须是非空数组" });
-        return;
-      }
-      
-      let pushCount = 0, hiddenCount = 0;
-      
-      for (const certId of certificate_ids) {
-        try {
-          // 查询证书
-          const certInfo = await query(
-            `SELECT pc.id, pc.cert_type, pc.certificate_no, pc.valid_until, pc.issue_date,
-                    cp.customer_id, cp.customer_name, cp.company_id
-             FROM project_certificate pc
-             JOIN certification_project cp ON cp.id = pc.project_id
-             WHERE pc.id = $1 AND pc.deleted_at IS NULL`,
-            [certId]
-          );
-          if (certInfo.rows.length === 0) continue;
-          const cert = certInfo.rows[0];
-          
-          // 阶段判断
-          const stageInfo = await query(
-            `SELECT current_stage, next_stage, next_stage_date, days_until_next, urgency_level
-             FROM certificate_next_stage($1::date, $2::date, $3)`,
-            [cert.issue_date, cert.valid_until, cert.cert_type]
-          );
-          const stage = stageInfo.rows[0] || { urgency_level: 'NORMAL' };
-          
-          const shouldPushTodo = ['RENEW', 'CRITICAL'].includes(stage.urgency_level);
-          
-          // 推送 todo
-          if (shouldPushTodo) {
-            function toDateOnly(v: any): string {
-              if (!v) return '';
-              if (typeof v === 'string') return v.split('T')[0].split(' ')[0];
-              if (v instanceof Date) {
-                const y = v.getFullYear();
-                const m = String(v.getMonth() + 1).padStart(2, '0');
-                const d = String(v.getDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
-              }
-              return String(v).split('T')[0];
-            }
-            const rawDate = toDateOnly(stage.next_stage_date || cert.valid_until);
-            const dueDate = (stage.days_until_next && stage.days_until_next < 0)
-              ? new Date().toISOString()
-              : (rawDate ? new Date(rawDate + 'T09:00:00').toISOString() : new Date().toISOString());
-            const priority = stage.urgency_level === 'RENEW' ? 'urgent' : 'high';
-            
-            await query(
-              `INSERT INTO todo (
-                company_id, owner_user_id, title, description,
-                category, source, source_ref, due_at, remind_at,
-                status, priority, customer_id, metadata, created_at, updated_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
-              [
-                cert.company_id, userId,
-                `🔔 证书${stage.next_stage || '再认证'}：${cert.customer_name} - ${cert.cert_type}`,
-                `客户【${cert.customer_name}】\n` +
-                `当前阶段：${stage.current_stage || '已过期'}\n` +
-                `下一阶段：${stage.next_stage || '再认证'}\n` +
-                `证书号：${cert.certificate_no}\n` +
-                `证书类型：${cert.cert_type}\n` +
-                `有效期至：${cert.valid_until}\n\n` +
-                `批量推送于 ${(u as any).username || 'admin'}。${note ? '\n备注：' + note : ''}`,
-                'general', 'cert_acknowledge', certId, dueDate,
-                new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-                'pending', priority, cert.customer_id,
-                JSON.stringify({
-                  cert_id: cert.id, urgency_level: stage.urgency_level, batch: true
-                })
-              ]
-            );
-            pushCount++;
-          } else {
-            hiddenCount++;
-          }
-          
-          // 标记已确认
-          await query(
-            `UPDATE project_certificate
-             SET acknowledged_at = NOW(), acknowledged_by = $1, acknowledged_note = $2
-             WHERE id = $3 AND deleted_at IS NULL`,
-            [userId, note || null, certId]
-          );
-        } catch (innerErr) {
-          // 单个失败不影响其他
-          console.error(`acknowledge failed for cert ${certId}:`, innerErr);
-        }
-      }
-      
-      response.json({
-        data: {
-          total: certificate_ids.length,
-          push_count: pushCount,
-          hidden_count: hiddenCount,
-          success: true
-        }
-      });
-    } catch (error) { next(error); }
-  });
 
   // V2.0：撤销确认（恢复显示）
-  app.post("/api/certificates/:id/unacknowledge", async (request, response, next) => {
-    try {
-      const u = getUserFromReq(request);
-      
-      const r = await query(
-        `UPDATE project_certificate
-         SET acknowledged_at = NULL, acknowledged_by = NULL, acknowledged_note = NULL
-         WHERE id = $1 AND deleted_at IS NULL
-         RETURNING id`,
-        [request.params.id]
-      );
-      
-      if (r.rows.length === 0) throw new NotFoundError("证书");
-      
-      // 删除由 acknowledge 创建的关联 todo（清理冗余）
-      await query(
-        `DELETE FROM todo 
-         WHERE source = 'cert_acknowledge' 
-           AND source_ref = $1
-           AND status = 'pending'`,
-        [request.params.id]
-      );
-      
-      response.json({ data: { id: request.params.id, unacknowledged: true } });
-    } catch (error) { next(error); }
-  });
 
   // 单个审核员
   // V2.0：获取证书图片（base64 形式，便于前端预览）
