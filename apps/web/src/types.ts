@@ -24,7 +24,8 @@ export type Page =
   | "template-engine"
   | "cert-expiry"
   | "data-exchange"
-  | "llm-config";
+  | "llm-config"
+  | "help";  // V2.3.8：帮助中心 FAQ
 
 export interface ReviewItem {
   id: string;
@@ -163,6 +164,22 @@ export interface CertificationOptionsResponse {
   industries: string[];
   riskLevels: RiskLevelOption[];
   certifications: CertificationOption[];
+}
+
+// ===== V2.3.8 帮助中心 FAQ =====
+export interface FaqItem {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  tags: string[];
+  error_code: string | null;
+  related_module: string | null;
+  status: "active" | "draft" | "archived";
+  view_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ===== 2.0-MVP 认证项目中心 =====

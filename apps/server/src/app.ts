@@ -17,6 +17,7 @@ import { createAuthRouter } from "./routes/auth.routes.js";
 import { createProjectsRouter } from "./routes/projects.routes.js";
 import { createCustomersRouter } from "./routes/customers.routes.js";
 import { createCertificationRouter } from "./routes/certification.routes.js";
+import { createHelpRouter } from "./routes/help.routes.js";
 import { createCertificatesRouter } from "./routes/certificates.routes.js";
 import { createAuditorRouter } from "./routes/auditor.routes.js";
 import { createAuditorsRouter } from "./routes/auditors.routes.js";
@@ -358,6 +359,9 @@ app.use("/api/files", createFilesRouter({ getUserFromReq, upload }));
   // V2.3：认证报价引擎（4 个端点：options/quote/quotes/export-docx）
   // 必须在全局错误处理（L3458）之前注册，否则 NotFoundError 走不到错误中间件
   app.use("/api/certification", createCertificationRouter({ getUserFromReq, quoteRepository }));
+
+  // V2.3.8：帮助中心 FAQ（6 个端点：faqs/categories, faqs, faqs/:id, faqs PATCH/DELETE）
+  app.use("/api/help", createHelpRouter({ getUserFromReq }));
 
   // V2.3：证书预警管理（5 个端点：expiring/detail/ack/ack-batch/unack）
   app.use("/api/certificates", createCertificatesRouter({ getUserFromReq }));

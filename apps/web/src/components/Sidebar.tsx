@@ -17,6 +17,7 @@ import {
   FileText,
   FolderOpen,
   Activity,
+  HelpCircle,
   History,
   LayoutDashboard,
   ListChecks,
@@ -103,7 +104,8 @@ const navigation: NavGroup[] = [
     items: [
       { id: "knowledge", label: "知识库", icon: BookOpen, color: "#8b5cf6" },
       { id: "knowledge-review", label: "知识审核", icon: ClipboardCheck, color: "#8b5cf6", requireModule: "KNOWLEDGE_REVIEW" },
-      { id: "files", label: "文件浏览", icon: FolderOpen, color: "#8b5cf6" }
+      { id: "files", label: "文件浏览", icon: FolderOpen, color: "#8b5cf6" },
+      { id: "help", label: "帮助中心 FAQ", icon: HelpCircle, color: "#f59e0b" }
     ]
   },
   // 工具（系统基础数据 + 数据导入导出 仅管理员）

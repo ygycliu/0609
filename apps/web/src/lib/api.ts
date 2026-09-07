@@ -843,10 +843,49 @@ export const api = {
     request<Array<{ id: string; version: number; change_summary: string; creator: string | null; created_at: string }>>(
       `/knowledge/${docCode}/versions`
     ),
+  // 知识纠错反馈（提交后进审核流）
+  postFeedback: (docCode: string, input: { isHelpful: boolean; correctContent?: string; comment?: string }) =>
+    request<{ ok: boolean }>(`/knowledge/${docCode}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
   expiringKnowledge: (days = 30) =>
     request<Array<{ doc_code: string; title: string; category: string; effective_to: string; days_remaining: number }>>(
       `/quality/expiring?days=${days}`
     ),
+
+  // ===== Help FAQ (V2.3.8 帮助中心) =====
+  listFaqs: (params?: { q?: string; category?: string; module?: string; tag?: string; status?: string; page?: number; pageSize?: number }) => {
+    const usp = new URLSearchParams();
+    if (params?.q) usp.set("q", params.q);
+    if (params?.category) usp.set("category", params.category);
+    if (params?.module) usp.set("module", params.module);
+    if (params?.tag) usp.set("tag", params.tag);
+    if (params?.status) usp.set("status", params.status);
+    if (params?.page) usp.set("page", String(params.page));
+    if (params?.pageSize) usp.set("pageSize", String(params.pageSize));
+    const qs = usp.toString();
+    return request<{ data: any[]; total: number; page: number; pageSize: number }>(`/help/faqs${qs ? `?${qs}` : ""}`);
+  },
+  listFaqCategories: () =>
+    request<{ data: Array<{ category: string; count: number }> }>(`/help/faqs/categories`),
+  getFaq: (id: string) =>
+    request<{ data: any }>(`/help/faqs/${id}`),
+  createFaq: (input: { category?: string; question: string; answer: string; tags?: string[]; error_code?: string; related_module?: string; status?: string }) =>
+    request<{ data: any }>(`/help/faqs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateFaq: (id: string, input: Partial<{ category: string; question: string; answer: string; tags: string[]; error_code: string | null; related_module: string | null; status: string }>) =>
+    request<{ data: any }>(`/help/faqs/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteFaq: (id: string) =>
+    request<{ data: any }>(`/help/faqs/${id}`, { method: "DELETE" }),
   listSignatories: () => request<{ data: Signatory[] }>("/signatories"),
   listServiceTypes: () => request<{ data: ServiceType[] }>("/service-types"),
   listPartnerOrgs: () => request<{ data: PartnerOrg[] }>("/partner-orgs"),
@@ -915,14 +954,6 @@ export const api = {
   createProjectReview: (projectId: string, input: any) =>
     request<{ data: any }>(`/projects/${projectId}/reviews`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input)
-    }),
-
-  // 知识纠错反馈（提交后进审核流）
-  postFeedback: (docCode: string, input: { isHelpful: boolean; correctContent?: string; comment?: string }) =>
-    request<{ ok: boolean }>(`/knowledge/${docCode}/feedback`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input)
     }),
 

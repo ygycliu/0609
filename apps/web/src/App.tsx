@@ -10,6 +10,7 @@ import { KnowledgeReviewPage } from "./pages/KnowledgeReviewPage";
 import { ConsultPage } from "./pages/ConsultPage";
 import { DocumentsPage } from "./pages/DocumentsPage";
 import { KnowledgePage } from "./pages/KnowledgePage";
+import { HelpPage } from "./pages/HelpPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { SystemEnumPage } from "./pages/SystemEnumPage";
@@ -201,6 +202,9 @@ export default function App() {
         )}
         {page === "certification-quote" && <CertificationQuotePage />}
         {page === "knowledge-review" && <KnowledgeReviewPage currentUser={auth.user} />}
+        {page === "help" && (
+          <HelpPage currentUser={{ ...auth.user, isAdmin: permissions.isAdmin }} />
+        )}
         {page === "knowledge" && (
           <KnowledgePage
             knowledge={knowledge}
