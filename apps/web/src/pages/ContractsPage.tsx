@@ -308,7 +308,7 @@ export default function ContractsPage() {
               onClick={() => setShowAll(s => !s)}
               title={showAll ? "已显示全部合同，点击切换为前 50 条" : `点击一次性显示全部 ${total} 条合同`}
             >
-              {showAll ? "✓ 全部 962 条" : "显示全部"}
+              {showAll ? `✓ 全部 ${total} 条` : `📋 显示全部 ${total} 条`}
             </button>
           </div>
 
