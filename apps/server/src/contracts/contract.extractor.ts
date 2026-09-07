@@ -118,17 +118,34 @@ export async function extractText(
   }
 
   if (fileType === "doc") {
-    // 旧版 .doc
+    // 旧版 .doc: 先 antiword，失败 → libreoffice 转 PDF → OCR
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const execFileAsync = promisify(execFile);
     try {
       const r = await execFileAsync("antiword", [filePath], { timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
-      return { text: r.stdout.trim(), usedOcr: false, errors };
+      const text = r.stdout.trim();
+      if (text.length > 50) return { text, usedOcr: false, errors };
+      errors.push(`antiword returned only ${text.length} chars, try libreoffice`);
     } catch (e: any) {
-      errors.push(`antiword failed: ${e.message}, try OCR`);
-      return await ocrFile(filePath);
+      errors.push(`antiword failed: ${e.message}, try libreoffice`);
     }
+    // V2.3.7 Bug #1: .doc antiword 失败/空白时，先用 libreoffice 转 PDF 再 OCR
+    // 原因：tesseract 不能直接处理 .doc 二进制
+    try {
+      const convertedPdf = await convertDocToPdf(filePath);
+      if (convertedPdf) {
+        const ocrResult = await ocrPdf(convertedPdf);
+        // 清理临时 PDF
+        const { unlink } = await import("node:fs/promises");
+        await unlink(convertedPdf).catch(() => {});
+        return ocrResult;
+      }
+    } catch (e: any) {
+      errors.push(`libreoffice conversion failed: ${e.message}, fallback to direct OCR`);
+    }
+    // 最后兜底：直接 OCR（基本会失败，但保留链路）
+    return await ocrFile(filePath);
   }
 
   if (fileType === "docx") {
@@ -151,6 +168,34 @@ export async function extractText(
 
   errors.push("未知文件类型");
   return { text: "", usedOcr: false, errors };
+}
+
+/**
+ * V2.3.7 Bug #1: 用 libreoffice 把 .doc/.docx 转 .pdf
+ * 用途：当 antiword/mammoth 失败或返回文本太短时，绕过直接 OCR 二进制的死路
+ * @returns 生成的 PDF 路径，失败返回 null
+ */
+async function convertDocToPdf(filePath: string): Promise<string | null> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const { mkdtemp } = await import("node:fs/promises");
+  const path = await import("node:path");
+  const execFileAsync = promisify(execFile);
+  const tmpDir = await mkdtemp("/tmp/contract_doc2pdf_");
+  try {
+    // --headless --convert-to pdf --outdir <dir> <file>
+    await execFileAsync("libreoffice", [
+      "--headless", "--convert-to", "pdf", "--outdir", tmpDir, filePath
+    ], { timeout: 60000, maxBuffer: 1024 * 1024 });
+    const { readdir } = await import("node:fs/promises");
+    const files = await readdir(tmpDir);
+    const pdfFile = files.find(f => f.toLowerCase().endsWith(".pdf"));
+    if (pdfFile) return path.join(tmpDir, pdfFile);
+    return null;
+  } catch (e: any) {
+    console.warn("[convertDocToPdf] libreoffice failed:", e.message);
+    return null;
+  }
 }
 
 /**
@@ -205,11 +250,19 @@ export async function extractContractFields(
 ): Promise<{ extracted: ExtractedContract; confidence: number }> {
   const { generateWithModel } = await import("../models/model.gateway.js");
 
+  // V2.3.7 Bug #2: 合同金额/签字栏经常在末页，之前 slice(0,16000) 截掉
+  // 改为"前 14K + 末 4K"策略：保留开头上下文 + 末页签字栏和金额
+  const HEAD_CHARS = 14000;
+  const TAIL_CHARS = 4000;
+  const truncatedText = text.length > HEAD_CHARS + TAIL_CHARS
+    ? text.slice(0, HEAD_CHARS) + "\n\n[...省略中间内容，重点关注末页签字栏与合同金额...]\n\n" + text.slice(-TAIL_CHARS)
+    : text;
+
   const prompt = `你是一个认证服务行业的合同信息抽取助手。
 
 合同全文：
 """
-${text.slice(0, 16000)}
+${truncatedText}
 """
 
 请严格按 JSON 格式输出（必须是合法 JSON，禁止任何其他文字）：
@@ -236,11 +289,12 @@ ${text.slice(0, 16000)}
 强规则（必须遵守）：
 1. **找不到的字段填 null**，绝不要瞎猜
 2. **日期严格 YYYY-MM-DD**：不完整日期（如 2024-05）填 null，绝不要带 -MM 截断
-3. **金额纯数字**：15000.00 不要 15,000 或 1.5万
+3. **金额纯数字**：15000.00 不要 15,000 或 1.5万；金额单位一般是人民币元
 4. **合同编号在第一页右上/左上角**、也可能在末页签字栏
 5. **联系人/电话在最后一页"经办人/委托代理人/联系人"栏**
 6. **认证体系勾选才填**：质量管理体系=QMS，环境=EMS，职业健康=OHSMS
-7. **只输出 JSON**，禁止 3反引号 + json + 3反引号 标记，禁止解释文字`;
+7. **只输出 JSON**，禁止 3反引号 + json + 3反引号 标记，禁止解释文字
+8. V2.3.7 Bug #2: 重点扫描末页"合同金额/合同总价款/含税金额/人民币大写"等字段——金额经常出现在末页签字栏附近，不是首页`;
 
   const result = await generateWithModel(preferredModel as any, {
     input: {

@@ -193,7 +193,18 @@ export default function ContractsPage() {
     try {
       const r = await importContractFromPdf(f);
       setImportResult(r.data);
-      ToastManager.success(`✅ PDF 已抽取（置信度 ${Math.round(r.data.confidence * 100)}%）`);
+      const conf = Math.round(r.data.confidence * 100);
+      // V2.3.7 Bug #3a: 关键字段空时高显告警，避免静默入库金额=0
+      const missing: string[] = [];
+      if (!r.data.extracted?.甲方客户名) missing.push("甲方客户名");
+      if (!r.data.extracted?.合同编号) missing.push("合同编号");
+      if (r.data.extracted?.合同金额 == null) missing.push("合同金额");
+      if (!r.data.extracted?.签订日期) missing.push("签订日期");
+      if (missing.length === 0) {
+        ToastManager.success(`✅ PDF 已抽取（置信度 ${conf}%）所有关键字段已识别`);
+      } else {
+        ToastManager.warning(`⚠️ AI 抽取置信度 ${conf}%，缺失 ${missing.length} 个关键字段: ${missing.join("、")}，请人工补录`);
+      }
     } catch (e: any) {
       ToastManager.error("导入失败：" + (e?.message || "未知"));
     } finally {
@@ -393,7 +404,16 @@ export default function ContractsPage() {
                     <td>{c.contractType === "main" ? "主合同" : c.contractType === "supplement" ? "补充协议" : c.contractType}</td>
                     <td>{c.customerName || "—"}</td>
                     <td>{c.signingEntityName || "—"}</td>
-                    <td>¥{(c.contractAmount || 0).toLocaleString()}</td>
+                    <td>
+                      {/* V2.3.7 Bug #3c: 金额=0 时给灰底 + 缺失标识，提醒人工补录 */}
+                      <span
+                        className={(!c.contractAmount || c.contractAmount === 0) ? "contract-amount-missing" : "contract-amount"}
+                        title={(!c.contractAmount || c.contractAmount === 0) ? "⚠️ 合同金额缺失，请人工补录" : ""}
+                      >
+                        ¥{(c.contractAmount || 0).toLocaleString()}
+                        {(!c.contractAmount || c.contractAmount === 0) && <span style={{marginLeft:4, fontSize:"11px"}}>⚠️缺失</span>}
+                      </span>
+                    </td>
                     <td>
                       {(c.certificationTypes || []).map(t => (
                         <span key={t} className="status-pill">{t}</span>

@@ -11448,6 +11448,26 @@ textarea:focus {
   padding: 0;
 }
 
+/* ============ V2.3.7 Bug #3c: 合同金额缺失视觉标识 ============ */
+.contract-amount-missing {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border-radius: 4px;
+  border: 1px dashed rgba(245, 158, 11, 0.4);
+  font-weight: 500;
+}
+
+.contract-amount-missing:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.contract-amount {
+  font-weight: 500;
+  color: #1e293b;
+}
+
 /* ============ V2.3.2 结构化合同详情 Modal ============ */
 .contract-detail-overlay {
   position: fixed;
