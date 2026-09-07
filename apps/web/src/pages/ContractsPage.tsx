@@ -94,9 +94,15 @@ export default function ContractsPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<{ status?: string; q?: string }>({});
+  const [filter, setFilter] = useState<{
+    status?: string;
+    q?: string;
+    contract_type?: string;
+    customer_id?: string;
+  }>({});
   const [showAll, setShowAll] = useState(false);  // V2.3.4：是否显示全部合同（默认 50 条）
   const [stats, setStats] = useState<any>(null);
+  const [customers, setCustomers] = useState<any[]>([]);  // V2.3.7：合同页客户下拉
 
   // PDF 导入
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -152,6 +158,14 @@ export default function ContractsPage() {
     } catch (e) { /* ignore */ }
   };
 
+  // V2.3.7：拉客户列表用于「按客户查询」下拉（一次拉最多 1000 个）
+  const loadCustomers = async () => {
+    try {
+      const r = await api.listCustomers({ limit: 1000 });
+      setCustomers(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+
   const loadBatches = async () => {
     try {
       const r = await api.listImportBatches();
@@ -162,6 +176,7 @@ export default function ContractsPage() {
   useEffect(() => {
     loadContracts();
     loadStats();
+    loadCustomers();
   }, [filter, showAll]);
 
   useEffect(() => {
@@ -300,6 +315,31 @@ export default function ContractsPage() {
               <option value="completed">已完成</option>
               <option value="terminated">已终止</option>
               <option value="archived">归档</option>
+            </select>
+            {/* V2.3.7：按合同类型查询 */}
+            <select
+              value={filter.contract_type || ""}
+              onChange={e => setFilter({ ...filter, contract_type: e.target.value || undefined })}
+              className="toolbar-select"
+              title="按合同类型查询"
+            >
+              <option value="">全部合同类型</option>
+              <option value="main">主合同</option>
+              <option value="supplement">补充协议</option>
+              <option value="change">合同变更</option>
+              <option value="terminate">合同终止</option>
+            </select>
+            {/* V2.3.7：按客户查询 */}
+            <select
+              value={filter.customer_id || ""}
+              onChange={e => setFilter({ ...filter, customer_id: e.target.value || undefined })}
+              className="toolbar-select"
+              title="按客户查询"
+            >
+              <option value="">全部客户</option>
+              {customers.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </select>
             <span className="muted">共 {total} 条</span>
             {/* V2.3.4：显示全部按钮 — 取消 50 条限制，一次性看 962 条 */}
