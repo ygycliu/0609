@@ -37,9 +37,49 @@ data/                     上传文件、模板和兼容数据（运行时生成
 
 正式试用环境以 PostgreSQL 为业务数据源，并使用 pgvector 保存知识分块向量。仓储层仍保留旧 JSON 兼容路径，生产环境应保持数据库可用并逐步移除共享 JSON 回退。
 
+## 环境要求
+
+### 必备软件
+
+| 组件 | 版本要求 | 说明 |
+| --- | --- | --- |
+| Node.js | 20 或更高版本 | 运行时与构建环境一致，Docker 镜像基于 `node:20-bookworm-slim` |
+| npm | 10 或更高版本 | 仓库使用 npm workspaces 管理 `apps/*`，锁文件为 `package-lock.json` |
+| PostgreSQL | 15 或更高版本 | 业务数据源；知识向量依赖 `pgvector` 扩展，镜像使用 `pgvector/pgvector:pg16` |
+
+开发与生产可任选一条路径：
+
+- **本地 Node 运行**：直接安装上述组件，按 [本地运行](#本地运行) 启动。
+- **容器运行**：需要 Docker Engine 20.10 以上与 Docker Compose v2（`docker compose` 命令），详见 `DOCKER.md`。
+
+### 数据库
+
+- 正式环境以 PostgreSQL 为业务数据源。知识分块向量依赖 `pgvector` 扩展，`data/migrations/001_initial.sql` 会创建 `embedding vector(1024)` 列与 HNSW/IVFFlat 索引，但**不会**自动安装扩展，需先用超级用户执行 `CREATE EXTENSION IF NOT EXISTS vector;`；`pgvector/pgvector:pg16` 镜像已内置该扩展。
+- `data/migrations/` 下的迁移脚本需按文件名字典序依次执行；升级前先备份并在测试库验证。
+- 开发模式未配置 `DATABASE_URL`（或数据库不可达）时，可继续使用内置演示模型；知识仓储层会回退到本地 JSON 兼容存储（`data/knowledge.json`）。生产环境（`NODE_ENV=production`）必须提供 `DATABASE_URL` 与 `JWT_SECRET`，否则服务启动即失败。
+
+### 端口与目录
+
+| 端口 | 用途 | 是否可改 |
+| --- | --- | --- |
+| 5173 | 前端开发服务器（Vite） | `apps/web/vite.config.ts` 中的 `server.port` |
+| 3001 | 后端 API 与健康检查 | `.env` 的 `PORT`，容器下为 `APP_PORT` |
+| 5432 | PostgreSQL | `.env` 的 `DATABASE_URL`，容器下为 `POSTGRES_PORT` |
+
+- `data/`（上传文件、知识 JSON 兼容存储、运行时数据）需要可写权限；容器部署以 `app-data`、`app-uploads`、`app-templates` 三个卷持久化，`templates/` 用于存放可编辑的 DOCX/PPTX 模板。
+- 生产环境运行在 Linux 时，进程必须由 `ai-consulting-center.service`（systemd user service）拉起，直接执行 Node 或 `npm start` 会在监听端口前失败。
+
+### 外部依赖（可选）
+
+- **模型服务**：默认使用内置演示模型，无需任何密钥即可体验完整流程；如需真实模型，可接入 OpenAI 兼容 API 或本地 Ollama，见 [接入模型](#接入模型)。
+- **反向代理**：正式发布建议使用 Apache 或 Nginx 转发 `/ai/` 与 `/ai/api/`，上传限制至少 20MB。
+- **环境变量**：复制 `.env.example` 为 `.env` 并按需修改；真实密码、JWT 密钥、数据库 URI 与模型密钥不得提交到仓库。
+
+生产部署的完整清单见 `DEPLOYMENT.md`。
+
 ## 本地运行
 
-环境要求：Node.js 20 或更高版本。
+需要 Node.js 20 或更高版本、npm 10 或更高版本；数据库为可选项（不配置时使用内置演示模型与本地 JSON 兼容存储）。
 
 ```powershell
 npm install
