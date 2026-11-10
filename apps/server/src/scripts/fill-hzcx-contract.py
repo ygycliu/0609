@@ -320,7 +320,7 @@ def main():
             set_run_text(rs[3], "")
             set_run_text(rs[7], "（√）无（）有")
             normalize_fill_run(rs[1])
-            log.append("有效人数 -> 留空待确认；多场所 -> 无")
+            log.append("有效人数 -> %s；多场所 -> 无" % (headcount.strip() or "留空待确认"))
             break
 
     # ---- 7. 费用明细表
