@@ -53,6 +53,9 @@ DEFAULTS = {
     "bank_name": "招商银行南昌分行铁路支行",
     "bank_account": "7919 0492 5410 401",
     "bank_holder": "华中国际认证检验集团有限公司",
+    "copies_total": "贰",
+    "copies_party_a": "壹",
+    "copies_party_b": "壹",
 }
 
 CN_NUM = {0: "零", 1: "壹", 2: "贰", 3: "叁", 4: "肆", 5: "伍", 6: "陆", 7: "柒", 8: "捌", 9: "玖"}
@@ -386,10 +389,16 @@ def main():
             replace_paragraph(p, bank_lines[t])
             log.append("乙方账户 -> %s" % bank_lines[t])
 
-    # ---- 11. 一式份数
+    # ---- 11. 一式份数（模板留了三处空白：总份数、甲方份数、乙方份数）
     for p in paras:
         if para_text(p).startswith("二十二、本合同一式"):
-            replace_paragraph(p, "二十二、本合同一式　　份，甲方　　份、乙方　　份，均具有同等法律效力。")
+            rs = runs_of(p)
+            # 模板结构：run4=总份数空白, run8=甲方份数空白, run10=乙方份数空白
+            set_run_text(rs[4], cfg["copies_total"])
+            set_run_text(rs[8], cfg["copies_party_a"])
+            set_run_text(rs[10], cfg["copies_party_b"])
+            log.append("合同份数 -> 一式%s份，甲方%s份、乙方%s份" % (
+                cfg["copies_total"], cfg["copies_party_a"], cfg["copies_party_b"]))
             break
 
     blobs["word/document.xml"] = ET.tostring(root, encoding="UTF-8", xml_declaration=True, standalone=True)
