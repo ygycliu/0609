@@ -10,6 +10,9 @@
     python3 fill-hzcx-contract.py <输出.docx> [--data 合同数据.json] [--template 模板.docx]
 
 合同数据 JSON 字段见下方 DEFAULTS；未给出的字段沿用默认值。
+
+合同份数默认「一式贰份，甲方壹份、乙方壹份」，与模板中预填的内容一致；
+模板本身的预填由 set-template-contract-copies.py 完成。
 """
 import argparse
 import copy
@@ -389,11 +392,13 @@ def main():
             replace_paragraph(p, bank_lines[t])
             log.append("乙方账户 -> %s" % bank_lines[t])
 
-    # ---- 11. 一式份数（模板留了三处空白：总份数、甲方份数、乙方份数）
+    # ---- 11. 一式份数（模板三处带下划线的份数位：总份数、甲方份数、乙方份数）
+    # 模板已由 set-template-contract-copies.py 预填「一式贰份，甲方壹份、乙方壹份」，
+    # 这里按 --data 重新写一遍，模板为空或已填都能得到同样的结果。
     for p in paras:
         if para_text(p).startswith("二十二、本合同一式"):
             rs = runs_of(p)
-            # 模板结构：run4=总份数空白, run8=甲方份数空白, run10=乙方份数空白
+            # 模板结构：run4=总份数, run8=甲方份数, run10=乙方份数
             set_run_text(rs[4], cfg["copies_total"])
             set_run_text(rs[8], cfg["copies_party_a"])
             set_run_text(rs[10], cfg["copies_party_b"])
